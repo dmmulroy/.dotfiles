@@ -14,12 +14,6 @@ return {
 
 			-- Progress/Status update for LSP
 			{ "j-hui/fidget.nvim", opts = {} },
-
-			-- Install lsp autocompletions
-			"hrsh7th/cmp-nvim-lsp",
-
-			-- Progress/Status update for LSP
-			{ "j-hui/fidget.nvim", opts = {} },
 		},
 		config = function()
 			local map_lsp_keybinds = require("user.keymaps").map_lsp_keybinds -- Has to load keymaps before pluginslsp
