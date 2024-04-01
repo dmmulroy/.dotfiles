@@ -80,7 +80,9 @@ return {
 				bashls = {},
 				cssls = {},
 				gleam = {},
-				eslint = {},
+				eslint = {
+					cmd = { "vscode-eslint-language-server", "--stdio", "--max-old-space-size=12288" },
+				},
 				html = {},
 				jsonls = {},
 				lua_ls = {
@@ -108,7 +110,7 @@ return {
 				tailwindcss = {},
 				tsserver = {
 					settings = {
-						maxTsServerMemory = 12000,
+						maxTsServerMemory = 12288,
 					},
 					handlers = {
 						["textDocument/publishDiagnostics"] = vim.lsp.with(
@@ -144,6 +146,7 @@ return {
 			-- Iterate over our servers and set them up
 			for name, config in pairs(servers) do
 				require("lspconfig")[name].setup({
+					cmd = config.cmd,
 					capabilities = capabilities,
 					filetypes = config.filetypes,
 					handlers = vim.tbl_deep_extend("force", {}, default_handlers, config.handlers or {}),
