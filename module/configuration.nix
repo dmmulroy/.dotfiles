@@ -21,6 +21,9 @@
   environment = {
     shells = [pkgs.zsh pkgs.fish];
     loginShell = pkgs.fish;
+    systemPackages = [
+      pkgs.gnused
+    ];
   };
 
   programs.fish.enable = true;

@@ -15,11 +15,14 @@ return {
 					"mason",
 					"notify",
 					"oil",
+					"Oil",
 				},
 				callback = function()
 					vim.b.miniindentscope_disable = true
 				end,
 			})
+
+			vim.api.nvim_set_hl(0, "MiniIndentscopeSymbol", { fg = "#c6a0f6" })
 		end,
 	},
 }
