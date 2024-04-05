@@ -6,9 +6,9 @@ return {
 			require("catppuccin").setup({
 				integrations = {
 					cmp = true,
+					fidget = true,
 					gitsigns = true,
 					harpoon = true,
-					illuminate = true,
 					indent_blankline = {
 						enabled = false,
 						scope_color = "sapphire",
@@ -16,9 +16,8 @@ return {
 					},
 					mason = true,
 					native_lsp = { enabled = true },
+					noice = true,
 					notify = true,
-					nvimtree = true,
-					neotree = true,
 					symbols_outline = true,
 					telescope = true,
 					treesitter = true,
