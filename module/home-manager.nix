@@ -138,8 +138,6 @@ in {
       require('user')
     '';
     extraPackages = [
-      # Alternative lsp for gleam
-      pkgs.glas
       # Included for nil_ls
       pkgs.cargo
       # Included to build telescope-fzf-native.nvim
