@@ -68,7 +68,8 @@ in {
     ];
     aliases = {
       lg = "!fish -c 'git_log_n $argv'";
-      nuke = "git add --all && git stash && git stash clear";
+      nuke = "!git add --all && git stash && git stash clear";
+      fomo = "!git fetch origin main && git rebase origin/main";
     };
     lfs = {
       enable = true;
