@@ -25,11 +25,12 @@
     end
   '';
   rm = ''
-    for f in $argv
-      if not string match -q -- "-" (string sub -l 1 -- $f)
-        mv -f $f /tmp/$f
-      end
+  for f in $argv
+    if not string match -q -- "-" (string sub -l 1 -- $f)
+      set timestamp (date +%s)
+      mv -f $f /tmp/{$f}_$timestamp
     end
+  end
   '';
   vim = ''
     if test (count $argv) -eq 0
