@@ -25,7 +25,7 @@
     end
   '';
   rm = ''
-    for f in $arv
+    for f in $argv
       mv -f $f /tmp/$f
     end
   '';
