@@ -24,6 +24,11 @@
       fd -t f | fzf --header "Open File in Vim" --preview "cat {}" -q "$query" | xargs nvim
     end
   '';
+  rm = ''
+    for f in $arv
+      mv -f $f /tmp/$f
+    end
+  '';
   vim = ''
     if test (count $argv) -eq 0
       nvim .
