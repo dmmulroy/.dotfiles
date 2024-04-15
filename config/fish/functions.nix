@@ -26,7 +26,9 @@
   '';
   rm = ''
     for f in $argv
-      mv -f $f /tmp/$f
+      if not string match -q -- "-" (string sub -l 1 -- $f)
+        mv -f $f /tmp/$f
+      end
     end
   '';
   vim = ''
