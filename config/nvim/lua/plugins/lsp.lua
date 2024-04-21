@@ -111,7 +111,6 @@ return {
 				pyright = {},
 				sqlls = {},
 				tailwindcss = {},
-				terraformls = {},
 				tsserver = {
 					settings = {
 						maxTsServerMemory = 12288,
