@@ -24,14 +24,6 @@
       fd -t f | fzf --header "Open File in Vim" --preview "cat {}" -q "$query" | xargs nvim
     end
   '';
-  rm = ''
-  for f in $argv
-    if not string match -q -- "-" (string sub -l 1 -- $f)
-      set timestamp (date +%s)
-      mv -f $f /tmp/{$f}_$timestamp
-    end
-  end
-  '';
   vim = ''
     if test (count $argv) -eq 0
       nvim .
