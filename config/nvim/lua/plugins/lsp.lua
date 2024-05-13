@@ -78,6 +78,7 @@ return {
 			local servers = {
 				-- LSP Servers
 				bashls = {},
+				biome = {},
 				cssls = {},
 				gleam = {},
 				eslint = {
@@ -85,6 +86,15 @@ return {
 					settings = {
 						format = false,
 					},
+					root_dir = function(filename)
+						local found = require("lspconfig").util.root_pattern(filename)("biome.jsonc")
+
+						if found == nil then
+							return require("lspconfig").eslint.root_dir(filename)
+						end
+
+						return nil
+					end,
 				},
 				html = {},
 				jsonls = {},
@@ -190,9 +200,9 @@ return {
 				lsp_fallback = true,
 			},
 			formatters_by_ft = {
-				javascript = { { "prettierd", "prettier" } },
-				typescript = { { "prettierd", "prettier" } },
-				typescriptreact = { { "prettierd", "prettier" } },
+				javascript = { { "biome", "prettierd", "prettier" } },
+				typescript = { { "biome", "prettierd", "prettier" } },
+				typescriptreact = { { "biome", "prettierd", "prettier" } },
 				lua = { "stylua" },
 			},
 		},
