@@ -21,10 +21,6 @@ return {
 			-- Override tsserver diagnostics to filter out specific messages
 			local messages_to_filter = {
 				"This may be converted to an async function.",
-				"'_Assertion' is declared but never used.",
-				"'__Assertion' is declared but never used.",
-				"The signature '(data: string): string' of 'atob' is deprecated.",
-				"The signature '(data: string): string' of 'btoa' is deprecated.",
 			}
 
 			local function tsserver_on_publish_diagnostics_override(_, result, ctx, config)
@@ -86,15 +82,6 @@ return {
 					settings = {
 						format = false,
 					},
-					root_dir = function(filename)
-						local found = require("lspconfig").util.root_pattern(filename)("biome.jsonc")
-
-						if found == nil then
-							return require("lspconfig").eslint.root_dir(filename)
-						end
-
-						return nil
-					end,
 				},
 				html = {},
 				jsonls = {},
@@ -165,6 +152,7 @@ return {
 					handlers = vim.tbl_deep_extend("force", {}, default_handlers, config.handlers or {}),
 					on_attach = on_attach,
 					settings = config.settings,
+					root_dir = config.root_dir,
 				})
 			end
 
@@ -200,9 +188,9 @@ return {
 				lsp_fallback = true,
 			},
 			formatters_by_ft = {
-				javascript = { { "biome", "prettierd", "prettier" } },
-				typescript = { { "biome", "prettierd", "prettier" } },
-				typescriptreact = { { "biome", "prettierd", "prettier" } },
+				javascript = { { "prettierd", "prettier" } },
+				typescript = { { "prettierd", "prettier" } },
+				typescriptreact = { { "prettierd", "prettier" } },
 				lua = { "stylua" },
 			},
 		},
