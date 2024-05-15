@@ -32,6 +32,9 @@ return {
 						".next",
 					},
 					hidden = true,
+					path_display = {
+						"filename_first",
+					},
 				},
 			})
 
