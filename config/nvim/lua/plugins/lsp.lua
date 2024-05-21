@@ -171,6 +171,7 @@ return {
 			-- Iterate over our servers and set them up
 			for name, config in pairs(servers) do
 				require("lspconfig")[name].setup({
+					autostart = config.autostart,
 					cmd = config.cmd,
 					capabilities = capabilities,
 					filetypes = config.filetypes,
