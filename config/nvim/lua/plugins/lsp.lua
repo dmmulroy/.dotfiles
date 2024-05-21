@@ -78,6 +78,7 @@ return {
 				cssls = {},
 				gleam = {},
 				eslint = {
+					autostart = false,
 					cmd = { "vscode-eslint-language-server", "--stdio", "--max-old-space-size=12288" },
 					settings = {
 						format = false,
