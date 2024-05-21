@@ -224,10 +224,11 @@ in {
       }
     ];
   };
-
   programs.zsh = {
     enable = true;
-    enableAutosuggestions = true;
+    autosuggestion = {
+      enable = true;
+    };
     enableCompletion = true;
     initExtra = ''
       ${builtins.readFile ../config/zsh/functions.zsh}
