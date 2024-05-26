@@ -104,7 +104,11 @@ return {
 					},
 				},
 				marksman = {},
-				ocamllsp = {},
+				ocamllsp = {
+					settings = {
+						inlayHints = true,
+					},
+				},
 				nil_ls = {},
 				pyright = {},
 				sqlls = {},
