@@ -149,6 +149,7 @@ return {
 					},
 				},
 				yamlls = {},
+				svelte = {},
 			}
 
 			local formatters = {

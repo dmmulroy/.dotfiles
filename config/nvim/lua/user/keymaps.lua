@@ -155,6 +155,20 @@ nnoremap("[w", function()
 	vim.api.nvim_feedkeys("zz", "n", false)
 end)
 
+-- Moonlander diagnostic movements --
+
+-- Goto next error diagnostic
+nnoremap(")#", function()
+	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
+	vim.api.nvim_feedkeys("zz", "n", false)
+end)
+
+-- Goto previous error diagnostic
+nnoremap("(*", function()
+	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })
+	vim.api.nvim_feedkeys("zz", "n", false)
+end)
+
 -- Open the diagnostic under the cursor in a float window
 nnoremap("<leader>d", function()
 	vim.diagnostic.open_float({
