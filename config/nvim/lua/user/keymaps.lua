@@ -158,13 +158,13 @@ end)
 -- Moonlander diagnostic movements --
 
 -- Goto next error diagnostic
-nnoremap(")#", function()
+nnoremap(")!", function()
 	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end)
 
 -- Goto previous error diagnostic
-nnoremap("(*", function()
+nnoremap("(|", function()
 	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end)
