@@ -150,6 +150,7 @@ return {
 				},
 				yamlls = {},
 				svelte = {},
+				rust_analyzer = {},
 			}
 
 			local formatters = {
