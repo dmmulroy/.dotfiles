@@ -5,7 +5,7 @@ local tnoremap = require("user.keymap_utils").tnoremap
 local xnoremap = require("user.keymap_utils").xnoremap
 local harpoon_ui = require("harpoon.ui")
 local harpoon_mark = require("harpoon.mark")
--- local conform = require("conform")
+local conform = require("conform")
 local utils = require("user.utils")
 
 local M = {}
@@ -186,9 +186,9 @@ nnoremap("<leader>m", ":MaximizerToggle<cr>")
 nnoremap("<leader>=", "<C-w>=")
 
 -- Press leader f to format
--- nnoremap("<leader>f", function()
--- 	conform.format({ async = true, lsp_fallback = true })
--- end, { desc = "Format the current buffer" })
+nnoremap("<leader>f", function()
+	conform.format({ async = true, lsp_fallback = true })
+end, { desc = "Format the current buffer" })
 
 -- Press leader rw to rotate open windows
 nnoremap("<leader>rw", ":RotateWindows<cr>", { desc = "[R]otate [W]indows" })
