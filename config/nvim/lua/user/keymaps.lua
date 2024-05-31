@@ -186,9 +186,9 @@ nnoremap("<leader>m", ":MaximizerToggle<cr>")
 nnoremap("<leader>=", "<C-w>=")
 
 -- Press leader f to format
-nnoremap("<leader>f", function()
-	conform.format({ async = true, lsp_fallback = true })
-end, { desc = "Format the current buffer" })
+-- nnoremap("<leader>f", function()
+-- 	conform.format({ async = true, lsp_fallback = true })
+-- end, { desc = "Format the current buffer" })
 
 -- Press leader rw to rotate open windows
 nnoremap("<leader>rw", ":RotateWindows<cr>", { desc = "[R]otate [W]indows" })
