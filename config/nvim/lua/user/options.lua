@@ -43,7 +43,7 @@ vim.opt.smartcase = true
 vim.opt.updatetime = 250
 
 -- Set completeopt to have a better completion experience
-vim.opt.completeopt = { "menuone", "noselect", "popup" }
+vim.opt.completeopt = { "menu", "menuone", "noselect" }
 
 -- Enable persistent undo history
 vim.opt.undofile = true
