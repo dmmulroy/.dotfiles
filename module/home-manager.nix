@@ -143,6 +143,8 @@ in {
       pkgs.cargo
       # Included to build telescope-fzf-native.nvim
       pkgs.cmake
+      # Included for LuaSnip
+      pkgs.luajitPackages.jsregexp
     ];
     withNodeJs = true;
     withPython3 = true;
