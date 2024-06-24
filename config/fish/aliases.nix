@@ -8,4 +8,5 @@
   node-shell = "nix shell nixpkgs#{nodejs_21, typescript, nodePackages.pnpm, bun, fnm} && eval $(fnm env)";
   opam-shell = "nix shell nixpkgs#opam --system aarch64-darwin nixpkgs#dune_3 --system aarch64-darwin nixpkgs#ocaml --system aarch64-darwin";
   pn = "pnpm";
+  vi = "vim";
 }
