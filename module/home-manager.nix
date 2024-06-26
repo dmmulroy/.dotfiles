@@ -19,6 +19,8 @@ in {
     ripgrep
     tree
     wget
+    graphite-cli
+    gh
   ];
 
   programs.direnv = {
@@ -35,6 +37,7 @@ in {
       set fish_greeting # Disable greeting
 
       ${builtins.readFile ../config/fish/catppuccin_macchiato_theme.fish}
+      ${builtins.readFile ../config/fish/graphite.fish}
     '';
     functions = import ../config/fish/functions.nix;
     plugins = [
