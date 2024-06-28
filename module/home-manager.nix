@@ -8,7 +8,7 @@
 in {
   # https://mipmip.github.io/home-manager-option-search/
 
-  home.stateVersion = "24.05";
+  home.stateVersion = "24.11";
 
   fonts.fontconfig.enable = true;
 
