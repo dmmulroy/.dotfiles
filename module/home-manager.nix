@@ -8,7 +8,7 @@
 in {
   # https://mipmip.github.io/home-manager-option-search/
 
-  home.stateVersion = "23.11";
+  home.stateVersion = "24.05";
 
   fonts.fontconfig.enable = true;
 
@@ -153,6 +153,8 @@ in {
     withPython3 = true;
     withRuby = true;
     vimdiffAlias = true;
+    viAlias = true;
+    vimAlias = true;
   };
 
   programs.starship = {
