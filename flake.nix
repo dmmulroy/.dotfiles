@@ -26,13 +26,12 @@
       flake = {
         darwinConfigurations = {
           aarch64 = darwin-system "aarch64-darwin";
-          x86_64 = darwin-system "x86_64-darwin";
         };
 
         lib = import ./lib {inherit inputs;};
       };
 
-      systems = ["aarch64-darwin" "x86_64-darwin"];
+      systems = ["aarch64-darwin"];
 
       perSystem = {pkgs, ...}: {
         formatter = pkgs.alejandra;
