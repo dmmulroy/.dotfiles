@@ -28,6 +28,11 @@ return {
 				replace_engine = {
 					sed = {
 						cmd = "sed",
+						args = {
+							"-i",
+							"",
+							"-E",
+						},
 					},
 				},
 			})
