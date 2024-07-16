@@ -76,7 +76,11 @@ return {
 				bashls = {},
 				biome = {},
 				cssls = {},
-				gleam = {},
+				gleam = {
+					settings = {
+						inlayHints = true,
+					},
+				},
 				eslint = {
 					autostart = false,
 					cmd = { "vscode-eslint-language-server", "--stdio", "--max-old-space-size=12288" },

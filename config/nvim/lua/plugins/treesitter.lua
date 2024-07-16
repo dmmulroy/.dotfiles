@@ -28,7 +28,7 @@ return {
 					"prisma",
 					"tsx",
 					"typescript",
-					"vim",
+					"vimdoc",
 					"svelte",
 					"yaml",
 				},
