@@ -228,9 +228,9 @@ return {
 				lsp_fallback = true,
 			},
 			formatters_by_ft = {
-				javascript = { { "prettierd", "prettier", "biome" } },
-				typescript = { { "prettierd", "prettier", "biome" } },
-				typescriptreact = { { "prettierd", "prettier", "biome" } },
+				javascript = { { "biome", "prettierd", "prettier" } },
+				typescript = { { "biome", "prettierd", "prettier" } },
+				typescriptreact = { { "biome", "prettierd", "prettier" } },
 				svelte = { { "prettierd", "prettier " } },
 				lua = { "stylua" },
 			},
