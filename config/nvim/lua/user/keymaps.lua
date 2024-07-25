@@ -188,7 +188,12 @@ nnoremap("<leader>=", "<C-w>=")
 
 -- Press leader f to format
 nnoremap("<leader>f", function()
-	conform.format({ async = true, lsp_fallback = true })
+	conform.format({
+		async = true,
+		timeout_ms = 500,
+		lsp_format = "fallback",
+		stop_after_first = true,
+	})
 end, { desc = "Format the current buffer" })
 
 -- Press leader rw to rotate open windows

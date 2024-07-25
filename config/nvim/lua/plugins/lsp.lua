@@ -186,7 +186,8 @@ return {
 			format_after_save = {
 				async = true,
 				timeout_ms = 500,
-				lsp_fallback = true,
+				lsp_format = "fallback",
+				stop_after_first = true,
 			},
 			formatters_by_ft = {
 				javascript = { { "biome", "prettierd", "prettier" } },
