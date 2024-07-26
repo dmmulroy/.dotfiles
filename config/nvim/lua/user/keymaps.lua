@@ -192,7 +192,6 @@ nnoremap("<leader>f", function()
 		async = true,
 		timeout_ms = 500,
 		lsp_format = "fallback",
-		stop_after_first = true,
 	})
 end, { desc = "Format the current buffer" })
 
@@ -347,8 +346,8 @@ nnoremap("<leader>oc", function()
 end, { desc = "[O]pen [C]opilot panel" })
 
 -- nvim-ufo keybinds
-nnoremap("zR", require("ufo").openAllFolds)
-nnoremap("zM", require("ufo").closeAllFolds)
+-- nnoremap("zR", require("ufo").openAllFolds)
+-- nnoremap("zM", require("ufo").closeAllFolds)
 
 -- toggle inlay hints
 nnoremap("<leader>ih", function()
