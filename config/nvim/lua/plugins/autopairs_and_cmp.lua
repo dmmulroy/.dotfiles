@@ -8,6 +8,7 @@ return {
 			"hrsh7th/cmp-nvim-lsp",
 			"hrsh7th/cmp-buffer",
 			"hrsh7th/cmp-path",
+			"hrsh7th/cmp-nvim-lsp-signature-help",
 			{
 				"L3MON4D3/LuaSnip",
 				version = "v2.3",
@@ -76,6 +77,7 @@ return {
 					{ name = "buffer", max_item_count = 5, group_index = 2 }, -- text within current buffer
 					{ name = "path", max_item_count = 3, group_index = 3 }, -- file system paths
 					{ name = "luasnip", max_item_count = 3, group_index = 5 }, -- snippets
+					{ name = "nvim-lsp-signature-help" },
 				}),
 				-- Enable pictogram icons for lsp/autocompletion
 				formatting = {

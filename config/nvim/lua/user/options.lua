@@ -65,11 +65,9 @@ vim.opt.cursorline = true
 -- See: https://github.com/kevinhwang91/nvim-ufo#minimal-configuration
 vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
-vim.opt.foldenable = true
 vim.opt.foldcolumn = "0"
 vim.opt.foldnestmax = 4
 vim.opt.foldmarker = "//#region,//#endregion"
-vim.opt.foldmethod = "expr"
 vim.opt.foldtext = ""
 
 vim.api.nvim_create_autocmd({ "BufReadPost" }, {
