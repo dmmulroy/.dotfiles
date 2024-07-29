@@ -65,16 +65,11 @@ vim.opt.cursorline = true
 -- See: https://github.com/kevinhwang91/nvim-ufo#minimal-configuration
 vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
+vim.opt.foldenable = true
 vim.opt.foldcolumn = "0"
 vim.opt.foldnestmax = 4
 vim.opt.foldmarker = "//#region,//#endregion"
 vim.opt.foldtext = ""
-
-vim.api.nvim_create_autocmd({ "BufReadPost" }, {
-	callback = function()
-		vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
-	end,
-})
 
 -- Always keep 8 lines above/below cursor unless at start/end of file
 vim.opt.scrolloff = 8
