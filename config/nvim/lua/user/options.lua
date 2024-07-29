@@ -67,8 +67,7 @@ vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
 vim.opt.foldenable = true
 vim.opt.foldcolumn = "0"
-vim.opt.foldnestmax = 4
-vim.opt.foldmarker = "//#region,//#endregion"
+vim.opt.foldnestmax = 5
 vim.opt.foldtext = ""
 
 -- Always keep 8 lines above/below cursor unless at start/end of file
