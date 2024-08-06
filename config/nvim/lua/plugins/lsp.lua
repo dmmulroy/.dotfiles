@@ -118,6 +118,7 @@ return {
 				rust_analyzer = {
 					check = {
 						command = "clippy",
+						features = "all",
 					},
 				},
 			}
