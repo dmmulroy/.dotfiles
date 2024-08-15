@@ -31,6 +31,7 @@ title = ghostty
 window-width = 90
 window-height = 30
 
+window-padding-color = background
 window-padding-balance = true
 window-padding-x = 0
 window-padding-y = 0
