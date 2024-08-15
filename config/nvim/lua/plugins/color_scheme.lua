@@ -2,6 +2,7 @@ return {
 
 	{
 		"catppuccin/nvim",
+		priority = 10000,
 		config = function()
 			require("catppuccin").setup({
 				integrations = {
