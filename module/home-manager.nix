@@ -231,6 +231,7 @@ in {
       }
     ];
   };
+  
   programs.zsh = {
     enable = true;
     autosuggestion = {

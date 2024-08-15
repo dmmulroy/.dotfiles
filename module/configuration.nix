@@ -22,6 +22,7 @@
     shells = [pkgs.zsh pkgs.fish];
     loginShell = pkgs.fish;
     systemPackages = [
+      pkgs.devenv
       pkgs.gnused
     ];
   };
