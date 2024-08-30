@@ -23,6 +23,8 @@ in {
     gh
   ];
 
+  programs.gpg.enable = true;
+
   programs.direnv = {
     enable = true;
     enableZshIntegration = true;
@@ -58,6 +60,10 @@ in {
     enable = true;
     userEmail = "dillon.mulroy@gmail.com";
     userName = "Dillon Mulroy";
+    signing = { 
+      signByDefault = true;
+      key = "~/.ssh/key.pub";
+    };
     includes = [
       {
         condition = "gitdir:~/Code/work/";
@@ -65,6 +71,7 @@ in {
           user = {
             name = "Dillon Mulroy";
             email = "dillon.mulroy@vercel.com";
+            signingkey = "~/.ssh/key.pub";
           };
         };
       }
@@ -89,11 +96,11 @@ in {
         writeCommitGraph = true;
       };
       gpg.format = "ssh";
+      user.signingkey = "~/.ssh/key.pub";
       init.defaultBranch = "main";
       pull.rebase = true;
       rebase.updateRefs = true;
       rerere.enabled = true;
-      user.signingkey = "~/.ssh/key.pub";
     };
   };
 
