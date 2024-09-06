@@ -74,6 +74,9 @@ nnoremap("<leader>e", function()
 	require("oil").toggle_float()
 end)
 
+-- Map Undotree to <leader>
+nnoremap("<leader>ut", ":UndotreeToggle<CR>", { desc = "Toggle [U]ndo[T]ree " })
+
 -- Center buffer while navigating
 nnoremap("<C-u>", "<C-u>zz")
 nnoremap("<C-d>", "<C-d>zz")
