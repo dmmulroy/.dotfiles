@@ -13,14 +13,15 @@ in {
   fonts.fontconfig.enable = true;
 
   home.packages = with pkgs; [
+    delta
     fd
+    gh
     gnused
+    graphite-cli
     mono-lisa-font
     ripgrep
     tree
     wget
-    graphite-cli
-    gh
   ];
 
   programs.gpg.enable = true;
@@ -90,6 +91,7 @@ in {
       core = {
         editor = "nvim";
         fsmonitor = true;
+        pager = "delta";
       };
       fetch = {
         prune = true;
