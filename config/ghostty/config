@@ -1,6 +1,8 @@
 # Ghostty theme
 theme = catppuccin-macchiato
+
 background-opacity = 1.0
+
 # Font family
 font-family = MonoLisa
 font-style = Regular
