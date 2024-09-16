@@ -4,6 +4,8 @@
   lib,
   ...
 }: {
+  system.stateVersion = 5;
+
   nix = {
     settings = {
       auto-optimise-store = true;
