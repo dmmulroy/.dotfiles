@@ -369,10 +369,10 @@ vnoremap("<space>", "<nop>")
 vnoremap("L", "$<left>")
 vnoremap("H", "^")
 
--- Paste without losing the contents of the register
 vnoremap("<A-j>", ":m '>+1<CR>gv=gv")
 vnoremap("<A-k>", ":m '<-2<CR>gv=gv")
 
+-- Paste without losing the contents of the register
 xnoremap("<leader>p", '"_dP')
 
 -- Reselect the last visual selection

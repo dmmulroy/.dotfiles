@@ -144,6 +144,13 @@ in {
     };
   };
 
+  xdg.configFile = {
+    dune = {
+      source = config.lib.file.mkOutOfStoreSymlink ../config/dune;
+      recursive = true;
+    };
+  };
+
   programs.neovim = {
     enable = true;
     defaultEditor = true;

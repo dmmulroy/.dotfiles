@@ -1,7 +1,6 @@
 # Ghostty theme
 theme = catppuccin-macchiato
 
-background-opacity = 1.0
 
 # Font family
 font-family = MonoLisa
@@ -16,6 +15,9 @@ font-size = 22
 # Opacity of split windows
 unfocused-split-opacity = 0.97  
 
+# Set the background-opacity to be fully opaque
+background-opacity = 1.0
+
 # Cursor style
 cursor-style-blink = true
 
@@ -29,10 +31,10 @@ macos-option-as-alt = true
 # Always show ghostty as the title
 title = ghostty 
 
-# Window size
+# Window settings
 window-width = 90
 window-height = 30
-
+window-colorspace = display-p3
 window-padding-color = background
 window-padding-balance = true
 window-padding-x = 0

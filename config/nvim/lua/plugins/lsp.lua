@@ -24,7 +24,7 @@ return {
 				["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, { border = "rounded" }),
 			}
 
-			local tsserver_inlay_hints = {
+			local ts_ls_inlay_hints = {
 				includeInlayEnumMemberValueHints = true,
 				includeInlayFunctionLikeReturnTypeHints = true,
 				includeInlayFunctionParameterTypeHints = true,
@@ -102,14 +102,14 @@ return {
 				pyright = {},
 				sqlls = {},
 				tailwindcss = {},
-				tsserver = {
+				ts_ls = {
 					settings = {
-						maxTsServerMemory = 12288,
+						maxts_lsMemory = 12288,
 						typescript = {
-							inlayHints = tsserver_inlay_hints,
+							inlayHints = ts_ls_inlay_hints,
 						},
 						javascript = {
-							inlayHints = tsserver_inlay_hints,
+							inlayHints = ts_ls_inlay_hints,
 						},
 					},
 				},

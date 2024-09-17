@@ -7,7 +7,6 @@
 in
   inputs.darwin.lib.darwinSystem {
     inherit system;
-    # modules: allows for reusable code
     modules = [
       system-config
 
