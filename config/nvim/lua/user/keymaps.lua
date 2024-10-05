@@ -18,9 +18,7 @@ nnoremap("<space>", "<nop>")
 
 -- Window +  better kitty navigation
 nnoremap("<C-j>", function()
-	if vim.fn.exists(":KittyNavigateDown") ~= 0 and TERM == "xterm-kitty" then
-		vim.cmd.KittyNavigateDown()
-	elseif vim.fn.exists(":NvimTmuxNavigateDown") ~= 0 then
+	if vim.fn.exists(":NvimTmuxNavigateDown") ~= 0 then
 		vim.cmd.NvimTmuxNavigateDown()
 	else
 		vim.cmd.wincmd("j")
@@ -28,9 +26,7 @@ nnoremap("<C-j>", function()
 end)
 
 nnoremap("<C-k>", function()
-	if vim.fn.exists(":KittyNavigateUp") ~= 0 and TERM == "xterm-kitty" then
-		vim.cmd.KittyNavigateUp()
-	elseif vim.fn.exists(":NvimTmuxNavigateUp") ~= 0 then
+	if vim.fn.exists(":NvimTmuxNavigateUp") ~= 0 then
 		vim.cmd.NvimTmuxNavigateUp()
 	else
 		vim.cmd.wincmd("k")
@@ -38,9 +34,7 @@ nnoremap("<C-k>", function()
 end)
 
 nnoremap("<C-l>", function()
-	if vim.fn.exists(":KittyNavigateRight") ~= 0 and TERM == "xterm-kitty" then
-		vim.cmd.KittyNavigateRight()
-	elseif vim.fn.exists(":NvimTmuxNavigateRight") ~= 0 then
+	if vim.fn.exists(":NvimTmuxNavigateRight") ~= 0 then
 		vim.cmd.NvimTmuxNavigateRight()
 	else
 		vim.cmd.wincmd("l")
@@ -48,9 +42,7 @@ nnoremap("<C-l>", function()
 end)
 
 nnoremap("<C-h>", function()
-	if vim.fn.exists(":KittyNavigateLeft") ~= 0 and TERM == "xterm-kitty" then
-		vim.cmd.KittyNavigateLeft()
-	elseif vim.fn.exists(":NvimTmuxNavigateLeft") ~= 0 then
+	if vim.fn.exists(":NvimTmuxNavigateLeft") ~= 0 then
 		vim.cmd.NvimTmuxNavigateLeft()
 	else
 		vim.cmd.wincmd("h")
