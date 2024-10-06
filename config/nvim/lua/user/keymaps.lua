@@ -10,8 +10,6 @@ local utils = require("user.utils")
 
 local M = {}
 
-local TERM = os.getenv("TERM")
-
 -- Normal --
 -- Disable Space bar since it'll be used as the leader key
 nnoremap("<space>", "<nop>")
