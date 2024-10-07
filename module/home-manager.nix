@@ -130,6 +130,13 @@ in {
     ];
   };
 
+  home.file = {
+    ".ideavimrc" = {
+      source = config.lib.file.mkOutOfStoreSymlink ../config/jetbrains/.ideavimrc;
+      recursive = true;
+    };
+  };
+
   xdg.configFile = {
     ghostty = {
       source = config.lib.file.mkOutOfStoreSymlink ../config/ghostty;
