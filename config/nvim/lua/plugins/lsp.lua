@@ -108,7 +108,7 @@ return {
 				tailwindcss = {},
 				ts_ls = {
 					settings = {
-						maxts_lsMemory = 12288,
+						maxTsServerMemory = 12288,
 						typescript = {
 							inlayHints = ts_ls_inlay_hints,
 						},
