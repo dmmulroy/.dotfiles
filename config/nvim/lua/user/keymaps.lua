@@ -348,8 +348,9 @@ nnoremap("<leader>ih", function()
 end)
 
 -- Insert --
--- Map jj to <esc>
+-- Map jj and JJ to <esc>
 inoremap("jj", "<esc>")
+inoremap("JJ", "<esc>")
 
 -- Visual --
 -- Disable Space bar since it'll be used as the leader key
