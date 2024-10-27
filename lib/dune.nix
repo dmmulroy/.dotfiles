@@ -1,6 +1,4 @@
-{
-  mkDerivation
-}:
+{mkDerivation}:
 mkDerivation {
   pluginName = "dune";
   version = "0.0.1.dmmulroy-fork";
@@ -11,4 +9,3 @@ mkDerivation {
     sha256 = "sha256-I8rAg3ecLxW4emtY1VpKpUMIaXfSks416LLkHtLZSsI=";
   };
 }
-

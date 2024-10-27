@@ -61,7 +61,7 @@ in {
     enable = true;
     userEmail = "dillon.mulroy@gmail.com";
     userName = "Dillon Mulroy";
-    signing = { 
+    signing = {
       signByDefault = true;
       key = "~/.ssh/key.pub";
     };
@@ -171,6 +171,8 @@ in {
       pkgs.cmake
       # Included for LuaSnip
       pkgs.luajitPackages.jsregexp
+      # Included for conform
+      pkgs.nodejs
     ];
     withNodeJs = true;
     withPython3 = true;
@@ -254,7 +256,7 @@ in {
       }
     ];
   };
-  
+
   programs.zsh = {
     enable = true;
     autosuggestion = {
