@@ -9,6 +9,7 @@ return {
 		dependencies = {
 			"catppuccin/nvim",
 		},
+    build = function() vim.fn["UpdateRemotePlugins"]() end,
 		config = function()
 			local wilder = require("wilder")
 			local macchiato = require("catppuccin.palettes").get_palette("macchiato")

@@ -228,6 +228,7 @@ in {
     enable = true;
     shell = "${pkgs.fish}/bin/fish";
     terminal = "xterm-256color";
+    sensibleOnTop = true;
     extraConfig = builtins.readFile ../config/tmux/tmux.conf;
     plugins = [
       pkgs.tmuxPlugins.vim-tmux-navigator
