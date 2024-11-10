@@ -7,8 +7,15 @@
   system.stateVersion = 5;
 
   nix = {
+    gc = {
+      automatic = true;
+      interval = { Weekday = 0; Hour = 0; Minute = 0; };
+      options = "--delete-older-than 30d";
+    };
+    optimise = {
+      automatic = true;
+    };
     settings = {
-      auto-optimise-store = true;
       builders-use-substitutes = true;
       experimental-features = ["flakes" "nix-command"];
       substituters = ["https://nix-community.cachix.org"];
