@@ -31,7 +31,6 @@
     shells = [pkgs.zsh pkgs.fish];
     systemPackages = [
       pkgs.devenv
-      pkgs.gnused
     ];
   };
 
