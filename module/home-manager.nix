@@ -138,22 +138,16 @@ in {
   };
 
   xdg.configFile = {
+    dune = {
+      source = config.lib.file.mkOutOfStoreSymlink ../config/dune;
+      recursive = true;
+    };
     ghostty = {
       source = config.lib.file.mkOutOfStoreSymlink ../config/ghostty;
       recursive = true;
     };
-  };
-
-  xdg.configFile = {
     nvim = {
       source = config.lib.file.mkOutOfStoreSymlink ../config/nvim;
-      recursive = true;
-    };
-  };
-
-  xdg.configFile = {
-    dune = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/dune;
       recursive = true;
     };
   };

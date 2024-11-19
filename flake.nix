@@ -18,10 +18,11 @@
     flake-parts,
     ...
   }: let
-    username = "dmmulroy";
     darwin-system = import ./system/darwin.nix {inherit inputs username;};
+    username = "dmmulroy";
   in
     flake-parts.lib.mkFlake {inherit inputs;} {
+      systems = ["aarch64-darwin"];
       flake = {
         darwinConfigurations = {
           aarch64 = darwin-system "aarch64-darwin";
@@ -29,10 +30,12 @@
 
         lib = import ./lib {inherit inputs;};
       };
-
-      systems = ["aarch64-darwin"];
-
-      perSystem = {pkgs, ...}: {
+      perSystem = {
+        config,
+        pkgs,
+        system,
+        ...
+      }: {
         formatter = pkgs.alejandra;
 
         packages = {
