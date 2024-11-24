@@ -14,6 +14,7 @@ in {
 
   home.packages = with pkgs; [
     delta
+    doggo
     fd
     gh
     gnused
