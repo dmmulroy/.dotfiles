@@ -13,6 +13,7 @@ in {
   fonts.fontconfig.enable = true;
 
   home.packages = with pkgs; [
+    aerospace
     delta
     doggo
     fd
