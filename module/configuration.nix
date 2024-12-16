@@ -31,6 +31,8 @@
     };
   };
 
+  security.pam.enableSudoTouchIdAuth = true;
+
   environment = {
     shells = [pkgs.zsh pkgs.fish];
     systemPackages = [
@@ -38,8 +40,14 @@
     ];
   };
 
-  programs.fish.enable = true;
-  programs.zsh.enable = true;
+  programs = {
+    fish = {
+      enable = true;
+    };
+    zsh = {
+      enable = true;
+    };
+  };
 
   services.nix-daemon.enable = true;
 

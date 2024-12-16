@@ -56,9 +56,6 @@ nnoremap("<leader>w", "<cmd>w<cr>", { silent = false })
 -- Quit with leader key
 nnoremap("<leader>q", "<cmd>q<cr>", { silent = false })
 
--- Save and Quit with leader key
-nnoremap("<leader>z", "<cmd>wq<cr>", { silent = false })
-
 -- Map Oil to <leader>e
 nnoremap("<leader>e", function()
 	require("oil").toggle_float()
@@ -149,7 +146,7 @@ nnoremap("[w", function()
 	vim.api.nvim_feedkeys("zz", "n", false)
 end)
 
--- Moonlander diagnostic movements --
+-- Diagnostic movements --
 
 -- Open the diagnostic under the cursor in a float window
 nnoremap("<leader>d", function()
@@ -238,28 +235,6 @@ end)
 nnoremap("<leader>5", function()
 	harpoon_ui.nav_file(5)
 end)
-
--- Git keymaps --
-nnoremap("<leader>gb", ":Gitsigns toggle_current_line_blame<cr>")
-nnoremap("<leader>gf", function()
-	local cmd = {
-		"sort",
-		"-u",
-		"<(git diff --name-only --cached)",
-		"<(git diff --name-only)",
-		"<(git diff --name-only --diff-filter=U)",
-	}
-
-	if not utils.is_git_directory() then
-		vim.notify(
-			"Current project is not a git directory",
-			vim.log.levels.WARN,
-			{ title = "Telescope Git Files", git_command = cmd }
-		)
-	else
-		require("telescope.builtin").git_files()
-	end
-end, { desc = "Search [G]it [F]iles" })
 
 -- Telescope keybinds --
 nnoremap("<leader>?", require("telescope.builtin").oldfiles, { desc = "[?] Find recently opened files" })

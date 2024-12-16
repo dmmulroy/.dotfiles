@@ -140,6 +140,10 @@ in {
   };
 
   xdg.configFile = {
+    aerospace = {
+      source = config.lib.file.mkOutOfStoreSymlink ../config/aerospace;
+      recursive = true;
+    };
     dune = {
       source = config.lib.file.mkOutOfStoreSymlink ../config/dune;
       recursive = true;
