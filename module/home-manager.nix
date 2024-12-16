@@ -14,7 +14,6 @@ in {
 
   home.packages = with pkgs; [
     aerospace
-    delta
     doggo
     fd
     gh
@@ -93,7 +92,6 @@ in {
       core = {
         editor = "nvim";
         fsmonitor = true;
-        pager = "delta";
       };
       fetch = {
         prune = true;
@@ -135,7 +133,6 @@ in {
   home.file = {
     ".ideavimrc" = {
       source = config.lib.file.mkOutOfStoreSymlink ../config/jetbrains/.ideavimrc;
-      recursive = true;
     };
   };
 
@@ -161,9 +158,9 @@ in {
   programs.neovim = {
     enable = true;
     defaultEditor = true;
-    extraLuaConfig = ''
-      require('user')
-    '';
+     extraLuaConfig = ''
+       require('user')
+     '';
     extraPackages = [
       # Included for nil_ls
       pkgs.cargo

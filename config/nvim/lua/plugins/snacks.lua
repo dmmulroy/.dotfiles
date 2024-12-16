@@ -15,6 +15,7 @@ return {
 			notifier = { enabled = true },
 			quickfile = { enabled = true },
 			statuscolumn = { enabled = true },
+			terminal = { enabled = true },
 			words = { enabled = true },
 			zen = { enabled = true },
 		},
@@ -72,7 +73,7 @@ return {
 			{
 				"<leader>gb",
 				function()
-					Snacks.git.blame_line()
+					Snacks.git.blame_line({ count = 10 })
 				end,
 				desc = "Git Blame Line",
 			},
