@@ -185,6 +185,9 @@ nnoremap("<leader>f", function()
 	})
 end, { desc = "Format the current buffer" })
 
+-- Show git blame on current line
+nnoremap("<leader>gb", ":Gitsigns toggle_current_line_blame<cr>")
+
 -- Press leader rw to rotate open windows
 nnoremap("<leader>rw", ":RotateWindows<cr>", { desc = "[R]otate [W]indows" })
 
