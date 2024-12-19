@@ -31,8 +31,6 @@
     };
   };
 
-  security.pam.enableSudoTouchIdAuth = true;
-
   environment = {
     shells = [pkgs.zsh pkgs.fish];
     systemPackages = [
