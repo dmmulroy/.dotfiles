@@ -24,6 +24,7 @@ return {
 					"json",
 					"lua",
 					"markdown",
+					"markdown_inline",
 					"ocaml",
 					"ocaml_interface",
 					"prisma",
