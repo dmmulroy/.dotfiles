@@ -107,6 +107,17 @@ nnoremap("U", "<C-r>")
 -- Turn off highlighted results
 nnoremap("<leader>no", "<cmd>noh<cr>")
 
+-- Snacks.toggle.option("wrap", { name = "[T]oggle [W]rap" }):map("<leader>tw")
+-- Snacks.toggle.option("relativenumber", { name = "Relative [L]ine [N]umbers" }):map("<leader>ln")
+nnoremap("<leader>tw", function()
+	Snacks.toggle.option("wrap")
+end, { desc = "[T]oggle [Wrap]" })
+
+nnoremap("<leader>ln", function()
+	vim.notify("here?")
+	Snacks.toggle.option("relativenumber")
+end, { desc = "Relative [L]ine [N]umbers" })
+
 -- Diagnostics
 
 -- Goto next diagnostic of any severity
@@ -183,9 +194,6 @@ nnoremap("<leader>f", function()
 		lsp_format = "fallback",
 	})
 end, { desc = "Format the current buffer" })
-
--- Show git blame on current line
-nnoremap("<leader>gb", ":Gitsigns toggle_current_line_blame<cr>")
 
 -- Press leader rw to rotate open windows
 nnoremap("<leader>rw", ":RotateWindows<cr>", { desc = "[R]otate [W]indows" })

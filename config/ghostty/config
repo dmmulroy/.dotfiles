@@ -1,7 +1,6 @@
 # Ghostty theme
 theme = catppuccin-macchiato
 
-#test
 # Shell integrations
 shell-integration = fish
 

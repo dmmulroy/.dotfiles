@@ -13,7 +13,6 @@ in {
   fonts.fontconfig.enable = true;
 
   home.packages = with pkgs; [
-    aerospace
     doggo
     fd
     gh
@@ -132,35 +131,28 @@ in {
 
   home.file = {
     ".ideavimrc" = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/jetbrains/.ideavimrc;
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/jetbrains/.ideavimrc";
     };
   };
 
   xdg.configFile = {
-    aerospace = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/aerospace;
-      recursive = true;
-    };
     dune = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/dune;
-      recursive = true;
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/dune";
     };
     ghostty = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/ghostty;
-      recursive = true;
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/ghostty";
     };
     nvim = {
-      source = config.lib.file.mkOutOfStoreSymlink ../config/nvim;
-      recursive = true;
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/nvim";
     };
   };
 
   programs.neovim = {
     enable = true;
     defaultEditor = true;
-     extraLuaConfig = ''
-       require('user')
-     '';
+     # extraLuaConfig = ''
+     #   require('user')
+     # '';
     extraPackages = [
       # Included for nil_ls
       pkgs.cargo
@@ -224,7 +216,7 @@ in {
   programs.tmux = {
     enable = true;
     shell = "${pkgs.fish}/bin/fish";
-    terminal = "xterm-256color";
+    terminal = "tmux-256color";
     sensibleOnTop = true;
     extraConfig = builtins.readFile ../config/tmux/tmux.conf;
     plugins = [
@@ -253,33 +245,5 @@ in {
         '';
       }
     ];
-  };
-
-  programs.zsh = {
-    enable = true;
-    autosuggestion = {
-      enable = true;
-    };
-    enableCompletion = true;
-    initExtra = ''
-      ${builtins.readFile ../config/zsh/functions.zsh}
-      ${builtins.readFile ../config/zsh/opam.zsh}
-    '';
-    oh-my-zsh = {
-      enable = true;
-      plugins = ["git" "z"];
-      theme = "robbyrussell";
-    };
-    shellAliases = {
-      "c" = "clear";
-      "code" = "vim";
-      "dwc" = ''darwin-rebuild check --flake ".#aarch64"'';
-      "dwb" = ''darwin-rebuild switch --flake ".#aarch64"'';
-      "ks" = "tmux kill-server";
-      "node-env" = "nix-shell -p nodejs_21 bun typescript eslint_d prettierd --command zsh";
-    };
-    syntaxHighlighting = {
-      enable = true;
-    };
   };
 }
