@@ -107,16 +107,9 @@ nnoremap("U", "<C-r>")
 -- Turn off highlighted results
 nnoremap("<leader>no", "<cmd>noh<cr>")
 
--- Snacks.toggle.option("wrap", { name = "[T]oggle [W]rap" }):map("<leader>tw")
--- Snacks.toggle.option("relativenumber", { name = "Relative [L]ine [N]umbers" }):map("<leader>ln")
 nnoremap("<leader>tw", function()
 	Snacks.toggle.option("wrap")
 end, { desc = "[T]oggle [Wrap]" })
-
-nnoremap("<leader>ln", function()
-	vim.notify("here?")
-	Snacks.toggle.option("relativenumber")
-end, { desc = "Relative [L]ine [N]umbers" })
 
 -- Diagnostics
 

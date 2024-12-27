@@ -2,7 +2,7 @@ local macchiato = require("catppuccin.palettes").get_palette("macchiato")
 
 vim.api.nvim_set_hl(0, "SnacksIndentScope", { fg = macchiato.mauve })
 
-local filtered_message = { "No information available", 'man.lua: "no manual entry for snacks"' }
+local filtered_message = { "No information available" }
 
 return {
 	{
@@ -25,6 +25,22 @@ return {
 			words = { enabled = true },
 			zen = { enabled = true },
 		},
+		init = function()
+			vim.api.nvim_create_autocmd("User", {
+				pattern = "VeryLazy",
+				callback = function()
+					local notify = Snacks.notifier.notify
+					Snacks.notifier.notify = function(message, level, opts)
+						for _, msg in ipairs(filtered_message) do
+							if message == msg then
+								return nil
+							end
+						end
+						return notify(message, level, opts)
+					end
+				end,
+			})
+		end,
 		keys = {
 			{
 				"<leader>.",
@@ -86,16 +102,31 @@ return {
 			{
 				"<leader>z",
 				function()
-					Snacks.zen()
+					Snacks.toggle.dim():toggle()
 				end,
-				desc = "Toggle Zen Mode",
+				desc = "Toggle [Z]en Mode",
+			},
+
+			{
+				"<leader>ln",
+				function()
+					Snacks.toggle.option("relativenumber", { name = "Relative Number" }):toggle()
+				end,
+				desc = "Toggle Relative [L]ine [N]umbers",
 			},
 			{
-				"<leader>Z",
+				"<leader>cl",
 				function()
-					Snacks.zen.zoom()
+					Snacks.toggle.option("cursorline", { name = "Cursor Line" }):toggle()
 				end,
-				desc = "Toggle Zoom",
+				desc = "Toggle [C]ursor [L]ine",
+			},
+			{
+				"<leader>td",
+				function()
+					Snacks.toggle.diagnostics():toggle()
+				end,
+				desc = "[T]oggle [D]iagnostics",
 			},
 		},
 	},
