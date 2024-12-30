@@ -150,9 +150,6 @@ in {
   programs.neovim = {
     enable = true;
     defaultEditor = true;
-     # extraLuaConfig = ''
-     #   require('user')
-     # '';
     extraPackages = [
       # Included for nil_ls
       pkgs.cargo
