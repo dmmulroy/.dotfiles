@@ -128,6 +128,24 @@ return {
 				end,
 				desc = "[T]oggle [D]iagnostics",
 			},
+			{
+				"<leader>tt",
+				function()
+					local tsc = require("treesitter-context")
+					Snacks.toggle({
+						name = "Treesitter Context",
+						get = tsc.enabled,
+						set = function(state)
+							if state then
+								tsc.enable()
+							else
+								tsc.disable()
+							end
+						end,
+					}):toggle()
+				end,
+				desc = "[T]oggle [T]reesitter Context",
+			},
 		},
 	},
 }
