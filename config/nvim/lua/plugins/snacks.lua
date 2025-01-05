@@ -9,6 +9,14 @@ return {
 		"folke/snacks.nvim",
 		priority = 1000,
 		lazy = false,
+		dependencies = {
+			{
+				"lewis6991/gitsigns.nvim",
+				init = function()
+					require("gitsigns").setup()
+				end,
+			},
+		},
 		---@type snacks.Config
 		opts = {
 			bigfile = { enabled = true },
@@ -30,6 +38,7 @@ return {
 				pattern = "VeryLazy",
 				callback = function()
 					local notify = Snacks.notifier.notify
+					---@diagnostic disable-next-line: duplicate-set-field
 					Snacks.notifier.notify = function(message, level, opts)
 						for _, msg in ipairs(filtered_message) do
 							if message == msg then
