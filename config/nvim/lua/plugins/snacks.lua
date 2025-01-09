@@ -155,6 +155,26 @@ return {
 				end,
 				desc = "[T]oggle [T]reesitter Context",
 			},
+			{
+				"<leader>hl",
+				function()
+					local hc = require("nvim-highlight-colors")
+					Snacks.toggle({
+						name = "Highlight Colors",
+						get = function()
+							return hc.is_active()
+						end,
+						set = function(state)
+							if state then
+								hc.turnOn()
+							else
+								hc.turnOff()
+							end
+						end,
+					}):toggle()
+				end,
+				desc = "Toggle [H]igh[L]ight Colors",
+			},
 		},
 	},
 }

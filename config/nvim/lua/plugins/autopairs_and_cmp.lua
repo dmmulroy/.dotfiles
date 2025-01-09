@@ -83,17 +83,25 @@ return {
 				-- Enable pictogram icons for lsp/autocompletion
 				formatting = {
 					expandable_indicator = true,
-					format = lspkind.cmp_format({
-						mode = "symbol_text",
-						maxwidth = 50,
-						ellipsis_char = "...",
-						menu = {
-							nvim_lsp = "[LSP]",
-							buffer = "[Buffer]",
-							path = "[PATH]",
-							luasnip = "[LuaSnip]",
-						},
-					}),
+					format = function(entry, item)
+						local color_item = require("nvim-highlight-colors").format(entry, { kind = item.kind })
+						item = lspkind.cmp_format({
+							mode = "symbol_text",
+							maxwidth = 50,
+							ellipsis_char = "...",
+							menu = {
+								nvim_lsp = "[LSP]",
+								buffer = "[Buffer]",
+								path = "[PATH]",
+								luasnip = "[LuaSnip]",
+							},
+						})(entry, item)
+						if color_item.abbr_hl_group then
+							item.kind_hl_group = color_item.abbr_hl_group
+							item.kind = color_item.abbr
+						end
+						return item
+					end,
 				},
 				experimental = {
 					ghost_text = true,
