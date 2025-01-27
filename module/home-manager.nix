@@ -156,7 +156,8 @@ in {
       # Included to build telescope-fzf-native.nvim
       pkgs.cmake
       # Included for LuaSnip
-      pkgs.luajitPackages.jsregexp
+      # pkgs.luajitPackages.jsregexp
+      pkgs.lua54Packages.jsregexp
       # Included for conform
       pkgs.nodejs
     ];
