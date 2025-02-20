@@ -8,17 +8,19 @@
 in {
   # https://mipmip.github.io/home-manager-option-search/
 
-  home.stateVersion = "24.05";
+  home.stateVersion = "24.11";
 
   fonts.fontconfig.enable = true;
 
   home.packages = with pkgs; [
+    bun
     doggo
     fd
     gh
     gnused
     graphite-cli
     mono-lisa-font
+    nodejs_20
     ripgrep
     tree
     wget
@@ -96,8 +98,8 @@ in {
         prune = true;
         writeCommitGraph = true;
       };
-      gpg.format = "ssh";
       user.signingkey = "~/.ssh/key.pub";
+      gpg.format = "ssh";
       init.defaultBranch = "main";
       pull.rebase = true;
       rebase.updateRefs = true;

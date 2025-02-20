@@ -114,6 +114,10 @@ return {
 					},
 				},
 				ts_ls = {
+					on_attach = function(client, buffer_number)
+						require("twoslash-queries").attach(client, buffer_number)
+						return on_attach(client, buffer_number)
+					end,
 					settings = {
 						maxTsServerMemory = 12288,
 						typescript = {

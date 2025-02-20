@@ -6,6 +6,8 @@
 }: {
   system.stateVersion = 5;
 
+  ids.gids.nixbld = 30000;
+
   nix = {
     gc = {
       automatic = true;
@@ -46,8 +48,6 @@
       enable = true;
     };
   };
-
-  services.nix-daemon.enable = true;
 
   users.users.${username} = {
     home = "/Users/${username}";
