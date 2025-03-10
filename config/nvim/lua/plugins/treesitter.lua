@@ -10,11 +10,9 @@ return {
 			require("nvim-treesitter.configs").setup({
 				ensure_installed = {
 					"bash",
-					"c",
 					"css",
 					"gleam",
 					"go",
-					"graphql",
 					"html",
 					"javascript",
 					"json",
@@ -23,7 +21,6 @@ return {
 					"markdown_inline",
 					"ocaml",
 					"ocaml_interface",
-					"prisma",
 					"rust",
 					"svelte",
 					"terraform",

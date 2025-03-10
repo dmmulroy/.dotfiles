@@ -1,373 +1,309 @@
-local nnoremap = require("user.keymap_utils").nnoremap
-local vnoremap = require("user.keymap_utils").vnoremap
-local inoremap = require("user.keymap_utils").inoremap
-local tnoremap = require("user.keymap_utils").tnoremap
-local xnoremap = require("user.keymap_utils").xnoremap
-local harpoon_ui = require("harpoon.ui")
-local harpoon_mark = require("harpoon.mark")
-local conform = require("conform")
-
 local M = {}
 
--- Normal --
--- Disable Space bar since it'll be used as the leader key
-nnoremap("<space>", "<nop>")
+-- Normal Mode --
+vim.keymap.set("n", "<space>", "<nop>", { desc = "Disable space (leader) in normal mode" })
 
--- Window +  better kitty navigation
-nnoremap("<C-j>", function()
+-- Window and kitty navigation
+vim.keymap.set("n", "<C-j>", function()
 	if vim.fn.exists(":NvimTmuxNavigateDown") ~= 0 then
 		vim.cmd.NvimTmuxNavigateDown()
 	else
 		vim.cmd.wincmd("j")
 	end
-end)
+end, { desc = "Navigate down (kitty navigation if available)" })
 
-nnoremap("<C-k>", function()
+vim.keymap.set("n", "<C-k>", function()
 	if vim.fn.exists(":NvimTmuxNavigateUp") ~= 0 then
 		vim.cmd.NvimTmuxNavigateUp()
 	else
 		vim.cmd.wincmd("k")
 	end
-end)
+end, { desc = "Navigate up (kitty navigation if available)" })
 
-nnoremap("<C-l>", function()
+vim.keymap.set("n", "<C-l>", function()
 	if vim.fn.exists(":NvimTmuxNavigateRight") ~= 0 then
 		vim.cmd.NvimTmuxNavigateRight()
 	else
 		vim.cmd.wincmd("l")
 	end
-end)
+end, { desc = "Navigate right (kitty navigation if available)" })
 
-nnoremap("<C-h>", function()
+vim.keymap.set("n", "<C-h>", function()
 	if vim.fn.exists(":NvimTmuxNavigateLeft") ~= 0 then
 		vim.cmd.NvimTmuxNavigateLeft()
 	else
 		vim.cmd.wincmd("h")
 	end
-end)
+end, { desc = "Navigate left (kitty navigation if available)" })
 
 -- Swap between last two buffers
-nnoremap("<leader>'", "<C-^>", { desc = "Switch to last buffer" })
+vim.keymap.set("n", "<leader>'", "<C-^>", { desc = "Switch to last buffer" })
 
--- Save with leader key
-nnoremap("<leader>w", "<cmd>w<cr>", { silent = false })
-
--- Quit with leader key
-nnoremap("<leader>q", "<cmd>q<cr>", { silent = false })
+-- Save and Quit
+vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { silent = false, desc = "Save current buffer" })
+vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { silent = false, desc = "Quit current buffer" })
 
 -- Map Oil to <leader>e
-nnoremap("<leader>e", function()
+vim.keymap.set("n", "<leader>e", function()
 	require("oil").toggle_float()
-end)
+end, { desc = "Toggle Oil file explorer" })
 
--- Map Undotree to <leader>
-nnoremap("<leader>ut", ":UndotreeToggle<CR>", { desc = "Toggle [U]ndo[T]ree " })
+-- Map Undotree
+vim.keymap.set("n", "<leader>ut", ":UndotreeToggle<CR>", { desc = "Toggle UndoTree" })
 
 -- Center buffer while navigating
-nnoremap("<C-u>", "<C-u>zz")
-nnoremap("<C-d>", "<C-d>zz")
-nnoremap("{", "{zz")
-nnoremap("}", "}zz")
-nnoremap("N", "Nzz")
-nnoremap("n", "nzz")
-nnoremap("G", "Gzz")
-nnoremap("gg", "ggzz")
-nnoremap("gd", "gdzz")
-nnoremap("<C-i>", "<C-i>zz")
-nnoremap("<C-o>", "<C-o>zz")
-nnoremap("%", "%zz")
-nnoremap("*", "*zz")
-nnoremap("#", "#zz")
+vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "Scroll up and center cursor" })
+vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "Scroll down and center cursor" })
+vim.keymap.set("n", "{", "{zz", { desc = "Jump to previous paragraph and center" })
+vim.keymap.set("n", "}", "}zz", { desc = "Jump to next paragraph and center" })
+vim.keymap.set("n", "N", "Nzz", { desc = "Search previous and center" })
+vim.keymap.set("n", "n", "nzz", { desc = "Search next and center" })
+vim.keymap.set("n", "G", "Gzz", { desc = "Go to end of file and center" })
+vim.keymap.set("n", "gg", "ggzz", { desc = "Go to beginning of file and center" })
+vim.keymap.set("n", "gd", "gdzz", { desc = "Go to definition and center" })
+vim.keymap.set("n", "<C-i>", "<C-i>zz", { desc = "Jump forward in jump list and center" })
+vim.keymap.set("n", "<C-o>", "<C-o>zz", { desc = "Jump backward in jump list and center" })
+vim.keymap.set("n", "%", "%zz", { desc = "Jump to matching bracket and center" })
+vim.keymap.set("n", "*", "*zz", { desc = "Search for word under cursor and center" })
+vim.keymap.set("n", "#", "#zz", { desc = "Search backward for word under cursor and center" })
 
--- Press 'S' for quick find/replace for the word under the cursor
-nnoremap("S", function()
+-- Quick find/replace for word under cursor
+vim.keymap.set("n", "S", function()
 	local cmd = ":%s/<C-r><C-w>/<C-r><C-w>/gI<Left><Left><Left>"
 	local keys = vim.api.nvim_replace_termcodes(cmd, true, false, true)
 	vim.api.nvim_feedkeys(keys, "n", false)
-end)
+end, { desc = "Quick find/replace word under cursor" })
 
--- Open Spectre for global find/replace
-nnoremap("<leader>S", function()
+-- Spectre for global find/replace
+vim.keymap.set("n", "<leader>S", function()
 	require("spectre").toggle()
-end)
+end, { desc = "Toggle Spectre for global find/replace" })
 
--- Open Spectre for global find/replace for the word under the cursor in normal mode
--- TODO Fix, currently being overriden by Telescope
-nnoremap("<leader>sw", function()
+-- Spectre for word under cursor (visual)
+vim.keymap.set("n", "<leader>sw", function()
 	require("spectre").open_visual({ select_word = true })
-end, { desc = "Search current word" })
+end, { desc = "Search current word using Spectre" })
 
--- Press 'H', 'L' to jump to start/end of a line (first/last char)
-nnoremap("L", "$")
-nnoremap("H", "^")
+-- Jump to start/end of line
+vim.keymap.set("n", "L", "$", { desc = "Jump to end of line" })
+vim.keymap.set("n", "H", "^", { desc = "Jump to beginning of line" })
 
--- Press 'U' for redo
-nnoremap("U", "<C-r>")
+-- Redo last change
+vim.keymap.set("n", "U", "<C-r>", { desc = "Redo last change" })
 
--- Turn off highlighted results
-nnoremap("<leader>no", "<cmd>noh<cr>")
+-- Turn off highlighted search results
+vim.keymap.set("n", "<leader>no", "<cmd>noh<cr>", { desc = "Clear search highlighting" })
 
-nnoremap("<leader>tw", function()
+-- Toggle wrap
+vim.keymap.set("n", "<leader>tw", function()
 	Snacks.toggle.option("wrap")
-end, { desc = "[T]oggle [Wrap]" })
+end, { desc = "Toggle line wrap" })
 
--- Diagnostics
-
--- Goto next diagnostic of any severity
-nnoremap("]d", function()
+-- Diagnostics --
+vim.keymap.set("n", "]d", function()
 	vim.diagnostic.goto_next({})
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to next diagnostic and center" })
 
--- Goto previous diagnostic of any severity
-nnoremap("[d", function()
+vim.keymap.set("n", "[d", function()
 	vim.diagnostic.goto_prev({})
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to previous diagnostic and center" })
 
--- Goto next error diagnostic
-nnoremap("]e", function()
+vim.keymap.set("n", "]e", function()
 	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to next error diagnostic and center" })
 
--- Goto previous error diagnostic
-nnoremap("[e", function()
+vim.keymap.set("n", "[e", function()
 	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to previous error diagnostic and center" })
 
--- Goto next warning diagnostic
-nnoremap("]w", function()
+vim.keymap.set("n", "]w", function()
 	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.WARN })
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to next warning diagnostic and center" })
 
--- Goto previous warning diagnostic
-nnoremap("[w", function()
+vim.keymap.set("n", "[w", function()
 	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.WARN })
 	vim.api.nvim_feedkeys("zz", "n", false)
-end)
+end, { desc = "Go to previous warning diagnostic and center" })
 
--- Diagnostic movements --
+-- Diagnostic float and quickfix
+vim.keymap.set("n", "<leader>d", function()
+	vim.diagnostic.open_float({ border = "rounded" })
+end, { desc = "Open diagnostic float with rounded border" })
 
--- Open the diagnostic under the cursor in a float window
-nnoremap("<leader>d", function()
-	vim.diagnostic.open_float({
-		border = "rounded",
-	})
-end)
+vim.keymap.set("n", "<leader>ld", vim.diagnostic.setqflist, { desc = "Populate quickfix list with diagnostics" })
 
--- Place all dignostics into a qflist
-nnoremap("<leader>ld", vim.diagnostic.setqflist, { desc = "Quickfix [L]ist [D]iagnostics" })
+-- Quickfix navigation
+vim.keymap.set("n", "<leader>cn", ":cnext<cr>zz", { desc = "Go to next quickfix item and center" })
+vim.keymap.set("n", "<leader>cp", ":cprevious<cr>zz", { desc = "Go to previous quickfix item and center" })
+vim.keymap.set("n", "<leader>co", ":copen<cr>zz", { desc = "Open quickfix list and center" })
+vim.keymap.set("n", "<leader>cc", ":cclose<cr>zz", { desc = "Close quickfix list" })
 
--- Navigate to next qflist item
-nnoremap("<leader>cn", ":cnext<cr>zz")
+-- Maximizer toggle and window resize
+vim.keymap.set("n", "<leader>m", ":MaximizerToggle<cr>", { desc = "Toggle window maximization" })
+vim.keymap.set("n", "<leader>=", "<C-w>=", { desc = "Equalize split window sizes" })
 
--- Navigate to previos qflist item
-nnoremap("<leader>cp", ":cprevious<cr>zz")
-
--- Open the qflist
-nnoremap("<leader>co", ":copen<cr>zz")
-
--- Close the qflist
-nnoremap("<leader>cc", ":cclose<cr>zz")
-
--- Map MaximizerToggle (szw/vim-maximizer) to leader-m
-nnoremap("<leader>m", ":MaximizerToggle<cr>")
-
--- Resize split windows to be equal size
-nnoremap("<leader>=", "<C-w>=")
-
--- Press leader f to format
-nnoremap("<leader>f", function()
-	conform.format({
+-- Format current buffer
+vim.keymap.set("n", "<leader>f", function()
+	require("conform").format({
 		async = true,
 		timeout_ms = 500,
 		lsp_format = "fallback",
 	})
 end, { desc = "Format the current buffer" })
 
--- Press leader rw to rotate open windows
-nnoremap("<leader>rw", ":RotateWindows<cr>", { desc = "[R]otate [W]indows" })
+-- Rotate open windows
+vim.keymap.set("n", "<leader>rw", ":RotateWindows<cr>", { desc = "Rotate open windows" })
 
--- Press gx to open the link under the cursor
-nnoremap("gx", ":sil !open <cWORD><cr>", { silent = true })
+-- Open link under cursor
+vim.keymap.set("n", "gx", ":sil !open <cWORD><cr>", { silent = true, desc = "Open link under cursor" })
 
--- TSC autocommand keybind to run TypeScripts tsc
-nnoremap("<leader>tc", ":TSC<cr>", { desc = "[T]ypeScript [C]ompile" })
+-- Run TypeScript compiler
+vim.keymap.set("n", "<leader>tc", ":TSC<cr>", { desc = "Run TypeScript compile" })
 
 -- Harpoon keybinds --
--- Open harpoon ui
-nnoremap("<leader>ho", function()
-	harpoon_ui.toggle_quick_menu()
-end)
+vim.keymap.set("n", "<leader>ho", function()
+	require("harpoon.ui").toggle_quick_menu()
+end, { desc = "Toggle Harpoon quick menu" })
 
--- Add current file to harpoon
-nnoremap("<leader>ha", function()
-	harpoon_mark.add_file()
-end)
+vim.keymap.set("n", "<leader>ha", function()
+	require("harpoon.mark").add_file()
+end, { desc = "Add current file to Harpoon" })
 
--- Remove current file from harpoon
-nnoremap("<leader>hr", function()
-	harpoon_mark.rm_file()
-end)
+vim.keymap.set("n", "<leader>hr", function()
+	require("harpoon.mark").rm_file()
+end, { desc = "Remove current file from Harpoon" })
 
--- Remove all files from harpoon
-nnoremap("<leader>hc", function()
-	harpoon_mark.clear_all()
-end)
+vim.keymap.set("n", "<leader>hc", function()
+	require("harpoon.mark").clear_all()
+end, { desc = "Clear all Harpoon marks" })
 
--- Quickly jump to harpooned files
-nnoremap("<leader>1", function()
-	harpoon_ui.nav_file(1)
-end)
+vim.keymap.set("n", "<leader>1", function()
+	require("harpoon.ui").nav_file(1)
+end, { desc = "Navigate to Harpoon file 1" })
 
-nnoremap("<leader>2", function()
-	harpoon_ui.nav_file(2)
-end)
+vim.keymap.set("n", "<leader>2", function()
+	require("harpoon.ui").nav_file(2)
+end, { desc = "Navigate to Harpoon file 2" })
 
-nnoremap("<leader>3", function()
-	harpoon_ui.nav_file(3)
-end)
+vim.keymap.set("n", "<leader>3", function()
+	require("harpoon.ui").nav_file(3)
+end, { desc = "Navigate to Harpoon file 3" })
 
-nnoremap("<leader>4", function()
-	harpoon_ui.nav_file(4)
-end)
+vim.keymap.set("n", "<leader>4", function()
+	require("harpoon.ui").nav_file(4)
+end, { desc = "Navigate to Harpoon file 4" })
 
-nnoremap("<leader>5", function()
-	harpoon_ui.nav_file(5)
-end)
+vim.keymap.set("n", "<leader>5", function()
+	require("harpoon.ui").nav_file(5)
+end, { desc = "Navigate to Harpoon file 5" })
 
 -- Telescope keybinds --
-nnoremap("<leader>?", require("telescope.builtin").oldfiles, { desc = "[?] Find recently opened files" })
-nnoremap("<leader>sb", require("telescope.builtin").buffers, { desc = "[S]earch Open [B]uffers" })
-nnoremap("<leader>sf", function()
+vim.keymap.set("n", "<leader>?", require("telescope.builtin").oldfiles, { desc = "Find recently opened files" })
+vim.keymap.set("n", "<leader>sb", require("telescope.builtin").buffers, { desc = "Search open buffers" })
+vim.keymap.set("n", "<leader>sf", function()
 	require("telescope.builtin").find_files({ hidden = true })
-end, { desc = "[S]earch [F]iles" })
-nnoremap("<leader>sh", require("telescope.builtin").help_tags, { desc = "[S]earch [H]elp" })
-nnoremap("<leader>sg", require("telescope.builtin").live_grep, { desc = "[S]earch by [G]rep" })
+end, { desc = "Find files (including hidden)" })
+vim.keymap.set("n", "<leader>sh", require("telescope.builtin").help_tags, { desc = "Search help tags" })
+vim.keymap.set("n", "<leader>sg", require("telescope.builtin").live_grep, { desc = "Live grep search" })
+vim.keymap.set("n", "<leader>sc", function()
+	require("telescope.builtin").commands(require("telescope.themes").get_dropdown({ previewer = false }))
+end, { desc = "Search commands" })
+vim.keymap.set("n", "<leader>/", function()
+	require("telescope.builtin").current_buffer_fuzzy_find(
+		require("telescope.themes").get_dropdown({ previewer = false })
+	)
+end, { desc = "Fuzzily search in current buffer" })
+vim.keymap.set("n", "<leader>ss", function()
+	require("telescope.builtin").spell_suggest(require("telescope.themes").get_dropdown({ previewer = false }))
+end, { desc = "Spell suggestions search" })
 
-nnoremap("<leader>sc", function()
-	require("telescope.builtin").commands(require("telescope.themes").get_dropdown({
-		previewer = false,
-	}))
-end, { desc = "[S]earch [C]ommands" })
-
-nnoremap("<leader>/", function()
-	require("telescope.builtin").current_buffer_fuzzy_find(require("telescope.themes").get_dropdown({
-		previewer = false,
-	}))
-end, { desc = "[/] Fuzzily search in current buffer]" })
-
-nnoremap("<leader>ss", function()
-	require("telescope.builtin").spell_suggest(require("telescope.themes").get_dropdown({
-		previewer = false,
-	}))
-end, { desc = "[S]earch [S]pelling suggestions" })
-
--- LSP Keybinds (exports a function to be used in ../../after/plugin/lsp.lua b/c we need a reference to the current buffer) --
+-- LSP Keybinds (per-buffer)
 M.map_lsp_keybinds = function(buffer_number)
-	nnoremap("<leader>rn", vim.lsp.buf.rename, { desc = "LSP: [R]e[n]ame", buffer = buffer_number })
-	nnoremap("<leader>ca", vim.lsp.buf.code_action, { desc = "LSP: [C]ode [A]ction", buffer = buffer_number })
-
-	nnoremap("gd", vim.lsp.buf.definition, { desc = "LSP: [G]oto [D]efinition", buffer = buffer_number })
-
-	-- Telescope LSP keybinds --
-	nnoremap(
+	vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "LSP: Rename symbol", buffer = buffer_number })
+	vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "LSP: Code action", buffer = buffer_number })
+	vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "LSP: Go to definition", buffer = buffer_number })
+	vim.keymap.set(
+		"n",
 		"gr",
 		require("telescope.builtin").lsp_references,
-		{ desc = "LSP: [G]oto [R]eferences", buffer = buffer_number }
+		{ desc = "LSP: Go to references", buffer = buffer_number }
 	)
-
-	nnoremap(
+	vim.keymap.set(
+		"n",
 		"gi",
 		require("telescope.builtin").lsp_implementations,
-		{ desc = "LSP: [G]oto [I]mplementation", buffer = buffer_number }
+		{ desc = "LSP: Go to implementations", buffer = buffer_number }
 	)
-
-	nnoremap(
+	vim.keymap.set(
+		"n",
 		"<leader>bs",
 		require("telescope.builtin").lsp_document_symbols,
-		{ desc = "LSP: [B]uffer [S]ymbols", buffer = buffer_number }
+		{ desc = "LSP: Document symbols", buffer = buffer_number }
 	)
-
-	nnoremap(
+	vim.keymap.set(
+		"n",
 		"<leader>ps",
 		require("telescope.builtin").lsp_workspace_symbols,
-		{ desc = "LSP: [P]roject [S]ymbols", buffer = buffer_number }
+		{ desc = "LSP: Workspace symbols", buffer = buffer_number }
 	)
-
-	-- See `:help K` for why this keymap
-	-- nnoremap("K", vim.lsp.buf.hover, { desc = "LSP: Hover Documentation", buffer = buffer_number })
-	nnoremap("<leader>k", vim.lsp.buf.signature_help, { desc = "LSP: Signature Documentation", buffer = buffer_number })
-	inoremap("<C-k>", vim.lsp.buf.signature_help, { desc = "LSP: Signature Documentation", buffer = buffer_number })
-
-	-- Lesser used LSP functionality
-	nnoremap("gD", vim.lsp.buf.declaration, { desc = "LSP: [G]oto [D]eclaration", buffer = buffer_number })
-	nnoremap("td", vim.lsp.buf.type_definition, { desc = "LSP: [T]ype [D]efinition", buffer = buffer_number })
+	vim.keymap.set(
+		"n",
+		"<leader>k",
+		vim.lsp.buf.signature_help,
+		{ desc = "LSP: Signature help", buffer = buffer_number }
+	)
+	vim.keymap.set("i", "<C-k>", vim.lsp.buf.signature_help, { desc = "LSP: Signature help", buffer = buffer_number })
+	vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { desc = "LSP: Go to declaration", buffer = buffer_number })
+	vim.keymap.set("n", "td", vim.lsp.buf.type_definition, { desc = "LSP: Type definition", buffer = buffer_number })
 end
 
 -- Symbol Outline keybind
-nnoremap("<leader>so", ":SymbolsOutline<cr>")
+vim.keymap.set("n", "<leader>so", ":SymbolsOutline<cr>", { desc = "Toggle symbol outline" })
 
 -- Open Copilot panel
-nnoremap("<leader>oc", function()
+vim.keymap.set("n", "<leader>oc", function()
 	require("copilot.panel").open({})
-end, { desc = "[O]pen [C]opilot panel" })
+end, { desc = "Open Copilot panel" })
 
--- nvim-ufo keybinds
--- nnoremap("zR", require("ufo").openAllFolds)
--- nnoremap("zM", require("ufo").closeAllFolds)
-
--- toggle inlay hints
-nnoremap("<leader>ih", function()
+-- Toggle inlay hints
+vim.keymap.set("n", "<leader>ih", function()
 	vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({}))
-end)
+end, { desc = "Toggle inlay hints" })
 
--- Insert --
--- Map jj and JJ to <esc>
-inoremap("jj", "<esc>")
-inoremap("JJ", "<esc>")
+-- Insert Mode --
+vim.keymap.set("i", "jj", "<esc>", { desc = "Exit insert mode (jj)" })
+vim.keymap.set("i", "JJ", "<esc>", { desc = "Exit insert mode (JJ)" })
 
--- Visual --
--- Disable Space bar since it'll be used as the leader key
-vnoremap("<space>", "<nop>")
+-- Visual Mode --
+vim.keymap.set("v", "<space>", "<nop>", { desc = "Disable space (leader) in visual mode" })
+vim.keymap.set("v", "L", "$<left>", { desc = "Move to end of line in visual mode" })
+vim.keymap.set("v", "H", "^", { desc = "Move to beginning of line in visual mode" })
+vim.keymap.set("v", "<A-j>", ":m '>+1<CR>gv=gv", { desc = "Move selected block down" })
+vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selected block up" })
 
--- Press 'H', 'L' to jump to start/end of a line (first/last char)
-vnoremap("L", "$<left>")
-vnoremap("H", "^")
-
-vnoremap("<A-j>", ":m '>+1<CR>gv=gv")
-vnoremap("<A-k>", ":m '<-2<CR>gv=gv")
-
--- Paste without losing the contents of the register
-xnoremap("<leader>p", '"_dP')
-
--- Reselect the last visual selection
-xnoremap("<<", function()
-	-- Move selected text up/down in visual mode
+-- Visual Block Mode --
+vim.keymap.set("x", "<leader>p", '"_dP', { desc = "Paste without overwriting register" })
+vim.keymap.set("x", "<<", function()
 	vim.cmd("normal! <<")
 	vim.cmd("normal! gv")
-end)
-
-xnoremap(">>", function()
+end, { desc = "Indent left and reselect visual block" })
+vim.keymap.set("x", ">>", function()
 	vim.cmd("normal! >>")
 	vim.cmd("normal! gv")
-end)
+end, { desc = "Indent right and reselect visual block" })
 
--- Terminal --
--- Enter normal mode while in a terminal
-tnoremap("<esc>", [[<C-\><C-n>]])
-tnoremap("jj", [[<C-\><C-n>]])
-
--- Window navigation from terminal
-tnoremap("<C-h>", [[<Cmd>wincmd h<CR>]])
-tnoremap("<C-j>", [[<Cmd>wincmd j<CR>]])
-tnoremap("<C-k>", [[<Cmd>wincmd k<CR>]])
-tnoremap("<C-l>", [[<Cmd>wincmd l<CR>]])
-
--- Reenable default <space> functionality to prevent input delay
-tnoremap("<space>", "<space>")
+-- Terminal Mode --
+vim.keymap.set("t", "<esc>", [[<C-\><C-n>]], { desc = "Exit terminal insert mode" })
+vim.keymap.set("t", "jj", [[<C-\><C-n>]], { desc = "Exit terminal insert mode (jj)" })
+vim.keymap.set("t", "<C-h>", [[<Cmd>wincmd h<CR>]], { desc = "Navigate left in terminal" })
+vim.keymap.set("t", "<C-j>", [[<Cmd>wincmd j<CR>]], { desc = "Navigate down in terminal" })
+vim.keymap.set("t", "<C-k>", [[<Cmd>wincmd k<CR>]], { desc = "Navigate up in terminal" })
+vim.keymap.set("t", "<C-l>", [[<Cmd>wincmd l<CR>]], { desc = "Navigate right in terminal" })
+vim.keymap.set("t", "<space>", "<space>", { desc = "Re-enable space key in terminal" })
 
 return M

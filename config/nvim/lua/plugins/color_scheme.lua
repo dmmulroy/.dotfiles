@@ -7,7 +7,7 @@ return {
 		config = function()
 			require("catppuccin").setup({
 				integrations = {
-					cmp = true,
+					blink_cmp = true,
 					fidget = true,
 					gitsigns = true,
 					harpoon = true,
@@ -21,6 +21,10 @@ return {
 					noice = true,
 					notify = true,
 					symbols_outline = true,
+					snacks = {
+						enabled = true,
+						indent_scope_color = "mauve",
+					},
 					telescope = true,
 					treesitter = true,
 					treesitter_context = true,
