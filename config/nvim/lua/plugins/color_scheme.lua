@@ -35,10 +35,11 @@ return {
 
 			vim.api.nvim_set_hl(0, "BlinkCmpMenu", { bg = palette.base })
 			vim.api.nvim_set_hl(0, "BlinkCmpMenuBorder", { fg = palette.blue })
-			vim.api.nvim_set_hl(0, "BlinkCmpDoc", { bg = palette.mantle })
+			vim.api.nvim_set_hl(0, "BlinkCmpDoc", { bg = palette.base })
 			vim.api.nvim_set_hl(0, "BlinkCmpDocBorder", { fg = palette.blue })
-			vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { bg = palette.mantle })
+			vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { bg = palette.base })
 			vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { fg = palette.blue })
+			vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = palette.blue, bg = palette.base })
 
 			-- Hide all semantic highlights until upstream issues are resolved (https://github.com/catppuccin/nvim/issues/480)
 			for _, group in ipairs(vim.fn.getcompletion("@lsp", "highlight")) do
