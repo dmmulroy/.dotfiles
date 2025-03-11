@@ -5,7 +5,7 @@ return {
 			"rafamadriz/friendly-snippets",
 			"onsails/lspkind.nvim",
 			"nvim-tree/nvim-web-devicons",
-			"fang2hou/blink-copilot",
+			-- "fang2hou/blink-copilot",
 		},
 		version = "*",
 		opts = {
@@ -101,19 +101,20 @@ return {
 				["<C-c>"] = { "cancel" },
 				["<CR>"] = { "accept", "fallback" },
 			},
-			signature = { enabled = true },
+			-- signature = { enabled = true },
 			sources = {
-				default = { "lsp", "path", "snippets", "buffer", "copilot" },
+				default = { "lsp", "path", "snippets", "buffer" },
+				-- default = { "lsp", "path", "snippets", "buffer", "copilot" },
 				providers = {
 					buffer = {
 						max_items = 5,
 					},
-					copilot = {
-						async = true,
-						name = "Copilot",
-						module = "blink-copilot",
-						score_offset = 4,
-					},
+					-- copilot = {
+					-- 	async = true,
+					-- 	name = "Copilot",
+					-- 	module = "blink-copilot",
+					-- 	score_offset = 4,
+					-- },
 					lsp = {
 						score_offset = 5,
 					},
