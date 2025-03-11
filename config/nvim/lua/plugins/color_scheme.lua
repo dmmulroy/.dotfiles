@@ -40,6 +40,7 @@ return {
 			vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelp", { bg = palette.base })
 			vim.api.nvim_set_hl(0, "BlinkCmpSignatureHelpBorder", { fg = palette.blue })
 			vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = palette.blue, bg = palette.base })
+			vim.api.nvim_set_hl(0, "BlinkCmpGhostText", { fg = palette.overlay2 })
 
 			-- Hide all semantic highlights until upstream issues are resolved (https://github.com/catppuccin/nvim/issues/480)
 			for _, group in ipairs(vim.fn.getcompletion("@lsp", "highlight")) do
@@ -75,3 +76,4 @@ return {
 -- 	base = "#24273a",
 -- 	mantle = "#1e2030",
 -- 	crust = "#181926",
+--#919ABA
