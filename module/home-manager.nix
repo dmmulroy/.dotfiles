@@ -135,6 +135,9 @@ in {
     ".ideavimrc" = {
       source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/jetbrains/.ideavimrc";
     };
+    ".aider.conf.yml" = {
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/aider/.aider.config.yml";
+    };
   };
 
   xdg.configFile = {
