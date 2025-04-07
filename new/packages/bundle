@@ -20,6 +20,7 @@ brew "tmux"
 brew "tpm"
 brew "tree"
 brew "wget"
+brew "zoxide"
 
 cask "arc"
 cask "cleanshot"
