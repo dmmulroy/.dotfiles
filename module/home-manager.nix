@@ -38,11 +38,22 @@ in {
 
   programs.fish = {
     enable = true;
+
     interactiveShellInit = ''
       set fish_greeting # Disable greeting
 
       ${builtins.readFile ../config/fish/catppuccin_macchiato_theme.fish}
       ${builtins.readFile ../config/fish/graphite.fish}
+
+      set -gx PATH "/Users/dmmulroy/.local/state/fnm_multishells/55214_1743969053185/bin" $PATH;
+      set -gx FNM_MULTISHELL_PATH "/Users/dmmulroy/.local/state/fnm_multishells/55214_1743969053185";
+      set -gx FNM_VERSION_FILE_STRATEGY "local";
+      set -gx FNM_DIR "/Users/dmmulroy/Library/Application Support/fnm";
+      set -gx FNM_LOGLEVEL "info";
+      set -gx FNM_NODE_DIST_MIRROR "https://nodejs.org/dist";
+      set -gx FNM_COREPACK_ENABLED "false";
+      set -gx FNM_RESOLVE_ENGINES "true";
+      set -gx FNM_ARCH "arm64";
     '';
     functions = import ../config/fish/functions.nix;
     plugins = [
@@ -136,7 +147,7 @@ in {
       source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/jetbrains/.ideavimrc";
     };
     ".aider.conf.yml" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/aider/.aider.config.yml";
+      source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/kickstart.nix/config/aider/.aider.conf.yml";
     };
   };
 

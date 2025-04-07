@@ -84,3 +84,6 @@ vim.opt.guicursor = {
 	"a:blinkwait700-blinkoff400-blinkon250", -- All modes: blinking settings
 	"sm:block-blinkwait175-blinkoff150-blinkon175", -- Showmatch: block cursor with specific blinking settings
 }
+
+-- Enable virtual lines for diagnostics
+-- vim.lsp.diagnostic.config({ virtual_lines = { current_line = true } })
