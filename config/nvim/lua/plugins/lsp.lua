@@ -14,7 +14,7 @@ return {
 			{ "j-hui/fidget.nvim" },
 		},
 		config = function()
-			local map_lsp_keybinds = require("user.keymaps").map_lsp_keybinds
+			local map_lsp_keybinds = require("dmmulroy.keymaps").map_lsp_keybinds
 
 			-- Default LSP handlers with rounded borders
 			local default_handlers = {

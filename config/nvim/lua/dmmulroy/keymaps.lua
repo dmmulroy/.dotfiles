@@ -3,6 +3,8 @@ local M = {}
 -- Normal Mode --
 vim.keymap.set("n", "<space>", "<nop>", { desc = "Disable space (leader) in normal mode" })
 
+vim.keymap.set("n", "<C-/>", "<nop>")
+
 -- Window and kitty navigation
 vim.keymap.set("n", "<C-j>", function()
 	if vim.fn.exists(":NvimTmuxNavigateDown") ~= 0 then

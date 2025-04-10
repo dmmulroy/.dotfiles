@@ -5,19 +5,12 @@ return {
 		"folke/snacks.nvim",
 		priority = 1000,
 		lazy = false,
-		dependencies = {
-			{
-				"lewis6991/gitsigns.nvim",
-				init = function()
-					require("gitsigns").setup()
-				end,
-			},
-		},
 		---@type snacks.Config
 		opts = {
 			bigfile = { enabled = true },
 			gitbrowse = { enabled = true },
 			indent = { enabled = true },
+			input = { enabled = true },
 			notifier = {
 				enabled = true,
 				timeout = 3000,
@@ -38,6 +31,15 @@ return {
 							end
 						end
 						return notify(message, level, opts)
+					end
+				end,
+			})
+
+			vim.api.nvim_create_autocmd("User", {
+				pattern = "OilActionsPost",
+				callback = function(event)
+					if event.data.actions.type == "move" then
+						Snacks.rename.on_rename_file(event.data.actions.src_url, event.data.actions.dest_url)
 					end
 				end,
 			})
