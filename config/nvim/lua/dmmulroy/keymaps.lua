@@ -12,7 +12,7 @@ vim.keymap.set("n", "<C-j>", function()
 	else
 		vim.cmd.wincmd("j")
 	end
-end, { desc = "Navigate down (kitty navigation if available)" })
+end, { desc = "Navigate down" })
 
 vim.keymap.set("n", "<C-k>", function()
 	if vim.fn.exists(":NvimTmuxNavigateUp") ~= 0 then
@@ -20,7 +20,7 @@ vim.keymap.set("n", "<C-k>", function()
 	else
 		vim.cmd.wincmd("k")
 	end
-end, { desc = "Navigate up (kitty navigation if available)" })
+end, { desc = "Navigate up" })
 
 vim.keymap.set("n", "<C-l>", function()
 	if vim.fn.exists(":NvimTmuxNavigateRight") ~= 0 then
@@ -28,7 +28,7 @@ vim.keymap.set("n", "<C-l>", function()
 	else
 		vim.cmd.wincmd("l")
 	end
-end, { desc = "Navigate right (kitty navigation if available)" })
+end, { desc = "Navigate right" })
 
 vim.keymap.set("n", "<C-h>", function()
 	if vim.fn.exists(":NvimTmuxNavigateLeft") ~= 0 then
@@ -36,7 +36,7 @@ vim.keymap.set("n", "<C-h>", function()
 	else
 		vim.cmd.wincmd("h")
 	end
-end, { desc = "Navigate left (kitty navigation if available)" })
+end, { desc = "Navigate left" })
 
 -- Swap between last two buffers
 vim.keymap.set("n", "<leader>'", "<C-^>", { desc = "Switch to last buffer" })
@@ -94,12 +94,15 @@ vim.keymap.set("n", "H", "^", { desc = "Jump to beginning of line" })
 vim.keymap.set("n", "U", "<C-r>", { desc = "Redo last change" })
 
 -- Turn off highlighted search results
-vim.keymap.set("n", "<leader>no", "<cmd>noh<cr>", { desc = "Clear search highlighting" })
+vim.keymap.set("n", "<leader>no", "<cmd>noh<cr>", { desc = "Toggle search highlighting" })
 
--- Toggle wrap
-vim.keymap.set("n", "<leader>tw", function()
-	Snacks.toggle.option("wrap")
-end, { desc = "Toggle line wrap" })
+-- Code Companion
+vim.keymap.set(
+	"n",
+	"<leader>ai",
+	"<cmd>CodeCompanionChat Toggle<cr>",
+	{ desc = "Toggle Code Companion chat", noremap = true, silent = true }
+)
 
 -- Diagnostics --
 vim.keymap.set("n", "]d", function()
@@ -206,20 +209,25 @@ end, { desc = "Navigate to Harpoon file 5" })
 
 -- Telescope keybinds --
 vim.keymap.set("n", "<leader>?", require("telescope.builtin").oldfiles, { desc = "Find recently opened files" })
+
 vim.keymap.set("n", "<leader>sb", require("telescope.builtin").buffers, { desc = "Search open buffers" })
+
 vim.keymap.set("n", "<leader>sf", function()
 	require("telescope.builtin").find_files({ hidden = true })
 end, { desc = "Find files (including hidden)" })
+
 vim.keymap.set("n", "<leader>sh", require("telescope.builtin").help_tags, { desc = "Search help tags" })
+
 vim.keymap.set("n", "<leader>sg", require("telescope.builtin").live_grep, { desc = "Live grep search" })
-vim.keymap.set("n", "<leader>sc", function()
-	require("telescope.builtin").commands(require("telescope.themes").get_dropdown({ previewer = false }))
-end, { desc = "Search commands" })
+
+vim.keymap.set("n", "<leader>sc", require("telescope.builtin").git_bcommits, { desc = "[S]earch buffer [C]ommits" })
+
 vim.keymap.set("n", "<leader>/", function()
 	require("telescope.builtin").current_buffer_fuzzy_find(
 		require("telescope.themes").get_dropdown({ previewer = false })
 	)
 end, { desc = "Fuzzily search in current buffer" })
+
 vim.keymap.set("n", "<leader>ss", function()
 	require("telescope.builtin").spell_suggest(require("telescope.themes").get_dropdown({ previewer = false }))
 end, { desc = "Spell suggestions search" })
@@ -267,15 +275,10 @@ end
 -- Symbol Outline keybind
 vim.keymap.set("n", "<leader>so", ":SymbolsOutline<cr>", { desc = "Toggle symbol outline" })
 
--- Open Copilot panel
-vim.keymap.set("n", "<leader>oc", function()
-	require("copilot.panel").open({})
-end, { desc = "Open Copilot panel" })
-
 -- Toggle inlay hints
 vim.keymap.set("n", "<leader>ih", function()
 	vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({}))
-end, { desc = "Toggle inlay hints" })
+end, { desc = "Toggle [i]nlay [h]ints" })
 
 -- Insert Mode --
 vim.keymap.set("i", "jj", "<esc>", { desc = "Exit insert mode (jj)" })
@@ -288,24 +291,29 @@ vim.keymap.set("v", "H", "^", { desc = "Move to beginning of line in visual mode
 vim.keymap.set("v", "<A-j>", ":m '>+1<CR>gv=gv", { desc = "Move selected block down" })
 vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selected block up" })
 
--- Visual Block Mode --
+-- Code Companion
+vim.keymap.set(
+	"x",
+	"<leader>ai",
+	"<cmd>'<,'>CodeCompanion<cr>",
+	{ desc = "Prompt Code Companion on the current selection", noremap = true, silent = true }
+)
+
 vim.keymap.set("x", "<leader>p", '"_dP', { desc = "Paste without overwriting register" })
+
+-- This keymap indents the selected visual block to the left and reselects it
 vim.keymap.set("x", "<<", function()
 	vim.cmd("normal! <<")
 	vim.cmd("normal! gv")
 end, { desc = "Indent left and reselect visual block" })
+vim.keymap.set("x", "<<", function()
+	vim.cmd("normal! <<")
+	vim.cmd("normal! gv")
+end, { desc = "Indent left and reselect visual block" })
+
 vim.keymap.set("x", ">>", function()
 	vim.cmd("normal! >>")
 	vim.cmd("normal! gv")
 end, { desc = "Indent right and reselect visual block" })
-
--- Terminal Mode --
-vim.keymap.set("t", "<esc>", [[<C-\><C-n>]], { desc = "Exit terminal insert mode" })
-vim.keymap.set("t", "jj", [[<C-\><C-n>]], { desc = "Exit terminal insert mode (jj)" })
-vim.keymap.set("t", "<C-h>", [[<Cmd>wincmd h<CR>]], { desc = "Navigate left in terminal" })
-vim.keymap.set("t", "<C-j>", [[<Cmd>wincmd j<CR>]], { desc = "Navigate down in terminal" })
-vim.keymap.set("t", "<C-k>", [[<Cmd>wincmd k<CR>]], { desc = "Navigate up in terminal" })
-vim.keymap.set("t", "<C-l>", [[<Cmd>wincmd l<CR>]], { desc = "Navigate right in terminal" })
-vim.keymap.set("t", "<space>", "<space>", { desc = "Re-enable space key in terminal" })
 
 return M

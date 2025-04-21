@@ -5,19 +5,25 @@ return {
 		"folke/snacks.nvim",
 		priority = 1000,
 		lazy = false,
+
 		---@type snacks.Config
 		opts = {
 			bigfile = { enabled = true },
+			bufdelete = { enabled = true },
+			dim = { enabled = true },
 			gitbrowse = { enabled = true },
 			indent = { enabled = true },
 			input = { enabled = true },
 			notifier = {
 				enabled = true,
 				timeout = 3000,
+				style = "fancy",
 			},
+			toggle = { enabled = true },
 			statuscolumn = { enabled = true },
 			words = { enabled = true },
 		},
+
 		init = function()
 			vim.api.nvim_create_autocmd("User", {
 				pattern = "VeryLazy",
@@ -103,7 +109,28 @@ return {
 				desc = "[T]oggle [D]iagnostics",
 			},
 			{
-				"<leader>tt",
+				"<leader>dm",
+				function()
+					Snacks.toggle.dim():toggle()
+				end,
+				desc = "Toggle [D]im [M]ode",
+			},
+			{
+				"<leader>zm",
+				function()
+					Snacks.toggle.zen():toggle()
+				end,
+				desc = "Toggle [Z]en [M]ode",
+			},
+			{
+				"<leader>tw",
+				function()
+					Snacks.toggle.option("wrap"):toggle()
+				end,
+				desc = "[T]oggle line [W]rap",
+			},
+			{
+				"<leader>tc",
 				function()
 					local tsc = require("treesitter-context")
 					Snacks.toggle({
@@ -118,7 +145,7 @@ return {
 						end,
 					}):toggle()
 				end,
-				desc = "[T]oggle [T]reesitter Context",
+				desc = "Toggle [T]reesitter [C]ontext",
 			},
 			{
 				"<leader>hl",
