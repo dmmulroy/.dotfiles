@@ -1,4 +1,4 @@
-config/nvim/.undodir
-config/nvim/lazy-lock.json
+*/**/.undodir
+lazy-lock.json
 .aider*
 .envrc

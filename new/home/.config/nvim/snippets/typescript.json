@@ -1,0 +1,11 @@
+{
+  "Readonly<{}>": {
+    "prefix": "type",
+    "body": [
+      "type $1 = Readonly<{",
+      "  $0",
+      "}>;"
+    ],
+    "description": "Readonly<{}>"
+  }
+}

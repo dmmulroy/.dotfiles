@@ -1,3 +1,4 @@
+local get_cursor_position = require("dmmulroy.prelude").get_cursor_position
 local M = {}
 
 -- Normal Mode --
@@ -106,39 +107,78 @@ vim.keymap.set(
 
 -- Diagnostics --
 vim.keymap.set("n", "]d", function()
-	vim.diagnostic.goto_next({})
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next() })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next diagnostic and center" })
 
 vim.keymap.set("n", "[d", function()
-	vim.diagnostic.goto_prev({})
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev() })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous diagnostic and center" })
 
 vim.keymap.set("n", "]e", function()
-	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.ERROR })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next(), severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next error diagnostic and center" })
 
 vim.keymap.set("n", "[e", function()
-	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.ERROR })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev(), severity = vim.diagnostic.severity.ERROR })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous error diagnostic and center" })
 
 vim.keymap.set("n", "]w", function()
-	vim.diagnostic.goto_next({ severity = vim.diagnostic.severity.WARN })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next(), severity = vim.diagnostic.severity.WARN })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next warning diagnostic and center" })
 
 vim.keymap.set("n", "[w", function()
-	vim.diagnostic.goto_prev({ severity = vim.diagnostic.severity.WARN })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev(), severity = vim.diagnostic.severity.WARN })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous warning diagnostic and center" })
 
--- Diagnostic float and quickfix
+-- Toggle diagnostics display mode
 vim.keymap.set("n", "<leader>d", function()
-	vim.diagnostic.open_float({ border = "rounded" })
-end, { desc = "Open diagnostic float with rounded border" })
+	-- Get all diagnostics for the current buffer
+	local buffer_diagnostics = vim.diagnostic.get()
+
+	-- If there are no diagnostics, exit early
+	if not (#buffer_diagnostics > 0) then
+		return
+	end
+
+	-- Get the current buffer number
+	local buffer_number = vim.api.nvim_get_current_buf()
+
+	-- Get the cursor position (row and column)
+	local cursor_position = get_cursor_position({ zero_indexed = true })
+
+	-- Get diagnostics for the current line
+	local line_diagnostics = vim.diagnostic.get(buffer_number, { lnum = cursor_position.row })
+
+	-- If there are no diagnostics on the current line, exit early
+	if not (#line_diagnostics > 0) then
+		return
+	end
+
+	-- Toggle between virtual lines and virtual text for diagnostics
+	if vim.diagnostic.config().virtual_lines then
+		-- Disable virtual lines and enable virtual text
+		vim.diagnostic.config({ virtual_lines = false, virtual_text = true })
+		return
+	end
+
+	-- Enable virtual lines for the current line and disable virtual text
+	vim.diagnostic.config({ virtual_lines = { current_line = true }, virtual_text = false })
+
+	-- Automatically reset to virtual text when the cursor moves
+	vim.api.nvim_create_autocmd("CursorMoved", {
+		group = vim.api.nvim_create_augroup("virtual_lines_cursor_moved", { clear = true }),
+		callback = function()
+			vim.diagnostic.config({ virtual_lines = false, virtual_text = true })
+			return true
+		end,
+	})
+end, { desc = "Toggle diagnostics display mode" })
 
 vim.keymap.set("n", "<leader>ld", vim.diagnostic.setqflist, { desc = "Populate quickfix list with diagnostics" })
 
@@ -262,13 +302,17 @@ M.map_lsp_keybinds = function(buffer_number)
 		{ desc = "LSP: Workspace symbols", buffer = buffer_number }
 	)
 
-	vim.keymap.set(
-		"n",
-		"<leader>k",
-		vim.lsp.buf.signature_help,
-		{ desc = "LSP: Signature help", buffer = buffer_number }
-	)
-	vim.keymap.set("i", "<C-k>", vim.lsp.buf.signature_help, { desc = "LSP: Signature help", buffer = buffer_number })
+	local signature_help = function()
+		return vim.lsp.buf.signature_help({ border = "rounded" })
+	end
+
+	local hover = function()
+		return vim.lsp.buf.hover({ border = "rounded" })
+	end
+
+	vim.keymap.set("n", "K", hover, { desc = "LSP: Signature help", buffer = buffer_number })
+
+	vim.keymap.set("i", "<C-k>", signature_help, { desc = "LSP: Signature help", buffer = buffer_number })
 	vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { desc = "LSP: Go to declaration", buffer = buffer_number })
 	vim.keymap.set("n", "td", vim.lsp.buf.type_definition, { desc = "LSP: Type definition", buffer = buffer_number })
 end

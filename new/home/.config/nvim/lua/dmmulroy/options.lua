@@ -89,4 +89,8 @@ vim.opt.guicursor = {
 -- vim.opt.winborder = "rounded"
 
 -- Enable virtual lines for diagnostics
-vim.diagnostic.config({ virtual_lines = { current_line = true } })
+vim.diagnostic.config({
+	float = { border = "rounded" },
+	virtual_text = true,
+	virtual_lines = false,
+})
