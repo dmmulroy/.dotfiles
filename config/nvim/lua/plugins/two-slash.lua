@@ -1,10 +1,13 @@
 return {
 	{
 		"marilari88/twoslash-queries.nvim",
-		lazy = true,
-		ft = "javascript,typescript,typescriptreact,svelte",
-		opts = {
-			is_enabled = true,
-		},
+		event = "VeryLazy",
+		config = function()
+			require("twoslash-queries").setup({
+				multi_line = true,
+				is_enabled = false,
+				highlight = "Comment",
+			})
+		end,
 	},
 }

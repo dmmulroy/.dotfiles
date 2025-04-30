@@ -137,7 +137,7 @@ return {
 					capabilities = capabilities,
 					filetypes = config.filetypes,
 					handlers = vim.tbl_deep_extend("force", {}, default_handlers, config.handlers or {}),
-					on_attach = on_attach,
+					on_attach = config.on_attach or on_attach,
 					settings = config.settings,
 					root_dir = config.root_dir,
 				})

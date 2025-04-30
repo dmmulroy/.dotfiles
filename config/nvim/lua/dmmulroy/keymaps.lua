@@ -1,3 +1,4 @@
+local twoslash = require("twoslash-queries")
 local M = {}
 
 -- Normal Mode --
@@ -272,6 +273,17 @@ M.map_lsp_keybinds = function(buffer_number)
 	vim.keymap.set("n", "gD", vim.lsp.buf.declaration, { desc = "LSP: Go to declaration", buffer = buffer_number })
 	vim.keymap.set("n", "td", vim.lsp.buf.type_definition, { desc = "LSP: Type definition", buffer = buffer_number })
 end
+
+vim.keymap.set("n", "<leader>ts", function()
+	if twoslash.config.is_enabled then
+		vim.cmd("TwoslashQueriesDisable")
+		Snacks.notify.info("Two Slash queries disabled")
+		return
+	end
+
+	vim.cmd(":TwoslashQueriesEnable")
+	Snacks.notify.info("Two Slash queries enabled")
+end, { desc = "Toggle [T]wo [S]lash queries" })
 
 -- Symbol Outline keybind
 vim.keymap.set("n", "<leader>so", ":SymbolsOutline<cr>", { desc = "Toggle symbol outline" })
