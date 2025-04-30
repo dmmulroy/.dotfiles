@@ -1,4 +1,6 @@
 local get_cursor_position = require("dmmulroy.prelude").get_cursor_position
+local copy_line_diagnostics_to_clipboard = require("dmmulroy.prelude").copy_line_diagnostics_to_clipboard
+
 local M = {}
 
 -- Normal Mode --
@@ -117,22 +119,26 @@ vim.keymap.set("n", "[d", function()
 end, { desc = "Go to previous diagnostic and center" })
 
 vim.keymap.set("n", "]e", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next(), severity = vim.diagnostic.severity.ERROR })
+	vim.diagnostic.jump({
+		diagnostic = vim.diagnostic.get_next({ severity = vim.diagnostic.severity.ERROR }),
+	})
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next error diagnostic and center" })
 
 vim.keymap.set("n", "[e", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev(), severity = vim.diagnostic.severity.ERROR })
+	vim.diagnostic.jump({
+		diagnostic = vim.diagnostic.get_prev({ severity = vim.diagnostic.severity.ERROR }),
+	})
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous error diagnostic and center" })
 
 vim.keymap.set("n", "]w", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next(), severity = vim.diagnostic.severity.WARN })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next({ severity = vim.diagnostic.severity.WARN }) })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next warning diagnostic and center" })
 
 vim.keymap.set("n", "[w", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev(), severity = vim.diagnostic.severity.WARN })
+	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev({ severity = vim.diagnostic.severity.WARN }) })
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous warning diagnostic and center" })
 
@@ -179,6 +185,8 @@ vim.keymap.set("n", "<leader>d", function()
 		end,
 	})
 end, { desc = "Toggle diagnostics display mode" })
+
+vim.keymap.set("n", "<leader>cd", copy_line_diagnostics_to_clipboard, { desc = "[C]opy line [D]iagnostics" })
 
 vim.keymap.set("n", "<leader>ld", vim.diagnostic.setqflist, { desc = "Populate quickfix list with diagnostics" })
 

@@ -20,6 +20,7 @@ return {
 				style = "fancy",
 			},
 			toggle = { enabled = true },
+			scratch = { enabled = true },
 			statuscolumn = { enabled = true },
 			words = { enabled = true },
 		},
@@ -159,6 +160,21 @@ return {
 					}):toggle()
 				end,
 				desc = "Toggle [H]igh[L]ight Colors",
+			},
+			{
+				"<leader>.",
+				function()
+					Snacks.scratch()
+				end,
+				desc = "Toggle Scratch Buffer",
+			},
+			{
+				"<leader>s.",
+				function()
+					Snacks.scratch.select()
+				end,
+
+				desc = "Search Scratch Buffers",
 			},
 		},
 	},
