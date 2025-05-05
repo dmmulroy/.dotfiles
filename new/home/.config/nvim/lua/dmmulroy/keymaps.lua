@@ -1,3 +1,4 @@
+local twoslash = require("twoslash-queries")
 local get_cursor_position = require("dmmulroy.prelude").get_cursor_position
 local copy_line_diagnostics_to_clipboard = require("dmmulroy.prelude").copy_line_diagnostics_to_clipboard
 
@@ -106,6 +107,17 @@ vim.keymap.set(
 	"<cmd>CodeCompanionChat Toggle<cr>",
 	{ desc = "Toggle Code Companion chat", noremap = true, silent = true }
 )
+
+vim.keymap.set("n", "<leader>ts", function()
+	if twoslash.config.is_enabled then
+		vim.cmd("TwoslashQueriesDisable")
+		Snacks.notify.info("Two Slash queries disabled")
+		return
+	end
+
+	vim.cmd(":TwoslashQueriesEnable")
+	Snacks.notify.info("Two Slash queries enabled")
+end, { desc = "Toggle [T]wo [S]lash queries" })
 
 -- Diagnostics --
 vim.keymap.set("n", "]d", function()
