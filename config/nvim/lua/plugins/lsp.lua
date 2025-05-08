@@ -5,8 +5,8 @@ return {
 		cmd = { "LspInfo", "LspInstall", "LspUninstall", "Mason" },
 		dependencies = {
 			-- LSP installer plugins
-			"williamboman/mason.nvim",
-			"williamboman/mason-lspconfig.nvim",
+			{ "mason-org/mason.nvim", version = "^1.0.0" },
+			{ "mason-org/mason-lspconfig.nvim", version = "^1.0.0" },
 			"WhoIsSethDaniel/mason-tool-installer.nvim",
 			-- Integrate blink w/ LSP
 			"hrsh7th/cmp-nvim-lsp",
@@ -22,7 +22,7 @@ return {
 				["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, { border = "rounded" }),
 			}
 
-			local ts_ls_inlay_hints = {
+			local vtsls_inlay_hints = {
 				includeInlayEnumMemberValueHints = true,
 				includeInlayFunctionLikeReturnTypeHints = true,
 				includeInlayFunctionParameterTypeHints = true,
@@ -84,15 +84,15 @@ return {
 				tailwindcss = {
 					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte" },
 				},
-				ts_ls = {
+				vtsls = {
 					on_attach = function(client, buffer_number)
 						require("twoslash-queries").attach(client, buffer_number)
 						return on_attach(client, buffer_number)
 					end,
 					settings = {
 						maxTsServerMemory = 12288,
-						typescript = { inlayHints = ts_ls_inlay_hints },
-						javascript = { inlayHints = ts_ls_inlay_hints },
+						typescript = { inlayHints = vtsls_inlay_hints },
+						javascript = { inlayHints = vtsls_inlay_hints },
 					},
 				},
 				yamlls = {},
