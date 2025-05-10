@@ -1,1 +1,0 @@
-zoxide init fish | source
