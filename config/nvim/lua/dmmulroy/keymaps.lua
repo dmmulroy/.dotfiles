@@ -306,7 +306,7 @@ vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selected block u
 
 -- Code Companion
 vim.keymap.set(
-	"x",
+	"v",
 	"<leader>ai",
 	"<cmd>'<,'>CodeCompanion<cr>",
 	{ desc = "Prompt Code Companion on the current selection", noremap = true, silent = true }
