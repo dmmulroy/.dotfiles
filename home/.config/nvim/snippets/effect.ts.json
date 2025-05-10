@@ -1,0 +1,69 @@
+{
+  "Effect.gen": {
+    "prefix": "gen",
+    "body": [
+      "Effect.gen(function* () {",
+      "  $0",
+      "}).pipe(Effect.withSpan($1));"
+    ],
+    "description": "Effect.gen"
+  },
+  "Effect.fn": {
+    "prefix": "fn",
+    "body": [
+      "Effect.fn($1)(function* ($2) {",
+      "  $0",
+      "});"
+    ],
+    "description": "Effect.fn"
+  },
+  "Effect.fnUntraced": {
+    "prefix": "fn",
+    "body": [
+      "Effect.fnUntraced(function* ($1) {",
+      "  $0",
+      "});"
+    ],
+    "description": "Effect.fnUntraced"
+  },
+  "Context.Tag": {
+    "prefix": "Tag",
+    "body": [
+      "class $1 extends Context.Tag($2)<$1, $3>() {}",
+      "$0"
+    ],
+    "description": "Context.Tag"
+  },
+  "Schema.TaggerError": {
+    "prefix": "Err",
+    "body": [
+      "class $1 extends Schema.TaggedError<$1>()($1, {",
+      "$0",
+      "}) {}"
+    ],
+    "description": "Schema.TaggerError"
+  },
+  "Generic Effect fn": {
+    "prefix": "<A",
+    "body": [
+      "<A, E, R>(effect: Effect.Effect<A, E, R>) => {",
+      "  $0",
+      "}"
+    ],
+    "description": "Generic Effect fn"
+  },
+  "Effect.Effect<A, E, R>": {
+    "prefix": "Effect.E",
+    "body": [
+      "Effect.Effect<$1, $2, $3>"
+    ],
+    "description": "Effect.Effect<A, E, R>"
+  },
+  "Option.Option<A>": {
+    "prefix": "Option.O",
+    "body": [
+      "Option.Option<$1>"
+    ],
+    "description": "Option.Option<A>"
+  }
+}

@@ -1,0 +1,2 @@
+brew "aws-iam-authenticator"
+brew "kubernetes-cli"

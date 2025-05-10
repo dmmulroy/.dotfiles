@@ -1,0 +1,22 @@
+{
+  "name": "dmmulroy-snippets",
+  "engines": {
+    "vscode": "^1.0.0"
+  },
+  "contributes": {
+    "snippets": [
+      {
+        "language": "typescript",
+        "path": "./effect.ts.json"
+      },
+      {
+        "language": "javascript",
+        "path": "./effect.ts.json"
+      },
+      {
+        "language": "typescript",
+        "path": "./typescript.json"
+      }
+    ]
+  }
+}
