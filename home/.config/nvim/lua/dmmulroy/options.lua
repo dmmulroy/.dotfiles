@@ -85,12 +85,10 @@ vim.opt.guicursor = {
 	"sm:block-blinkwait175-blinkoff150-blinkon175", -- Showmatch: block cursor with specific blinking settings
 }
 
--- Set the default borders for floating windows to be rounded
--- vim.opt.winborder = "rounded"
-
 -- Enable virtual lines for diagnostics
 vim.diagnostic.config({
 	float = { border = "rounded" },
 	virtual_text = true,
+	-- virtual_text = { current_line = true },
 	virtual_lines = false,
 })

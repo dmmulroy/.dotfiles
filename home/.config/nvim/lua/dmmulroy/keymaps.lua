@@ -1,5 +1,4 @@
 local twoslash = require("twoslash-queries")
-local get_cursor_position = require("dmmulroy.prelude").get_cursor_position
 local copy_line_diagnostics_to_clipboard = require("dmmulroy.prelude").copy_line_diagnostics_to_clipboard
 
 local M = {}
@@ -154,49 +153,10 @@ vim.keymap.set("n", "[w", function()
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous warning diagnostic and center" })
 
--- Toggle diagnostics display mode
+-- Diagnostic float and quickfix
 vim.keymap.set("n", "<leader>d", function()
-	-- Get all diagnostics for the current buffer
-	local buffer_diagnostics = vim.diagnostic.get()
-
-	-- If there are no diagnostics, exit early
-	if not (#buffer_diagnostics > 0) then
-		return
-	end
-
-	-- Get the current buffer number
-	local buffer_number = vim.api.nvim_get_current_buf()
-
-	-- Get the cursor position (row and column)
-	local cursor_position = get_cursor_position({ zero_indexed = true })
-
-	-- Get diagnostics for the current line
-	local line_diagnostics = vim.diagnostic.get(buffer_number, { lnum = cursor_position.row })
-
-	-- If there are no diagnostics on the current line, exit early
-	if not (#line_diagnostics > 0) then
-		return
-	end
-
-	-- Toggle between virtual lines and virtual text for diagnostics
-	if vim.diagnostic.config().virtual_lines then
-		-- Disable virtual lines and enable virtual text
-		vim.diagnostic.config({ virtual_lines = false, virtual_text = true })
-		return
-	end
-
-	-- Enable virtual lines for the current line and disable virtual text
-	vim.diagnostic.config({ virtual_lines = { current_line = true }, virtual_text = false })
-
-	-- Automatically reset to virtual text when the cursor moves
-	vim.api.nvim_create_autocmd("CursorMoved", {
-		group = vim.api.nvim_create_augroup("virtual_lines_cursor_moved", { clear = true }),
-		callback = function()
-			vim.diagnostic.config({ virtual_lines = false, virtual_text = true })
-			return true
-		end,
-	})
-end, { desc = "Toggle diagnostics display mode" })
+	vim.diagnostic.open_float({ border = "rounded" })
+end, { desc = "Open diagnostic float with rounded border" })
 
 vim.keymap.set("n", "<leader>cd", copy_line_diagnostics_to_clipboard, { desc = "[C]opy line [D]iagnostics" })
 
