@@ -16,7 +16,7 @@ return {
 		config = function()
 			local map_lsp_keybinds = require("dmmulroy.keymaps").map_lsp_keybinds
 
-			local ts_ls_inlay_hints = {
+			local vtsls_inlay_hints = {
 				includeInlayEnumMemberValueHints = true,
 				includeInlayFunctionLikeReturnTypeHints = true,
 				includeInlayFunctionParameterTypeHints = true,
@@ -78,15 +78,15 @@ return {
 				tailwindcss = {
 					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte" },
 				},
-				ts_ls = {
+				vtsls = {
 					on_attach = function(client, buffer_number)
 						require("twoslash-queries").attach(client, buffer_number)
 						return on_attach(client, buffer_number)
 					end,
 					settings = {
 						maxTsServerMemory = 12288,
-						typescript = { inlayHints = ts_ls_inlay_hints },
-						javascript = { inlayHints = ts_ls_inlay_hints },
+						typescript = { inlayHints = vtsls_inlay_hints },
+						javascript = { inlayHints = vtsls_inlay_hints },
 					},
 				},
 				yamlls = {},
