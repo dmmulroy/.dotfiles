@@ -17,14 +17,14 @@ return {
 			local map_lsp_keybinds = require("dmmulroy.keymaps").map_lsp_keybinds
 
 			local vtsls_inlay_hints = {
-				includeInlayEnumMemberValueHints = true,
-				includeInlayFunctionLikeReturnTypeHints = true,
-				includeInlayFunctionParameterTypeHints = true,
-				includeInlayParameterNameHints = "all",
-				includeInlayParameterNameHintsWhenArgumentMatchesName = true,
-				includeInlayPropertyDeclarationTypeHints = true,
-				includeInlayVariableTypeHints = true,
-				includeInlayVariableTypeHintsWhenTypeMatchesName = true,
+				enumMemberValues = { enabled = true },
+				functionLikeReturnTypes = { enabled = true },
+				functionParameterTypes = { enabled = true },
+				parameterNames = { enabled = "all" },
+				parameterNameWhenArgumentMatchesNames = { enabled = true },
+				propertyDeclarationTypes = { enabled = true },
+				variableTypes = { enabled = true },
+				variableTypeWhenTypeMatchesNames = { enabled = true },
 			}
 
 			-- on_attach: call your custom keymap binding function
@@ -84,8 +84,25 @@ return {
 						return on_attach(client, buffer_number)
 					end,
 					settings = {
-						maxTsServerMemory = 12288,
-						typescript = { inlayHints = vtsls_inlay_hints },
+						complete_function_calls = true,
+						vtsls = {
+							autoUseWorkspaceTsdk = true,
+							experimental = {
+								completion = {
+									enableServerSideFuzzyMatch = true,
+								},
+							},
+						},
+						typescript = {
+							updateImportOnFileMove = { enabled = "always" },
+							suggest = {
+								completeFunctionCalls = true,
+							},
+							tsserver = {
+								maxTsServerMemory = 12288,
+							},
+							inlayHints = vtsls_inlay_hints,
+						},
 						javascript = { inlayHints = vtsls_inlay_hints },
 					},
 				},
