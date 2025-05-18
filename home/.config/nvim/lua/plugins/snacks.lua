@@ -72,7 +72,7 @@ return {
 				function()
 					Snacks.notifier.show_history()
 				end,
-				desc = "Notification History",
+				desc = "[N]otification [H]istory",
 			},
 			{
 				"<leader>nd",
@@ -124,7 +124,7 @@ return {
 				desc = "[T]oggle line [W]rap",
 			},
 			{
-				"<leader>tc",
+				"<leader>tx",
 				function()
 					local tsc = require("treesitter-context")
 					Snacks.toggle({
@@ -139,7 +139,7 @@ return {
 						end,
 					}):toggle()
 				end,
-				desc = "Toggle [T]reesitter [C]ontext",
+				desc = "Toggle [T]reesitter Conte[x]t",
 			},
 			{
 				"<leader>hl",
