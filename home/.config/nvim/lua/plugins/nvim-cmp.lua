@@ -67,8 +67,8 @@ return {
 					["<C-c>"] = cmp.mapping.abort(), -- close completion window
 					["<CR>"] = cmp.mapping(function(fallback) -- select suggestion or snippet
 						if cmp.visible() then
-							if luasnip.expand_or_locally_jumpable(1) then
-								luasnip.expand_or_jump(1)
+							if luasnip.expandable() then
+								luasnip.expand()
 							else
 								cmp.confirm({
 									select = true,
