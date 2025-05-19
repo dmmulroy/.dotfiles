@@ -301,9 +301,9 @@ end
 vim.keymap.set("n", "<leader>so", ":SymbolsOutline<cr>", { desc = "Toggle symbol outline" })
 
 -- Toggle inlay hints
-vim.keymap.set("n", "<leader>ih", function()
-	vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({}))
-end, { desc = "Toggle [i]nlay [h]ints" })
+-- vim.keymap.set("n", "<leader>ih", function()
+-- 	vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({}))
+-- end, { desc = "Toggle [i]nlay [h]ints" })
 
 -- Insert Mode --
 vim.keymap.set("i", "jj", "<esc>", { desc = "Exit insert mode (jj)" })
