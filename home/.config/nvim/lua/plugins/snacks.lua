@@ -142,6 +142,25 @@ return {
 				desc = "Toggle [T]reesitter Conte[x]t",
 			},
 			{
+				"<leader>ih",
+				function()
+					Snacks.toggle({
+						name = "Inlay Hints",
+						get = function()
+							return vim.lsp.inlay_hint.is_enabled()
+						end,
+						set = function(state)
+							if state then
+								vim.lsp.inlay_hint.enable(true)
+							else
+								vim.lsp.inlay_hint.enable(false)
+							end
+						end,
+					}):toggle()
+				end,
+				desc = "Toggle [I]nlay [H]ints",
+			},
+			{
 				"<leader>hl",
 				function()
 					local hc = require("nvim-highlight-colors")
