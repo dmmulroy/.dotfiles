@@ -3,6 +3,7 @@ cask_args appdir: "~/Applications", require_sha: true
 
 brew "aider"
 brew "awscli"
+brew "cmake"
 brew "direnv"
 brew "doggo"
 brew "fd"
