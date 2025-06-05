@@ -123,36 +123,36 @@ end, { desc = "Toggle [T]wo [S]lash queries" })
 
 -- Diagnostics --
 vim.keymap.set("n", "]d", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next() })
+	pcall(vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next() }))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next diagnostic and center" })
 
 vim.keymap.set("n", "[d", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev() })
+	pcall(vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev() }))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous diagnostic and center" })
 
 vim.keymap.set("n", "]e", function()
-	vim.diagnostic.jump({
+	pcall(vim.diagnostic.jump({
 		diagnostic = vim.diagnostic.get_next({ severity = vim.diagnostic.severity.ERROR }),
-	})
+	}))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next error diagnostic and center" })
 
 vim.keymap.set("n", "[e", function()
-	vim.diagnostic.jump({
+	pcall(vim.diagnostic.jump({
 		diagnostic = vim.diagnostic.get_prev({ severity = vim.diagnostic.severity.ERROR }),
-	})
+	}))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous error diagnostic and center" })
 
 vim.keymap.set("n", "]w", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next({ severity = vim.diagnostic.severity.WARN }) })
+	pcall(vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_next({ severity = vim.diagnostic.severity.WARN }) }))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to next warning diagnostic and center" })
 
 vim.keymap.set("n", "[w", function()
-	vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev({ severity = vim.diagnostic.severity.WARN }) })
+	pcall(vim.diagnostic.jump({ diagnostic = vim.diagnostic.get_prev({ severity = vim.diagnostic.severity.WARN }) }))
 	vim.api.nvim_feedkeys("zz", "n", false)
 end, { desc = "Go to previous warning diagnostic and center" })
 
