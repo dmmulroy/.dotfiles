@@ -909,39 +909,41 @@ cmd_backup_delete() {
 }
 
 cmd_backup_help() {
-    cat << EOF
-${BOLD}${SCRIPT_NAME} backup${RESET} - Backup management commands
-
-${BOLD}USAGE:${RESET}
-    ${SCRIPT_NAME} backup [SUBCOMMAND] [OPTIONS]
-
-${BOLD}SUBCOMMANDS:${RESET}
-    create [NAME]       Create compressed backup of current configuration (default)
-    restore [NAME]      Restore configuration from backup or list available backups
-    list                List all backups with details
-    clean               Remove backups older than 30 days
-    compress            Compress legacy uncompressed backups
-    delete NAME         Delete specific backup
-    help                Show this help message
-
-${BOLD}EXAMPLES:${RESET}
-    ${SCRIPT_NAME} backup                    # Create timestamped backup
-    ${SCRIPT_NAME} backup create mybackup    # Create named backup
-    ${SCRIPT_NAME} backup mybackup           # Create named backup (shorthand)
-    ${SCRIPT_NAME} backup restore            # List available backups
-    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup
-    ${SCRIPT_NAME} backup list               # List all backups with details
-    ${SCRIPT_NAME} backup clean              # Remove old backups
-    ${SCRIPT_NAME} backup compress           # Compress legacy backups
-    ${SCRIPT_NAME} backup delete mybackup    # Delete specific backup
-
-${BOLD}NOTES:${RESET}
-    - Backups are automatically compressed using gzip for space efficiency
-    - Legacy uncompressed backups are still supported
-    - Clean command removes backups older than 30 days
-    - All operations require confirmation for destructive actions
-
-EOF
+    echo -e "${BOLD}${SCRIPT_NAME} backup${RESET} - Backup management commands"
+    echo ""
+    
+    echo -e "${BOLD}USAGE:${RESET}"
+    echo "    ${SCRIPT_NAME} backup [SUBCOMMAND] [OPTIONS]"
+    echo ""
+    
+    echo -e "${BOLD}SUBCOMMANDS:${RESET}"
+    echo "    create [NAME]       Create compressed backup of current configuration (default)"
+    echo "    restore [NAME]      Restore configuration from backup or list available backups"
+    echo "    list                List all backups with details"
+    echo "    clean               Remove backups older than 30 days"
+    echo "    compress            Compress legacy uncompressed backups"
+    echo "    delete NAME         Delete specific backup"
+    echo "    help                Show this help message"
+    echo ""
+    
+    echo -e "${BOLD}EXAMPLES:${RESET}"
+    echo "    ${SCRIPT_NAME} backup                    # Create timestamped backup"
+    echo "    ${SCRIPT_NAME} backup create mybackup    # Create named backup"
+    echo "    ${SCRIPT_NAME} backup mybackup           # Create named backup (shorthand)"
+    echo "    ${SCRIPT_NAME} backup restore            # List available backups"
+    echo "    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup"
+    echo "    ${SCRIPT_NAME} backup list               # List all backups with details"
+    echo "    ${SCRIPT_NAME} backup clean              # Remove old backups"
+    echo "    ${SCRIPT_NAME} backup compress           # Compress legacy backups"
+    echo "    ${SCRIPT_NAME} backup delete mybackup    # Delete specific backup"
+    echo ""
+    
+    echo -e "${BOLD}NOTES:${RESET}"
+    echo "    - Backups are automatically compressed using gzip for space efficiency"
+    echo "    - Legacy uncompressed backups are still supported"
+    echo "    - Clean command removes backups older than 30 days"
+    echo "    - All operations require confirmation for destructive actions"
+    echo ""
 }
 
 cmd_link() {
@@ -1315,67 +1317,71 @@ cmd_check_packages() {
 }
 
 cmd_help() {
-    cat << EOF
-${BOLD}${SCRIPT_NAME}${RESET} - Dotfiles management tool
-Version: ${VERSION}
-
-${BOLD}USAGE:${RESET}
-    ${SCRIPT_NAME} [OPTIONS] COMMAND [ARGS]
-
-${BOLD}COMMANDS:${RESET}
-    init                Initialize and install dotfiles
-    update              Update dotfiles and packages
-    doctor              Run diagnostics and check installation
-    check-packages      Check which packages are installed/missing
-    retry-failed        Retry failed package installations
-    summary             Summarize recent git commits using Claude Code
-    backup              Backup management commands (create, restore, list, clean, etc.)
-    link                Create global symlink for dotfiles command
-    unlink              Remove global symlink
-    edit                Open dotfiles in editor
-    help                Show this help message (default)
-
-${BOLD}OPTIONS:${RESET}
-    --skip-ssh      Skip SSH key generation
-    --skip-font     Skip font installation
-    --version       Show version information
-    -h, --help      Show this help message
-
-${BOLD}EXAMPLES:${RESET}
-    ${SCRIPT_NAME} init                      # Full initialization
-    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup
-    ${SCRIPT_NAME} update                    # Update everything
-    ${SCRIPT_NAME} doctor                    # Check installation health
-    ${SCRIPT_NAME} check-packages            # See package installation status
-    ${SCRIPT_NAME} retry-failed              # Retry any failed installations
-    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI
-    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits
-    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup
-    ${SCRIPT_NAME} backup create mybackup    # Create named compressed backup
-    ${SCRIPT_NAME} backup restore            # List available backups
-    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup
-    ${SCRIPT_NAME} backup list               # List all backups with details
-    ${SCRIPT_NAME} backup clean              # Remove backups older than 30 days
-    ${SCRIPT_NAME} backup compress           # Compress legacy uncompressed backups
-    ${SCRIPT_NAME} backup delete foo         # Delete specific backup
-    ${SCRIPT_NAME} link                      # Install dot command globally
-
-${BOLD}CONFIGURATION:${RESET}
-    Dotfiles directory: ${DOTFILES_DIR}
-    Packages directory: ${PACKAGES_DIR}
-    Home directory:     ${HOME_DIR}
-
-${BOLD}NOTES:${RESET}
-    - Package installation is resilient to failures
-    - Failed packages are logged and can be retried later
-    - Backups are automatically compressed using gzip
-    - Legacy uncompressed backups are still supported
-    - SHA verification is disabled for better reliability
-    - Includes Claude Code CLI for AI assistance
-    - Doctor command checks all critical development tools
-    - Summary command uses AI to analyze and summarize git commits
-
-EOF
+    echo -e "${BOLD}${SCRIPT_NAME}${RESET} - Dotfiles management tool"
+    echo "Version: ${VERSION}"
+    echo ""
+    
+    echo -e "${BOLD}USAGE:${RESET}"
+    echo "    ${SCRIPT_NAME} [OPTIONS] COMMAND [ARGS]"
+    echo ""
+    
+    echo -e "${BOLD}COMMANDS:${RESET}"
+    echo "    init                Initialize and install dotfiles"
+    echo "    update              Update dotfiles and packages"
+    echo "    doctor              Run diagnostics and check installation"
+    echo "    check-packages      Check which packages are installed/missing"
+    echo "    retry-failed        Retry failed package installations"
+    echo "    summary             Summarize recent git commits using Claude Code"
+    echo "    backup              Backup management commands (create, restore, list, clean, etc.)"
+    echo "    link                Create global symlink for dotfiles command"
+    echo "    unlink              Remove global symlink"
+    echo "    edit                Open dotfiles in editor"
+    echo "    help                Show this help message (default)"
+    echo ""
+    
+    echo -e "${BOLD}OPTIONS:${RESET}"
+    echo "    --skip-ssh      Skip SSH key generation"
+    echo "    --skip-font     Skip font installation"
+    echo "    --version       Show version information"
+    echo "    -h, --help      Show this help message"
+    echo ""
+    
+    echo -e "${BOLD}EXAMPLES:${RESET}"
+    echo "    ${SCRIPT_NAME} init                      # Full initialization"
+    echo "    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup"
+    echo "    ${SCRIPT_NAME} update                    # Update everything"
+    echo "    ${SCRIPT_NAME} doctor                    # Check installation health"
+    echo "    ${SCRIPT_NAME} check-packages            # See package installation status"
+    echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
+    echo "    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI"
+    echo "    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits"
+    echo "    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup"
+    echo "    ${SCRIPT_NAME} backup create mybackup    # Create named compressed backup"
+    echo "    ${SCRIPT_NAME} backup restore            # List available backups"
+    echo "    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup"
+    echo "    ${SCRIPT_NAME} backup list               # List all backups with details"
+    echo "    ${SCRIPT_NAME} backup clean              # Remove backups older than 30 days"
+    echo "    ${SCRIPT_NAME} backup compress           # Compress legacy uncompressed backups"
+    echo "    ${SCRIPT_NAME} backup delete foo         # Delete specific backup"
+    echo "    ${SCRIPT_NAME} link                      # Install dot command globally"
+    echo ""
+    
+    echo -e "${BOLD}CONFIGURATION:${RESET}"
+    echo "    Dotfiles directory: ${DOTFILES_DIR}"
+    echo "    Packages directory: ${PACKAGES_DIR}"
+    echo "    Home directory:     ${HOME_DIR}"
+    echo ""
+    
+    echo -e "${BOLD}NOTES:${RESET}"
+    echo "    - Package installation is resilient to failures"
+    echo "    - Failed packages are logged and can be retried later"
+    echo "    - Backups are automatically compressed using gzip"
+    echo "    - Legacy uncompressed backups are still supported"
+    echo "    - SHA verification is disabled for better reliability"
+    echo "    - Includes Claude Code CLI for AI assistance"
+    echo "    - Doctor command checks all critical development tools"
+    echo "    - Summary command uses AI to analyze and summarize git commits"
+    echo ""
 }
 
 # Main function
