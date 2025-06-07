@@ -1316,6 +1316,511 @@ cmd_check_packages() {
     fi
 }
 
+cmd_package() {
+    local subcommand="${1:-list}"
+    shift || true
+    
+    case "$subcommand" in
+        add)
+            cmd_package_add "$@"
+            ;;
+        remove)
+            cmd_package_remove "$@"
+            ;;
+        update)
+            cmd_package_update "$@"
+            ;;
+        list)
+            cmd_package_list "$@"
+            ;;
+        -h|--help|help)
+            cmd_package_help
+            ;;
+        *)
+            print_error "Unknown package subcommand: $subcommand"
+            print_info "Run '${SCRIPT_NAME} package help' for usage"
+            return 1
+            ;;
+    esac
+}
+
+cmd_package_add() {
+    local package_name="$1"
+    local package_type="${2:-auto}"
+    local bundle_file="${3:-base}"
+    
+    if [[ -z "$package_name" ]]; then
+        print_error "Package name required"
+        print_info "Usage: ${SCRIPT_NAME} package add <package-name> [brew|cask] [base|work]"
+        return 1
+    fi
+    
+    # Determine bundle file
+    local target_bundle
+    if [[ "$bundle_file" == "work" ]]; then
+        target_bundle="${PACKAGES_DIR}/bundle.work"
+    else
+        target_bundle="${PACKAGES_DIR}/bundle"
+    fi
+    
+    # Auto-detect package type if not specified
+    if [[ "$package_type" == "auto" ]]; then
+        print_info "Detecting package type..."
+        if brew search --formula "$package_name" | grep -q "^${package_name}$"; then
+            package_type="brew"
+        elif brew search --cask "$package_name" | grep -q "^${package_name}$"; then
+            package_type="cask"
+        else
+            print_warning "Package '$package_name' not found in either formulas or casks"
+            print_info "Defaulting to brew formula. Use 'brew' or 'cask' to specify explicitly"
+            package_type="brew"
+        fi
+    fi
+    
+    # Validate package type
+    if [[ "$package_type" != "brew" && "$package_type" != "cask" ]]; then
+        print_error "Package type must be 'brew' or 'cask'"
+        return 1
+    fi
+    
+    # Check if package already exists in bundle
+    local package_line="${package_type} \"${package_name}\""
+    if grep -q "^${package_line}$" "$target_bundle" 2>/dev/null; then
+        print_warning "Package '$package_name' already exists in $(basename "$target_bundle")"
+        return 0
+    fi
+    
+    print_header "Adding $package_type package: $package_name"
+    
+    # Install the package first
+    print_info "Installing package..."
+    if [[ "$package_type" == "cask" ]]; then
+        if brew install --cask "$package_name"; then
+            print_success "Package installed successfully"
+        else
+            print_error "Failed to install package"
+            return 1
+        fi
+    else
+        if brew install "$package_name"; then
+            print_success "Package installed successfully"
+        else
+            print_error "Failed to install package"
+            return 1
+        fi
+    fi
+    
+    # Add to bundle file
+    print_info "Adding to bundle file..."
+    if [[ ! -f "$target_bundle" ]]; then
+        print_warning "Bundle file doesn't exist, creating: $target_bundle"
+        mkdir -p "$(dirname "$target_bundle")"
+        touch "$target_bundle"
+    fi
+    
+    # Find the right place to insert the package (keep them sorted)
+    local temp_file
+    temp_file=$(mktemp)
+    local inserted=false
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # If this is a package line of the same type and comes after our package alphabetically
+        if [[ "$line" =~ ^${package_type}[[:space:]]+\"([^\"]+)\" ]] && [[ "$inserted" == false ]]; then
+            local existing_package="${BASH_REMATCH[1]}"
+            if [[ "$package_name" < "$existing_package" ]]; then
+                echo "$package_line" >> "$temp_file"
+                inserted=true
+            fi
+        fi
+        echo "$line" >> "$temp_file"
+    done < "$target_bundle"
+    
+    # If we haven't inserted yet, add at the end
+    if [[ "$inserted" == false ]]; then
+        echo "$package_line" >> "$temp_file"
+    fi
+    
+    # Replace the original file
+    mv "$temp_file" "$target_bundle"
+    
+    print_success "Added '$package_name' to $(basename "$target_bundle")"
+    print_info "Package will be included in future installations"
+}
+
+cmd_package_remove() {
+    local package_name="$1"
+    local bundle_file="${2:-auto}"
+    
+    if [[ -z "$package_name" ]]; then
+        print_error "Package name required"
+        print_info "Usage: ${SCRIPT_NAME} package remove <package-name> [base|work|auto]"
+        return 1
+    fi
+    
+    print_header "Removing package: $package_name"
+    
+    # Determine which bundle files to check
+    local bundle_files=()
+    if [[ "$bundle_file" == "work" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle.work")
+    elif [[ "$bundle_file" == "base" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle")
+    else
+        # Auto mode - check both
+        bundle_files=("${PACKAGES_DIR}/bundle" "${PACKAGES_DIR}/bundle.work")
+    fi
+    
+    local found=false
+    local package_type=""
+    
+    # Find and remove from bundle files
+    for target_bundle in "${bundle_files[@]}"; do
+        if [[ ! -f "$target_bundle" ]]; then
+            continue
+        fi
+        
+        # Check if package exists
+        if grep -q "^\\(brew\\|cask\\)[[:space:]]*\"${package_name}\"" "$target_bundle"; then
+            found=true
+            
+            # Determine package type
+            if grep -q "^brew[[:space:]]*\"${package_name}\"" "$target_bundle"; then
+                package_type="formula"
+            else
+                package_type="cask"
+            fi
+            
+            # Remove from bundle file
+            print_info "Removing from $(basename "$target_bundle")..."
+            local temp_file
+            temp_file=$(mktemp)
+            grep -v "^\\(brew\\|cask\\)[[:space:]]*\"${package_name}\"" "$target_bundle" > "$temp_file"
+            mv "$temp_file" "$target_bundle"
+            
+            print_success "Removed '$package_name' from $(basename "$target_bundle")"
+        fi
+    done
+    
+    if [[ "$found" == false ]]; then
+        print_warning "Package '$package_name' not found in any bundle files"
+        return 0
+    fi
+    
+    # Ask if user wants to uninstall the actual package
+    if confirm "Uninstall '$package_name' from system?" "n"; then
+        print_info "Uninstalling package..."
+        if [[ "$package_type" == "cask" ]]; then
+            if brew uninstall --cask "$package_name"; then
+                print_success "Package uninstalled successfully"
+            else
+                print_warning "Failed to uninstall package (it may have dependencies)"
+            fi
+        else
+            if brew uninstall "$package_name"; then
+                print_success "Package uninstalled successfully"
+            else
+                print_warning "Failed to uninstall package (it may have dependencies)"
+            fi
+        fi
+    else
+        print_info "Package removed from bundle but left installed on system"
+    fi
+}
+
+cmd_package_update() {
+    local package_name="${1:-all}"
+    local bundle_file="${2:-all}"
+    
+    print_header "Updating packages"
+    
+    # If updating a specific package
+    if [[ "$package_name" != "all" ]]; then
+        print_info "Updating specific package: $package_name"
+        
+        # Check if package is installed
+        local is_formula=false
+        local is_cask=false
+        
+        if brew list --formula | grep -q "^${package_name}$"; then
+            is_formula=true
+        elif brew list --cask | grep -q "^${package_name}$"; then
+            is_cask=true
+        else
+            print_error "Package '$package_name' is not installed"
+            return 1
+        fi
+        
+        # Update the specific package
+        if [[ "$is_formula" == true ]]; then
+            print_info "Updating brew formula: $package_name"
+            if brew upgrade "$package_name"; then
+                print_success "Updated $package_name successfully"
+            else
+                print_warning "Failed to update $package_name (may already be latest version)"
+            fi
+        else
+            print_info "Updating cask: $package_name"
+            if brew upgrade --cask "$package_name"; then
+                print_success "Updated $package_name successfully"
+            else
+                print_warning "Failed to update $package_name (may already be latest version or not upgradeable)"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Update all packages (default behavior)
+    print_info "Updating Homebrew and all packages..."
+    
+    # Update Homebrew first
+    print_info "Updating Homebrew..."
+    if brew update; then
+        print_success "Homebrew updated successfully"
+    else
+        print_error "Failed to update Homebrew"
+        return 1
+    fi
+    
+    # Determine which packages to update based on bundle filter
+    local bundle_files=()
+    local bundle_names=()
+    
+    if [[ "$bundle_file" == "work" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle.work")
+        bundle_names=("work")
+    elif [[ "$bundle_file" == "base" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle")
+        bundle_names=("base")
+    else
+        # All mode - update everything installed, not just bundle packages
+        print_info "Upgrading all installed packages..."
+        
+        # Upgrade all formulas
+        print_info "Upgrading brew formulas..."
+        if brew upgrade; then
+            print_success "Brew formulas updated"
+        else
+            print_warning "Some brew formulas failed to update"
+        fi
+        
+        # Upgrade all casks
+        print_info "Upgrading casks..."
+        if brew upgrade --cask; then
+            print_success "Casks updated"
+        else
+            print_warning "Some casks failed to update"
+        fi
+        
+        # Cleanup
+        if confirm "Clean up old versions?" "y"; then
+            print_info "Cleaning up old package versions..."
+            brew cleanup
+            print_success "Cleanup completed"
+        fi
+        
+        return 0
+    fi
+    
+    # Update packages from specific bundle(s)
+    local updated_packages=()
+    local failed_packages=()
+    
+    for i in "${!bundle_files[@]}"; do
+        local target_bundle="${bundle_files[$i]}"
+        local bundle_name="${bundle_names[$i]}"
+        
+        if [[ ! -f "$target_bundle" ]]; then
+            print_warning "Bundle file not found: $(basename "$target_bundle")"
+            continue
+        fi
+        
+        print_info "Updating packages from ${bundle_name} bundle..."
+        
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                
+                # Check if package is installed
+                if brew list --formula | grep -q "^${package}$"; then
+                    print_info "Updating brew formula: $package"
+                    if brew upgrade "$package" 2>/dev/null; then
+                        updated_packages+=("$package (formula)")
+                    else
+                        # Package might already be up to date
+                        print_info "$package is already up to date"
+                    fi
+                else
+                    print_warning "Package $package not installed, skipping"
+                fi
+                
+            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                
+                # Check if cask is installed
+                if brew list --cask | grep -q "^${package}$"; then
+                    print_info "Updating cask: $package"
+                    if brew upgrade --cask "$package" 2>/dev/null; then
+                        updated_packages+=("$package (cask)")
+                    else
+                        # Cask might already be up to date or not upgradeable
+                        print_info "$package is already up to date or not upgradeable"
+                    fi
+                else
+                    print_warning "Cask $package not installed, skipping"
+                fi
+            fi
+        done < "$target_bundle"
+    done
+    
+    # Report results
+    if [[ ${#updated_packages[@]} -gt 0 ]]; then
+        print_success "Updated ${#updated_packages[@]} packages:"
+        printf "  - %s\n" "${updated_packages[@]}"
+    else
+        print_info "All packages are already up to date"
+    fi
+    
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        print_warning "Failed to update ${#failed_packages[@]} packages:"
+        printf "  - %s\n" "${failed_packages[@]}"
+    fi
+    
+    # Cleanup
+    if confirm "Clean up old versions?" "y"; then
+        print_info "Cleaning up old package versions..."
+        brew cleanup
+        print_success "Cleanup completed"
+    fi
+}
+
+cmd_package_list() {
+    local bundle_file="${1:-all}"
+    
+    print_header "Listing packages"
+    
+    # Determine which bundle files to list
+    local bundle_files=()
+    local bundle_names=()
+    
+    if [[ "$bundle_file" == "work" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle.work")
+        bundle_names=("work")
+    elif [[ "$bundle_file" == "base" ]]; then
+        bundle_files=("${PACKAGES_DIR}/bundle")
+        bundle_names=("base")
+    else
+        # All mode
+        bundle_files=("${PACKAGES_DIR}/bundle" "${PACKAGES_DIR}/bundle.work")
+        bundle_names=("base" "work")
+    fi
+    
+    for i in "${!bundle_files[@]}"; do
+        local target_bundle="${bundle_files[$i]}"
+        local bundle_name="${bundle_names[$i]}"
+        
+        if [[ ! -f "$target_bundle" ]]; then
+            if [[ "$bundle_file" != "all" ]]; then
+                print_warning "Bundle file not found: $(basename "$target_bundle")"
+            fi
+            continue
+        fi
+        
+        echo -e "\n${BOLD}${bundle_name^} packages ($(basename "$target_bundle")):${RESET}"
+        
+        local brew_packages=()
+        local cask_packages=()
+        
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                brew_packages+=("${BASH_REMATCH[1]}")
+            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
+                cask_packages+=("${BASH_REMATCH[1]}")
+            fi
+        done < "$target_bundle"
+        
+        if [[ ${#brew_packages[@]} -gt 0 ]]; then
+            echo -e "  ${BOLD}Brew formulas (${#brew_packages[@]}):${RESET}"
+            for package in "${brew_packages[@]}"; do
+                if brew list --formula | grep -q "^${package}$"; then
+                    print_success "    $package"
+                else
+                    print_error "    $package (not installed)"
+                fi
+            done
+        fi
+        
+        if [[ ${#cask_packages[@]} -gt 0 ]]; then
+            echo -e "  ${BOLD}Casks (${#cask_packages[@]}):${RESET}"
+            for package in "${cask_packages[@]}"; do
+                if brew list --cask | grep -q "^${package}$"; then
+                    print_success "    $package"
+                else
+                    print_error "    $package (not installed)"
+                fi
+            done
+        fi
+        
+        if [[ ${#brew_packages[@]} -eq 0 && ${#cask_packages[@]} -eq 0 ]]; then
+            print_info "  No packages found"
+        fi
+    done
+}
+
+cmd_package_help() {
+    echo -e "${BOLD}${SCRIPT_NAME} package${RESET} - Package management commands"
+    echo ""
+    
+    echo -e "${BOLD}USAGE:${RESET}"
+    echo "    ${SCRIPT_NAME} package [SUBCOMMAND] [OPTIONS]"
+    echo ""
+    
+    echo -e "${BOLD}SUBCOMMANDS:${RESET}"
+    echo "    add NAME [TYPE] [BUNDLE]   Add package to bundle and install it"
+    echo "    remove NAME [BUNDLE]       Remove package from bundle and optionally uninstall"
+    echo "    update [NAME] [BUNDLE]     Update packages (all packages by default)"
+    echo "    list [BUNDLE]              List packages in bundle files (default)"
+    echo "    help                       Show this help message"
+    echo ""
+    
+    echo -e "${BOLD}PARAMETERS:${RESET}"
+    echo "    NAME                       Package name (required for add/remove, optional for update)"
+    echo "    TYPE                       Package type: 'brew' or 'cask' (auto-detected if not specified)"
+    echo "    BUNDLE                     Bundle file: 'base', 'work', or 'all' (default varies by command)"
+    echo ""
+    
+    echo -e "${BOLD}EXAMPLES:${RESET}"
+    echo "    ${SCRIPT_NAME} package list               # List all packages"
+    echo "    ${SCRIPT_NAME} package list base          # List base packages only"
+    echo "    ${SCRIPT_NAME} package list work          # List work packages only"
+    echo "    ${SCRIPT_NAME} package add git            # Add git formula to base bundle"
+    echo "    ${SCRIPT_NAME} package add docker cask    # Add docker cask to base bundle"
+    echo "    ${SCRIPT_NAME} package add kubectl brew work  # Add kubectl to work bundle"
+    echo "    ${SCRIPT_NAME} package remove git         # Remove git from any bundle"
+    echo "    ${SCRIPT_NAME} package remove docker base # Remove docker from base bundle only"
+    echo "    ${SCRIPT_NAME} package update             # Update all installed packages"
+    echo "    ${SCRIPT_NAME} package update git         # Update specific package"
+    echo "    ${SCRIPT_NAME} package update all base    # Update only base bundle packages"
+    echo "    ${SCRIPT_NAME} package update all work    # Update only work bundle packages"
+    echo ""
+    
+    echo -e "${BOLD}NOTES:${RESET}"
+    echo "    - Package type is auto-detected if not specified"
+    echo "    - Packages are kept sorted alphabetically within each type"
+    echo "    - Adding a package installs it immediately and adds to bundle"
+    echo "    - Removing a package removes from bundle and optionally uninstalls"
+    echo "    - Updating without arguments updates all installed packages"
+    echo "    - Update command includes Homebrew refresh and optional cleanup"
+    echo "    - Work bundle (bundle.work) is for work-specific packages"
+    echo "    - Base bundle (bundle) is for general-purpose packages"
+    echo ""
+}
+
 cmd_help() {
     echo -e "${BOLD}${SCRIPT_NAME}${RESET} - Dotfiles management tool"
     echo "Version: ${VERSION}"
@@ -1329,6 +1834,7 @@ cmd_help() {
     echo "    init                Initialize and install dotfiles"
     echo "    update              Update dotfiles and packages"
     echo "    doctor              Run diagnostics and check installation"
+    echo "    package             Package management commands (add, remove, list)"
     echo "    check-packages      Check which packages are installed/missing"
     echo "    retry-failed        Retry failed package installations"
     echo "    summary             Summarize recent git commits using Claude Code"
@@ -1351,6 +1857,10 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup"
     echo "    ${SCRIPT_NAME} update                    # Update everything"
     echo "    ${SCRIPT_NAME} doctor                    # Check installation health"
+    echo "    ${SCRIPT_NAME} package list              # List all packages"
+    echo "    ${SCRIPT_NAME} package add git           # Add git package to base bundle"
+    echo "    ${SCRIPT_NAME} package update            # Update all packages"
+    echo "    ${SCRIPT_NAME} package remove docker     # Remove docker from bundles"
     echo "    ${SCRIPT_NAME} check-packages            # See package installation status"
     echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
     echo "    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI"
@@ -1425,6 +1935,9 @@ main() {
             ;;
         doctor)
             cmd_doctor "$@"
+            ;;
+        package)
+            cmd_package "$@"
             ;;
         check-packages)
             cmd_check_packages "$@"
