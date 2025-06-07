@@ -3,3 +3,5 @@ lazy-lock.json
 .aider*
 .envrc
 */**/tmux/plugins/*
+backups/
+packages/failed_packages_*.txt

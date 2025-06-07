@@ -1,0 +1,1363 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Colors for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
+readonly MAGENTA='\033[0;35m'
+readonly CYAN='\033[0;36m'
+readonly RESET='\033[0m'
+readonly BOLD='\033[1m'
+
+# Script metadata
+readonly SCRIPT_NAME="dot"
+readonly VERSION="1.0.0"
+readonly DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Configuration
+readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
+readonly HOME_DIR="${DOTFILES_DIR}/home"
+readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
+readonly GITHUB_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
+readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
+
+# Progress indicators
+CURRENT_STEP=0
+TOTAL_STEPS=0
+
+# Helper functions
+print_header() {
+    echo -e "\n${BOLD}${BLUE}==>${RESET} ${BOLD}$1${RESET}"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${RESET} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${RESET} $1" >&2
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${RESET} $1"
+}
+
+print_info() {
+    echo -e "${CYAN}ℹ${RESET} $1"
+}
+
+print_step() {
+    ((CURRENT_STEP++))
+    echo -e "\n${BOLD}[${CURRENT_STEP}/${TOTAL_STEPS}]${RESET} $1"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+confirm() {
+    local prompt="${1:-Continue?}"
+    local default="${2:-n}"
+    
+    if [[ "$default" == "y" ]]; then
+        prompt="$prompt [Y/n]: "
+    else
+        prompt="$prompt [y/N]: "
+    fi
+    
+    read -r -p "$prompt" response
+    
+    case "$response" in
+        [yY][eE][sS]|[yY]) return 0 ;;
+        [nN][oO]|[nN]) return 1 ;;
+        "")
+            if [[ "$default" == "y" ]]; then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+check_dependencies() {
+    local deps=("$@")
+    local missing=()
+    
+    for dep in "${deps[@]}"; do
+        if ! command_exists "$dep"; then
+            missing+=("$dep")
+        fi
+    done
+    
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        print_error "Missing dependencies: ${missing[*]}"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Installation functions
+install_homebrew() {
+    print_step "Installing Homebrew"
+    
+    if command_exists brew; then
+        print_success "Homebrew is already installed"
+        return 0
+    fi
+    
+    print_info "Homebrew is not installed. Installing now..."
+    
+    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+        print_success "Homebrew installation successful"
+        
+        # Configure Homebrew environment for the current session
+        print_info "Configuring Homebrew environment..."
+        if [[ "$(uname -m)" == "arm64" ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        else
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+        print_success "Homebrew environment configured"
+    else
+        print_error "Homebrew installation failed"
+        return 1
+    fi
+}
+
+install_packages() {
+    print_step "Installing packages from Brewfile"
+    
+    if [[ ! -f "${PACKAGES_DIR}/bundle" ]]; then
+        print_error "Base Brewfile not found at ${PACKAGES_DIR}/bundle"
+        return 1
+    fi
+    
+    print_info "Installing base packages..."
+    
+    # Try to install all packages at once first
+    if brew bundle --file="${PACKAGES_DIR}/bundle" --no-lock; then
+        print_success "All base packages installed successfully"
+    else
+        print_warning "Some packages failed to install, trying individually..."
+        
+        # Parse Brewfile and try to install packages one by one
+        local failed_packages=()
+        local installed_count=0
+        
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            # Extract package type and name
+            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                print_info "Installing brew package: $package"
+                if brew install "$package" 2>/dev/null; then
+                    ((installed_count++))
+                else
+                    print_warning "Failed to install: $package"
+                    failed_packages+=("brew:$package")
+                fi
+            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                print_info "Installing cask: $package"
+                if brew install --cask "$package" 2>/dev/null; then
+                    ((installed_count++))
+                else
+                    print_warning "Failed to install: $package"
+                    failed_packages+=("cask:$package")
+                fi
+            fi
+        done < "${PACKAGES_DIR}/bundle"
+        
+        if [[ ${#failed_packages[@]} -gt 0 ]]; then
+            print_warning "Failed to install ${#failed_packages[@]} packages:"
+            printf "  - %s\n" "${failed_packages[@]}"
+            
+            # Save failed packages to a file for reference
+            local failed_file="${PACKAGES_DIR}/failed_packages_$(date +%Y%m%d_%H%M%S).txt"
+            printf "%s\n" "${failed_packages[@]}" > "$failed_file"
+            print_info "Failed packages saved to: $failed_file"
+        fi
+        
+        print_success "Successfully installed $installed_count packages"
+    fi
+    
+    # Work packages
+    if [[ -f "${PACKAGES_DIR}/bundle.work" ]] && confirm "Install work-specific packages?" "n"; then
+        print_info "Installing work packages..."
+        if brew bundle --file="${PACKAGES_DIR}/bundle.work" --no-lock; then
+            print_success "Work packages installed successfully"
+        else
+            print_warning "Some work packages failed to install"
+            
+            # Try individual installation for work packages too
+            local work_failed=()
+            while IFS= read -r line; do
+                [[ "$line" =~ ^[[:space:]]*# ]] && continue
+                [[ -z "${line// }" ]] && continue
+                
+                if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                    local package="${BASH_REMATCH[1]}"
+                    print_info "Installing work package: $package"
+                    if ! brew install "$package" 2>/dev/null; then
+                        work_failed+=("$package")
+                    fi
+                fi
+            done < "${PACKAGES_DIR}/bundle.work"
+            
+            if [[ ${#work_failed[@]} -gt 0 ]]; then
+                print_warning "Failed work packages: ${work_failed[*]}"
+            fi
+        fi
+    fi
+}
+
+stow_dotfiles() {
+    print_step "Stowing configuration files"
+    
+    if ! command_exists stow; then
+        print_error "GNU Stow is not installed"
+        print_info "Please install stow via Homebrew: brew install stow"
+        return 1
+    fi
+    
+    print_info "Stowing files from ${HOME_DIR} to ${HOME}..."
+    
+    # Create backup directory for existing configs
+    local backup_dir="${DOTFILES_DIR}/backups/$(date +%Y%m%d_%H%M%S)"
+    local files_to_backup=()
+    
+    # Check for existing files that would be overwritten
+    while IFS= read -r -d '' file; do
+        local relative_path="${file#${HOME_DIR}/}"
+        local target_path="${HOME}/${relative_path}"
+        
+        if [[ -e "$target_path" && ! -L "$target_path" ]]; then
+            files_to_backup+=("$relative_path")
+        fi
+    done < <(find "${HOME_DIR}" -type f -print0)
+    
+    if [[ ${#files_to_backup[@]} -gt 0 ]]; then
+        print_warning "The following files will be replaced:"
+        printf "  %s\n" "${files_to_backup[@]}"
+        
+        if confirm "Create backups of existing files?" "y"; then
+            mkdir -p "$backup_dir"
+            for file in "${files_to_backup[@]}"; do
+                local src="${HOME}/${file}"
+                local dst="${backup_dir}/${file}"
+                mkdir -p "$(dirname "$dst")"
+                cp -p "$src" "$dst"
+            done
+            print_success "Backups created in ${backup_dir}"
+        fi
+    fi
+    
+    if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
+        print_success "Dotfiles stowed successfully"
+    else
+        print_error "Failed to stow dotfiles"
+        return 1
+    fi
+}
+
+install_bun() {
+    print_step "Installing Bun"
+    
+    if command_exists bun; then
+        print_success "Bun is already installed"
+        return 0
+    fi
+    
+    print_info "Installing Bun..."
+    if curl -fsSL https://bun.sh/install | bash; then
+        print_success "Bun installed successfully"
+    else
+        print_error "Failed to install Bun"
+        return 1
+    fi
+}
+
+generate_ssh_key() {
+    print_step "Generating SSH key for GitHub"
+    
+    if [[ -f "$GITHUB_KEY_PATH" ]]; then
+        print_success "SSH key already exists at $GITHUB_KEY_PATH"
+        return 0
+    fi
+    
+    print_info "Generating new SSH key..."
+    mkdir -p "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
+    
+    if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_KEY_PATH"; then
+        print_success "SSH key generated successfully"
+        print_info "Add the public key to GitHub:"
+        echo "  pbcopy < ${GITHUB_KEY_PATH}.pub"
+        echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
+    else
+        print_error "Failed to generate SSH key"
+        return 1
+    fi
+}
+
+install_font() {
+    print_step "Installing MonoLisa font"
+    
+    if [[ ! -f "$GITHUB_KEY_PATH" ]]; then
+        print_warning "GitHub SSH key not found. Skipping font installation"
+        return 0
+    fi
+    
+    if ! confirm "Have you added the SSH key to your GitHub account?" "n"; then
+        print_warning "Skipping font installation"
+        return 0
+    fi
+    
+    local font_temp_dir
+    font_temp_dir=$(mktemp -d)
+    local font_install_dir="${HOME}/Library/Fonts"
+    
+    print_info "Cloning font repository..."
+    if GIT_SSH_COMMAND="ssh -i $GITHUB_KEY_PATH -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
+        print_success "Repository cloned successfully"
+        
+        mkdir -p "$font_install_dir"
+        print_info "Installing font files..."
+        
+        local font_count=0
+        while IFS= read -r -d '' font_file; do
+            cp "$font_file" "$font_install_dir/"
+            ((font_count++))
+        done < <(find "$font_temp_dir" -name '*.otf' -print0)
+        
+        if [[ $font_count -gt 0 ]]; then
+            print_success "Installed $font_count font files"
+        else
+            print_warning "No font files found in repository"
+        fi
+    else
+        print_error "Failed to clone font repository"
+    fi
+    
+    rm -rf "$font_temp_dir"
+}
+
+setup_fish_shell() {
+    print_step "Setting up Fish shell"
+    
+    if ! command_exists fish; then
+        print_error "Fish shell is not installed"
+        return 1
+    fi
+    
+    local fish_path
+    fish_path=$(command -v fish)
+    
+    # Add fish to /etc/shells if needed
+    if ! grep -q "$fish_path" /etc/shells; then
+        print_info "Adding Fish to /etc/shells..."
+        echo "$fish_path" | sudo tee -a /etc/shells >/dev/null
+        print_success "Fish added to /etc/shells"
+    fi
+    
+    # Set fish as default shell
+    if [[ "$SHELL" != "$fish_path" ]]; then
+        print_info "Setting Fish as default shell..."
+        if chsh -s "$fish_path"; then
+            print_success "Default shell changed to Fish"
+            print_info "Please log out and back in for changes to take effect"
+        else
+            print_error "Failed to change default shell"
+            return 1
+        fi
+    else
+        print_success "Fish is already the default shell"
+    fi
+    
+    # Install Fisher plugins
+    print_info "Installing Fish plugins..."
+    if fish -c "fisher install jhillyerd/plugin-git" 2>/dev/null; then
+        print_success "Fish plugins installed"
+    else
+        print_warning "Failed to install some Fish plugins"
+    fi
+}
+
+# Command functions
+cmd_init() {
+    print_header "Initializing dotfiles"
+    
+    TOTAL_STEPS=7
+    CURRENT_STEP=0
+    
+    # Run all installation steps
+    install_homebrew || return 1
+    install_packages || return 1
+    stow_dotfiles || return 1
+    install_bun || return 1
+    
+    if [[ "${SKIP_SSH:-}" != "true" ]]; then
+        generate_ssh_key || print_warning "SSH key generation failed (continuing)"
+    fi
+    
+    if [[ "${SKIP_FONT:-}" != "true" ]]; then
+        install_font || print_warning "Font installation failed (continuing)"
+    fi
+    
+    setup_fish_shell || print_warning "Fish shell setup failed (continuing)"
+    
+    print_header "Initialization complete! 🎉"
+}
+
+cmd_update() {
+    print_header "Updating dotfiles"
+    
+    # Pull latest changes
+    print_info "Pulling latest changes..."
+    if git -C "$DOTFILES_DIR" pull; then
+        print_success "Repository updated"
+    else
+        print_error "Failed to update repository"
+        return 1
+    fi
+    
+    # Update packages
+    if confirm "Update Homebrew packages?" "y"; then
+        print_info "Updating Homebrew..."
+        brew update
+        brew upgrade
+        print_success "Packages updated"
+    fi
+    
+    # Re-stow dotfiles
+    if confirm "Re-stow dotfiles?" "y"; then
+        stow_dotfiles
+    fi
+}
+
+cmd_doctor() {
+    print_header "Running diagnostics"
+    
+    local issues=0
+    
+    # Check Homebrew
+    if command_exists brew; then
+        print_success "Homebrew installed"
+    else
+        print_error "Homebrew not installed"
+        ((issues++))
+    fi
+    
+    # Check Stow
+    if command_exists stow; then
+        print_success "GNU Stow installed"
+    else
+        print_error "GNU Stow not installed"
+        ((issues++))
+    fi
+    
+    # Check Fish
+    if command_exists fish; then
+        print_success "Fish shell installed"
+        if [[ "$SHELL" == "$(command -v fish)" ]]; then
+            print_success "Fish is default shell"
+        else
+            print_warning "Fish is not default shell"
+        fi
+    else
+        print_error "Fish shell not installed"
+        ((issues++))
+    fi
+    
+    # Check Claude Code
+    if command_exists claude; then
+        print_success "Claude Code installed"
+        # Check if we can get version (indicates it's working)
+        if claude --version >/dev/null 2>&1; then
+            print_success "Claude Code is functional"
+        else
+            print_warning "Claude Code may need authentication"
+        fi
+    else
+        print_warning "Claude Code not installed"
+    fi
+    
+    # Check symlinks
+    local broken_links=0
+    while IFS= read -r -d '' link; do
+        if [[ ! -e "$link" ]]; then
+            ((broken_links++))
+        fi
+    done < <(find "${HOME}" -maxdepth 3 -type l -print0 2>/dev/null)
+    
+    if [[ $broken_links -eq 0 ]]; then
+        print_success "No broken symlinks found"
+    else
+        print_warning "Found $broken_links broken symlinks"
+    fi
+    
+    # Check SSH key
+    if [[ -f "$GITHUB_KEY_PATH" ]]; then
+        print_success "GitHub SSH key exists"
+    else
+        print_warning "GitHub SSH key not found"
+    fi
+    
+    # Check key development tools
+    local dev_tools=("git" "nvim" "tmux" "node" "npm" "bun")
+    local missing_tools=()
+    
+    for tool in "${dev_tools[@]}"; do
+        if command_exists "$tool"; then
+            print_success "$tool is available"
+        else
+            missing_tools+=("$tool")
+        fi
+    done
+    
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        print_warning "Missing development tools: ${missing_tools[*]}"
+    fi
+    
+    # Check if Fish plugins are installed (Fisher)
+    if command_exists fish && command_exists fisher; then
+        print_success "Fisher (Fish plugin manager) is available"
+    elif command_exists fish; then
+        print_warning "Fisher not installed - Fish plugins may not work"
+    fi
+    
+    # Check if dotfiles directory is in PATH
+    if echo "$PATH" | grep -q "$DOTFILES_DIR"; then
+        print_success "Dotfiles directory is in PATH"
+    else
+        print_warning "Dotfiles directory not in PATH - 'dot' command may not work globally"
+        if [[ "$SHELL" == *"fish"* ]]; then
+            print_info "Run 'source ~/.config/fish/config.fish' or restart shell to fix"
+        else
+            print_info "Add 'export PATH=\"$DOTFILES_DIR:\$PATH\"' to your shell profile"
+        fi
+    fi
+    
+    if [[ $issues -eq 0 ]]; then
+        print_header "All critical checks passed! ✨"
+        if [[ ${#missing_tools[@]} -gt 0 ]]; then
+            print_info "Note: Some optional tools are missing but core functionality is intact"
+        fi
+    else
+        print_header "Found $issues critical issues"
+    fi
+}
+
+cmd_backup() {
+    print_header "Creating backup of current configuration"
+    
+    local backup_name="${1:-backup-$(date +%Y%m%d-%H%M%S)}"
+    local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+    local backup_archive="${backup_dir}.tar.gz"
+    
+    # Create temporary directory for staging
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    print_info "Creating backup..."
+    mkdir -p "$temp_dir/$backup_name"
+    
+    # Find all symlinks pointing to our dotfiles
+    local count=0
+    while IFS= read -r -d '' file; do
+        local relative_path="${file#${HOME_DIR}/}"
+        local source_path="${HOME}/${relative_path}"
+        
+        if [[ -L "$source_path" ]]; then
+            local target_dir="$temp_dir/$backup_name/$(dirname "$relative_path")"
+            mkdir -p "$target_dir"
+            cp -P "$source_path" "$temp_dir/$backup_name/${relative_path}"
+            ((count++))
+        fi
+    done < <(find "${HOME_DIR}" -type f -print0)
+    
+    if [[ $count -eq 0 ]]; then
+        print_warning "No symlinks found to backup"
+        rm -rf "$temp_dir"
+        return 0
+    fi
+    
+    # Create compressed archive
+    print_info "Compressing backup ($count files)..."
+    mkdir -p "${DOTFILES_DIR}/backups"
+    
+    if tar -czf "$backup_archive" -C "$temp_dir" "$backup_name"; then
+        local archive_size
+        archive_size=$(du -h "$backup_archive" | cut -f1)
+        print_success "Backup created: ${backup_archive} (${archive_size})"
+        print_info "Backed up $count configuration files"
+    else
+        print_error "Failed to create backup archive"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Cleanup
+    rm -rf "$temp_dir"
+}
+
+cmd_restore() {
+    print_header "Restoring configuration from backup"
+    
+    local backup_name="${1:-}"
+    if [[ -z "$backup_name" ]]; then
+        # List available backups
+        print_info "Available backups:"
+        if [[ -d "${DOTFILES_DIR}/backups" ]]; then
+            local found_backups=false
+            
+            # List compressed backups
+            for backup in "${DOTFILES_DIR}/backups"/*.tar.gz; do
+                if [[ -f "$backup" ]]; then
+                    local name
+                    name=$(basename "$backup" .tar.gz)
+                    local size
+                    size=$(du -h "$backup" | cut -f1)
+                    local date
+                    date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+                    echo "  - $name (${size}, $date)"
+                    found_backups=true
+                fi
+            done
+            
+            # List uncompressed backups (legacy)
+            for backup in "${DOTFILES_DIR}/backups"/*; do
+                if [[ -d "$backup" ]]; then
+                    local name
+                    name=$(basename "$backup")
+                    echo "  - $name (uncompressed, legacy)"
+                    found_backups=true
+                fi
+            done
+            
+            if [[ "$found_backups" == false ]]; then
+                print_warning "No backups found"
+            fi
+        else
+            print_warning "No backups directory found"
+        fi
+        return 0
+    fi
+    
+    # Check for compressed backup first
+    local backup_archive="${DOTFILES_DIR}/backups/${backup_name}.tar.gz"
+    local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+    local temp_dir
+    
+    if [[ -f "$backup_archive" ]]; then
+        print_info "Found compressed backup: $backup_name"
+        
+        if ! confirm "Restore from backup '${backup_name}'?" "n"; then
+            print_warning "Restore cancelled"
+            return 0
+        fi
+        
+        # Extract to temporary directory
+        temp_dir=$(mktemp -d)
+        print_info "Extracting backup..."
+        
+        if ! tar -xzf "$backup_archive" -C "$temp_dir"; then
+            print_error "Failed to extract backup"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        
+        backup_dir="$temp_dir/$backup_name"
+    elif [[ -d "$backup_dir" ]]; then
+        print_info "Found uncompressed backup: $backup_name"
+        
+        if ! confirm "Restore from backup '${backup_name}'?" "n"; then
+            print_warning "Restore cancelled"
+            return 0
+        fi
+    else
+        print_error "Backup '${backup_name}' not found"
+        print_info "Run '${SCRIPT_NAME} restore' to see available backups"
+        return 1
+    fi
+    
+    print_info "Restoring files..."
+    local count=0
+    while IFS= read -r -d '' file; do
+        local relative_path="${file#${backup_dir}/}"
+        local target_path="${HOME}/${relative_path}"
+        
+        mkdir -p "$(dirname "$target_path")"
+        cp -P "$file" "$target_path"
+        ((count++))
+    done < <(find "$backup_dir" -type f -print0)
+    
+    print_success "Restored $count files from backup"
+    
+    # Cleanup temporary directory if used
+    if [[ -n "$temp_dir" ]]; then
+        rm -rf "$temp_dir"
+    fi
+}
+
+cmd_link() {
+    print_header "Creating symlink for dot command"
+    
+    local target_dir="/usr/local/bin"
+    local link_path="${target_dir}/dot"
+    
+    # Check if we can write to target directory
+    if [[ ! -w "$target_dir" ]]; then
+        print_info "Need sudo access to create symlink in ${target_dir}"
+        target_dir="${HOME}/.local/bin"
+        link_path="${target_dir}/dot"
+        mkdir -p "$target_dir"
+        print_info "Using ${target_dir} instead"
+    fi
+    
+    # Remove existing link if present
+    if [[ -L "$link_path" ]]; then
+        rm "$link_path"
+    fi
+    
+    # Create symlink
+    if ln -s "${DOTFILES_DIR}/dot" "$link_path"; then
+        print_success "Created symlink at ${link_path}"
+        print_info "Make sure ${target_dir} is in your PATH"
+    else
+        print_error "Failed to create symlink"
+        return 1
+    fi
+}
+
+cmd_unlink() {
+    print_header "Removing dot symlink"
+    
+    local paths=(
+        "/usr/local/bin/dot"
+        "${HOME}/.local/bin/dot"
+        "/usr/local/bin/dotfiles"  # Legacy name
+        "${HOME}/.local/bin/dotfiles"  # Legacy name
+    )
+    
+    local found=false
+    for link_path in "${paths[@]}"; do
+        if [[ -L "$link_path" ]]; then
+            if rm "$link_path"; then
+                print_success "Removed symlink at ${link_path}"
+                found=true
+            else
+                print_error "Failed to remove symlink at ${link_path}"
+            fi
+        fi
+    done
+    
+    if [[ "$found" == false ]]; then
+        print_warning "No dot symlink found"
+    fi
+}
+
+cmd_edit() {
+    print_header "Opening dotfiles in editor"
+    
+    local editor="${EDITOR:-nvim}"
+    
+    if command_exists "$editor"; then
+        exec "$editor" "$DOTFILES_DIR"
+    else
+        print_error "Editor '$editor' not found"
+        print_info "Set EDITOR environment variable to specify your preferred editor"
+        return 1
+    fi
+}
+
+cmd_summary() {
+    print_header "Summarizing recent changes"
+    
+    # Check if Claude Code is available
+    if ! command_exists claude; then
+        print_error "Claude Code is not installed"
+        print_info "Install it with: brew install claude-code"
+        return 1
+    fi
+    
+    # Check if we're in a git repository
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        print_error "Not in a git repository"
+        return 1
+    fi
+    
+    # Parse options
+    local num_commits=3
+    local include_diff=false
+    local verbose=false
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -n|--number)
+                num_commits="$2"
+                shift 2
+                ;;
+            -d|--diff)
+                include_diff=true
+                shift
+                ;;
+            -v|--verbose)
+                verbose=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}USAGE:${RESET}
+    ${SCRIPT_NAME} summary [OPTIONS]
+
+${BOLD}OPTIONS:${RESET}
+    -n, --number NUM    Number of commits to summarize (default: 3)
+    -d, --diff          Include diff in analysis for more detailed summary
+    -v, --verbose       Show detailed commit info before summary
+    -h, --help          Show this help
+
+${BOLD}EXAMPLES:${RESET}
+    ${SCRIPT_NAME} summary              # Summarize last 3 commits
+    ${SCRIPT_NAME} summary -n 5         # Summarize last 5 commits  
+    ${SCRIPT_NAME} summary -d           # Include diffs for detailed analysis
+    ${SCRIPT_NAME} summary -v -n 2      # Verbose mode, 2 commits
+
+EOF
+                return 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                print_info "Run '${SCRIPT_NAME} summary --help' for usage"
+                return 1
+                ;;
+        esac
+    done
+    
+    # Validate number of commits
+    if ! [[ "$num_commits" =~ ^[0-9]+$ ]] || [[ "$num_commits" -lt 1 ]] || [[ "$num_commits" -gt 20 ]]; then
+        print_error "Number of commits must be between 1 and 20"
+        return 1
+    fi
+    
+    print_info "Analyzing last $num_commits commit(s)..."
+    
+    # Get commit information
+    local git_log_format="%H|%an|%ae|%ad|%s"
+    local commits_info
+    commits_info=$(git log --format="$git_log_format" --date=short -n "$num_commits")
+    
+    if [[ -z "$commits_info" ]]; then
+        print_warning "No commits found"
+        return 0
+    fi
+    
+    # Show verbose info if requested
+    if [[ "$verbose" == true ]]; then
+        print_info "Recent commits:"
+        echo "$commits_info" | while IFS='|' read -r hash author email date subject; do
+            local short_hash="${hash:0:8}"
+            echo "  $short_hash - $subject ($author, $date)"
+        done
+        echo ""
+    fi
+    
+    # Build prompt for Claude
+    local claude_prompt="Please provide a concise summary of these recent Git commits. Focus on:
+1. What changes were made (features, fixes, improvements)
+2. Overall patterns or themes in the development
+3. Any notable technical decisions or architectural changes
+
+Here are the commits (most recent first):
+
+"
+    
+    # Add commit details to prompt
+    local commit_count=0
+    while IFS='|' read -r hash author email date subject; do
+        ((commit_count++))
+        local short_hash="${hash:0:8}"
+        claude_prompt+="Commit $commit_count ($short_hash, $date):
+Subject: $subject
+Author: $author
+"
+        
+        # Add diff if requested
+        if [[ "$include_diff" == true ]]; then
+            local diff_output
+            diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null)
+            if [[ -n "$diff_output" ]]; then
+                claude_prompt+="Files changed:
+$diff_output
+
+"
+            fi
+        fi
+        
+        claude_prompt+="
+"
+    done <<< "$commits_info"
+    
+    # Add instructions
+    claude_prompt+="Please provide a summary in 2-3 paragraphs. Be specific about what was accomplished and avoid generic language."
+    
+    # Create temporary file for the prompt
+    local temp_file
+    temp_file=$(mktemp)
+    echo "$claude_prompt" > "$temp_file"
+    
+    print_info "Generating summary with Claude Code..."
+    
+    # Call Claude Code
+    local claude_output
+    local claude_error
+    if claude_output=$(claude --print < "$temp_file" 2>&1); then
+        print_header "Summary of Recent Changes"
+        echo ""
+        echo "$claude_output"
+        echo ""
+    else
+        print_error "Failed to generate summary with Claude Code"
+        
+        # Check if it's an authentication issue
+        if echo "$claude_output" | grep -q -i "auth\|login\|api"; then
+            print_info "Claude Code needs authentication. Run: claude auth login"
+        elif echo "$claude_output" | grep -q -i "network\|connection"; then
+            print_info "Network connection issue. Check your internet connection"
+        else
+            print_info "Claude Code error: $claude_output"
+            print_info "Try running: claude --version to verify installation"
+        fi
+        
+        rm "$temp_file"
+        return 1
+    fi
+    
+    # Cleanup
+    rm "$temp_file"
+    
+    # Show git log reference
+    print_info "For detailed commit history, run: git log --oneline -n $num_commits"
+}
+
+cmd_manage_backups() {
+    local action="${1:-list}"
+    
+    case "$action" in
+        list)
+            print_header "Managing backups"
+            cmd_restore  # This lists backups when no name is provided
+            ;;
+        clean)
+            print_header "Cleaning up old backups"
+            
+            if [[ ! -d "${DOTFILES_DIR}/backups" ]]; then
+                print_info "No backups directory found"
+                return 0
+            fi
+            
+            local old_backups=()
+            local cutoff_date
+            cutoff_date=$(date -d "30 days ago" +%Y%m%d 2>/dev/null || date -v-30d +%Y%m%d 2>/dev/null)
+            
+            # Find old compressed backups
+            for backup in "${DOTFILES_DIR}/backups"/*.tar.gz; do
+                if [[ -f "$backup" ]]; then
+                    local name
+                    name=$(basename "$backup" .tar.gz)
+                    if [[ "$name" =~ backup-([0-9]{8}) ]]; then
+                        local backup_date="${BASH_REMATCH[1]}"
+                        if [[ "$backup_date" < "$cutoff_date" ]]; then
+                            old_backups+=("$backup")
+                        fi
+                    fi
+                fi
+            done
+            
+            if [[ ${#old_backups[@]} -eq 0 ]]; then
+                print_success "No old backups found (older than 30 days)"
+                return 0
+            fi
+            
+            print_warning "Found ${#old_backups[@]} old backups:"
+            for backup in "${old_backups[@]}"; do
+                local size
+                size=$(du -h "$backup" | cut -f1)
+                echo "  - $(basename "$backup") (${size})"
+            done
+            
+            if confirm "Delete these old backups?" "n"; then
+                for backup in "${old_backups[@]}"; do
+                    rm "$backup"
+                    print_success "Deleted $(basename "$backup")"
+                done
+            fi
+            ;;
+        compress)
+            print_header "Compressing legacy backups"
+            
+            if [[ ! -d "${DOTFILES_DIR}/backups" ]]; then
+                print_info "No backups directory found"
+                return 0
+            fi
+            
+            local legacy_backups=()
+            for backup in "${DOTFILES_DIR}/backups"/*; do
+                if [[ -d "$backup" ]]; then
+                    legacy_backups+=("$backup")
+                fi
+            done
+            
+            if [[ ${#legacy_backups[@]} -eq 0 ]]; then
+                print_success "No legacy backups found"
+                return 0
+            fi
+            
+            print_info "Found ${#legacy_backups[@]} uncompressed backups"
+            
+            for backup_dir in "${legacy_backups[@]}"; do
+                local backup_name
+                backup_name=$(basename "$backup_dir")
+                local backup_archive="${backup_dir}.tar.gz"
+                
+                print_info "Compressing $backup_name..."
+                
+                if tar -czf "$backup_archive" -C "${DOTFILES_DIR}/backups" "$backup_name"; then
+                    local original_size
+                    local compressed_size
+                    original_size=$(du -sh "$backup_dir" | cut -f1)
+                    compressed_size=$(du -sh "$backup_archive" | cut -f1)
+                    
+                    print_success "Compressed $backup_name: $original_size → $compressed_size"
+                    
+                    if confirm "Delete original uncompressed backup?" "y"; then
+                        rm -rf "$backup_dir"
+                    fi
+                else
+                    print_error "Failed to compress $backup_name"
+                fi
+            done
+            ;;
+        delete)
+            local backup_name="$2"
+            if [[ -z "$backup_name" ]]; then
+                print_error "Backup name required for delete action"
+                print_info "Usage: ${SCRIPT_NAME} manage-backups delete <backup-name>"
+                return 1
+            fi
+            
+            print_header "Deleting backup: $backup_name"
+            
+            local backup_archive="${DOTFILES_DIR}/backups/${backup_name}.tar.gz"
+            local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+            
+            if [[ -f "$backup_archive" ]]; then
+                if confirm "Delete compressed backup '${backup_name}'?" "n"; then
+                    rm "$backup_archive"
+                    print_success "Deleted backup: $backup_name"
+                fi
+            elif [[ -d "$backup_dir" ]]; then
+                if confirm "Delete uncompressed backup '${backup_name}'?" "n"; then
+                    rm -rf "$backup_dir"
+                    print_success "Deleted backup: $backup_name"
+                fi
+            else
+                print_error "Backup '$backup_name' not found"
+                return 1
+            fi
+            ;;
+        *)
+            print_error "Unknown backup action: $action"
+            print_info "Available actions: list, clean, compress, delete"
+            return 1
+            ;;
+    esac
+}
+
+cmd_retry_failed() {
+    print_header "Retrying failed package installations"
+    
+    # Find the most recent failed packages file
+    local failed_file
+    failed_file=$(find "${PACKAGES_DIR}" -name "failed_packages_*.txt" -type f 2>/dev/null | sort -r | head -1)
+    
+    if [[ -z "$failed_file" || ! -f "$failed_file" ]]; then
+        print_info "No failed packages file found"
+        return 0
+    fi
+    
+    print_info "Found failed packages file: $failed_file"
+    print_info "Attempting to retry installation..."
+    
+    local retry_count=0
+    local success_count=0
+    
+    while IFS= read -r package_info; do
+        ((retry_count++))
+        
+        if [[ "$package_info" =~ ^brew:(.+)$ ]]; then
+            local package="${BASH_REMATCH[1]}"
+            print_info "Retrying brew package: $package"
+            if brew install "$package" 2>/dev/null; then
+                print_success "Successfully installed: $package"
+                ((success_count++))
+            else
+                print_warning "Still failing: $package"
+            fi
+        elif [[ "$package_info" =~ ^cask:(.+)$ ]]; then
+            local package="${BASH_REMATCH[1]}"
+            print_info "Retrying cask: $package"
+            if brew install --cask "$package" 2>/dev/null; then
+                print_success "Successfully installed: $package"
+                ((success_count++))
+            else
+                print_warning "Still failing: $package"
+            fi
+        fi
+    done < "$failed_file"
+    
+    print_info "Retry complete: $success_count/$retry_count packages installed"
+    
+    if [[ $success_count -eq $retry_count ]]; then
+        print_success "All failed packages now installed!"
+        rm "$failed_file"
+    fi
+}
+
+cmd_check_packages() {
+    print_header "Checking installed packages"
+    
+    local missing_brew=()
+    local missing_cask=()
+    local installed_brew=()
+    local installed_cask=()
+    
+    # Check base packages
+    if [[ -f "${PACKAGES_DIR}/bundle" ]]; then
+        print_info "Checking base packages..."
+        
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                if brew list --formula | grep -q "^${package}$"; then
+                    installed_brew+=("$package")
+                else
+                    missing_brew+=("$package")
+                fi
+            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                if brew list --cask | grep -q "^${package}$"; then
+                    installed_cask+=("$package")
+                else
+                    missing_cask+=("$package")
+                fi
+            fi
+        done < "${PACKAGES_DIR}/bundle"
+    fi
+    
+    # Check work packages
+    if [[ -f "${PACKAGES_DIR}/bundle.work" ]]; then
+        print_info "Checking work packages..."
+        
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            
+            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
+                local package="${BASH_REMATCH[1]}"
+                if brew list --formula | grep -q "^${package}$"; then
+                    installed_brew+=("$package (work)")
+                else
+                    missing_brew+=("$package (work)")
+                fi
+            fi
+        done < "${PACKAGES_DIR}/bundle.work"
+    fi
+    
+    # Report results
+    print_header "Package Status Report"
+    
+    echo -e "\n${BOLD}Installed Packages:${RESET}"
+    print_success "Brew formulas: ${#installed_brew[@]}"
+    print_success "Casks: ${#installed_cask[@]}"
+    
+    if [[ ${#missing_brew[@]} -gt 0 || ${#missing_cask[@]} -gt 0 ]]; then
+        echo -e "\n${BOLD}Missing Packages:${RESET}"
+        
+        if [[ ${#missing_brew[@]} -gt 0 ]]; then
+            print_warning "Missing brew formulas (${#missing_brew[@]}):"
+            printf "  - %s\n" "${missing_brew[@]}"
+        fi
+        
+        if [[ ${#missing_cask[@]} -gt 0 ]]; then
+            print_warning "Missing casks (${#missing_cask[@]}):"
+            printf "  - %s\n" "${missing_cask[@]}"
+        fi
+        
+        echo ""
+        print_info "Run '${SCRIPT_NAME} init' to install missing packages"
+    else
+        print_success "All packages are installed!"
+    fi
+}
+
+cmd_help() {
+    cat << EOF
+${BOLD}${SCRIPT_NAME}${RESET} - Dotfiles management tool
+Version: ${VERSION}
+
+${BOLD}USAGE:${RESET}
+    ${SCRIPT_NAME} [OPTIONS] COMMAND [ARGS]
+
+${BOLD}COMMANDS:${RESET}
+    init                Initialize and install dotfiles (default)
+    update              Update dotfiles and packages
+    doctor              Run diagnostics and check installation
+    check-packages      Check which packages are installed/missing
+    retry-failed        Retry failed package installations
+    summary             Summarize recent git commits using Claude Code
+    backup              Create compressed backup of current configuration
+    restore             Restore configuration from backup
+    manage-backups      Manage backup files (list, clean, compress, delete)
+    link                Create global symlink for dotfiles command
+    unlink              Remove global symlink
+    edit                Open dotfiles in editor
+    help                Show this help message
+
+${BOLD}OPTIONS:${RESET}
+    --skip-ssh      Skip SSH key generation
+    --skip-font     Skip font installation
+    --version       Show version information
+    -h, --help      Show this help message
+
+${BOLD}EXAMPLES:${RESET}
+    ${SCRIPT_NAME} init                      # Full initialization
+    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup
+    ${SCRIPT_NAME} update                    # Update everything
+    ${SCRIPT_NAME} doctor                    # Check installation health
+    ${SCRIPT_NAME} check-packages            # See package installation status
+    ${SCRIPT_NAME} retry-failed              # Retry any failed installations
+    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI
+    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits
+    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup
+    ${SCRIPT_NAME} backup mybackup           # Create named compressed backup
+    ${SCRIPT_NAME} restore                   # List available backups
+    ${SCRIPT_NAME} restore mybackup          # Restore specific backup
+    ${SCRIPT_NAME} manage-backups list       # List all backups with details
+    ${SCRIPT_NAME} manage-backups clean      # Remove backups older than 30 days
+    ${SCRIPT_NAME} manage-backups compress   # Compress legacy uncompressed backups
+    ${SCRIPT_NAME} manage-backups delete foo # Delete specific backup
+    ${SCRIPT_NAME} link                      # Install dot command globally
+
+${BOLD}CONFIGURATION:${RESET}
+    Dotfiles directory: ${DOTFILES_DIR}
+    Packages directory: ${PACKAGES_DIR}
+    Home directory:     ${HOME_DIR}
+
+${BOLD}NOTES:${RESET}
+    - Package installation is resilient to failures
+    - Failed packages are logged and can be retried later
+    - Backups are automatically compressed using gzip
+    - Legacy uncompressed backups are still supported
+    - SHA verification is disabled for better reliability
+    - Includes Claude Code CLI for AI assistance
+    - Doctor command checks all critical development tools
+    - Summary command uses AI to analyze and summarize git commits
+
+EOF
+}
+
+# Main function
+main() {
+    # Parse global options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skip-ssh)
+                export SKIP_SSH=true
+                shift
+                ;;
+            --skip-font)
+                export SKIP_FONT=true
+                shift
+                ;;
+            --version)
+                echo "${SCRIPT_NAME} version ${VERSION}"
+                exit 0
+                ;;
+            -h|--help)
+                cmd_help
+                exit 0
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    # Get command
+    local cmd="${1:-init}"
+    shift || true
+    
+    # Execute command
+    case "$cmd" in
+        init)
+            cmd_init "$@"
+            ;;
+        update)
+            cmd_update "$@"
+            ;;
+        doctor)
+            cmd_doctor "$@"
+            ;;
+        check-packages)
+            cmd_check_packages "$@"
+            ;;
+        retry-failed)
+            cmd_retry_failed "$@"
+            ;;
+        summary)
+            cmd_summary "$@"
+            ;;
+        backup)
+            cmd_backup "$@"
+            ;;
+        restore)
+            cmd_restore "$@"
+            ;;
+        manage-backups)
+            cmd_manage_backups "$@"
+            ;;
+        link)
+            cmd_link "$@"
+            ;;
+        unlink)
+            cmd_unlink "$@"
+            ;;
+        edit)
+            cmd_edit "$@"
+            ;;
+        help)
+            cmd_help
+            ;;
+        *)
+            print_error "Unknown command: $cmd"
+            echo "Run '${SCRIPT_NAME} help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

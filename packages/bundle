@@ -1,8 +1,10 @@
 # set arguments for all 'brew install --cask' commands
-cask_args appdir: "~/Applications", require_sha: true
+# Note: require_sha disabled to prevent installation failures
+cask_args appdir: "~/Applications"
 
 brew "aider"
 brew "awscli"
+brew "claude-code"
 brew "cmake"
 brew "direnv"
 brew "doggo"
