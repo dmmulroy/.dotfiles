@@ -219,7 +219,33 @@ dot unlink
 
 ### Package Management
 
-The system uses two Brewfiles for different contexts:
+The system provides comprehensive package management through the `dot package` command and uses two Brewfiles for different contexts:
+
+#### Package Commands
+
+```bash
+# List packages
+dot package list              # List all packages
+dot package list base         # List base packages only
+dot package list work         # List work packages only
+
+# Add packages
+dot package add git           # Add git formula to base bundle
+dot package add docker cask   # Add docker cask to base bundle  
+dot package add kubectl brew work  # Add kubectl to work bundle
+
+# Update packages
+dot package update            # Update all installed packages
+dot package update git        # Update specific package
+dot package update all base   # Update only base bundle packages
+dot package update all work   # Update only work bundle packages
+
+# Remove packages
+dot package remove git        # Remove git from any bundle
+dot package remove docker base  # Remove docker from base bundle only
+```
+
+#### Package Files
 
 **`packages/bundle`** - Base packages for all machines:
 - Development tools: neovim, tmux, fish, git
@@ -230,6 +256,14 @@ The system uses two Brewfiles for different contexts:
 **`packages/bundle.work`** - Work-specific additions:
 - AWS/Kubernetes tools
 - Enterprise development tools
+
+#### Package Features
+
+- **Auto-detection**: Package type (brew vs cask) automatically detected
+- **Sorted maintenance**: Packages kept alphabetically sorted within each type
+- **Installation integration**: Adding packages installs them immediately
+- **Update flexibility**: Can update all packages, specific packages, or by bundle
+- **Cleanup included**: Update command includes Homebrew refresh and optional cleanup
 
 ### Key Configurations
 
@@ -283,6 +317,16 @@ The system uses two Brewfiles for different contexts:
 ### Customization
 
 #### Adding Packages
+
+**Method 1: Using package commands (recommended):**
+```bash
+# Add package using the package command
+dot package add new-tool             # Adds to base bundle
+dot package add new-app cask         # Adds cask to base bundle
+dot package add work-tool brew work  # Adds to work bundle
+```
+
+**Method 2: Manual editing:**
 Edit `packages/bundle` or `packages/bundle.work`:
 ```ruby
 # Add to packages/bundle

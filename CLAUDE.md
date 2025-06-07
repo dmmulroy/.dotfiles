@@ -21,6 +21,20 @@ stow -R -v -d . -t "$HOME" home
 # Check installation health
 ./dot doctor
 
+# Package management
+./dot package list                    # List all packages
+./dot package list base               # List base packages only  
+./dot package list work               # List work packages only
+./dot package add git                 # Add git formula to base bundle
+./dot package add docker cask         # Add docker cask to base bundle
+./dot package add kubectl brew work   # Add kubectl to work bundle
+./dot package update                  # Update all installed packages
+./dot package update git              # Update specific package
+./dot package update all base         # Update only base bundle packages
+./dot package update all work         # Update only work bundle packages
+./dot package remove git              # Remove git from any bundle
+./dot package remove docker base      # Remove docker from base bundle only
+
 # Summarize recent commits with AI
 ./dot summary
 ./dot summary -n 5 -d
@@ -62,3 +76,8 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Package installation has fallback logic - continues even if individual packages fail
 - Claude Code CLI is included for AI assistance
 - The `dot doctor` command performs comprehensive health checks of the development environment
+- Package management commands (`dot package add/remove/update/list`) automatically detect package type (brew vs cask) and maintain sorted bundle files
+- Adding packages installs them immediately and updates the appropriate bundle file
+- Updating packages can target all packages, specific packages, or packages from specific bundles
+- Update command includes Homebrew refresh and optional cleanup of old versions
+- Removing packages from bundles optionally uninstalls them from the system
