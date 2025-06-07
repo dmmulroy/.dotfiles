@@ -1,0 +1,418 @@
+# Dotfiles
+
+A comprehensive, automated dotfiles management system for macOS development environments. Features a powerful CLI tool for setup, maintenance, and AI-powered development insights.
+
+## Overview
+
+This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management, Homebrew for package installation, and includes configurations for Fish shell, Neovim, Tmux, Git, and other essential development tools.
+
+### Key Features
+
+- 🚀 **One-command setup** - Complete development environment in minutes
+- 🤖 **AI Integration** - Claude Code for commit summaries and assistance
+- 📦 **Resilient Package Management** - Continues installation even if packages fail
+- 💾 **Compressed Backups** - Create and restore configuration snapshots
+- 🔍 **Health Monitoring** - Comprehensive environment diagnostics
+- 🛠️ **Modular Design** - Separate work and personal configurations
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/dmmulroy/.dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+
+# Full setup (installs everything)
+./dot init
+
+# Or customize the installation
+./dot init --skip-ssh --skip-font
+```
+
+After installation, the `dot` command will be available globally for ongoing management.
+
+## Repository Structure
+
+```
+~/.dotfiles/
+├── dot                 # Main CLI tool
+├── home/              # Configuration files (stowed to ~)
+│   ├── .config/
+│   │   ├── fish/      # Fish shell configuration
+│   │   ├── git/       # Git configuration
+│   │   ├── nvim/      # Neovim configuration
+│   │   ├── tmux/      # Tmux configuration
+│   │   └── ...
+│   └── .ideavimrc     # IntelliJ IDEA Vim config
+├── packages/
+│   ├── bundle         # Base Brewfile
+│   └── bundle.work    # Work-specific packages
+├── backups/           # Configuration backups (compressed)
+├── CLAUDE.md          # Instructions for Claude Code
+└── README.md          # This file
+```
+
+## The `dot` CLI Tool
+
+The `dot` command is a comprehensive management tool for your dotfiles. It handles everything from initial setup to ongoing maintenance and provides AI-powered insights.
+
+### Installation Commands
+
+#### `dot init` - Initial Setup
+Complete environment setup with all tools and configurations.
+
+```bash
+# Full installation
+dot init
+
+# Skip SSH key generation
+dot init --skip-ssh
+
+# Skip font installation  
+dot init --skip-font
+
+# Skip both SSH and font setup
+dot init --skip-ssh --skip-font
+```
+
+**What it does:**
+1. Installs Homebrew (if not present)
+2. Installs packages from Brewfiles
+3. Creates symlinks with GNU Stow
+4. Installs Bun runtime
+5. Generates SSH key for GitHub (optional)
+6. Installs MonoLisa font (optional)
+7. Sets up Fish shell with plugins
+
+### Maintenance Commands
+
+#### `dot update` - Update Everything
+```bash
+dot update
+```
+- Pulls latest dotfiles changes
+- Updates Homebrew packages
+- Re-stows configuration files
+
+#### `dot doctor` - Health Check
+```bash
+dot doctor
+```
+Comprehensive diagnostics including:
+- ✅ Homebrew installation
+- ✅ Essential tools (git, nvim, tmux, node, etc.)
+- ✅ Claude Code functionality
+- ✅ Fish shell configuration
+- ✅ PATH configuration
+- ⚠️ Broken symlinks detection
+- ⚠️ Missing dependencies
+
+#### `dot check-packages` - Package Status
+```bash
+dot check-packages
+```
+Shows which packages are installed vs. missing from your Brewfiles.
+
+#### `dot retry-failed` - Retry Failed Installations
+```bash
+dot retry-failed
+```
+Attempts to reinstall packages that failed during initial setup.
+
+### AI-Powered Features
+
+#### `dot summary` - Commit Analysis
+Uses Claude Code to generate intelligent summaries of recent git commits.
+
+```bash
+# Summarize last 3 commits (default)
+dot summary
+
+# Summarize specific number of commits
+dot summary -n 5
+
+# Include file diffs for detailed analysis
+dot summary -d
+
+# Verbose mode with commit details
+dot summary -v
+
+# Combine options
+dot summary -n 10 -d -v
+```
+
+**Example Output:**
+```
+=> Summary of Recent Changes
+
+Development Focus: Recent work centers on improving the diagnostic navigation
+system in Neovim, updating deprecated API calls to use modern vim.diagnostic.jump()
+functions. This includes better error handling and user experience improvements.
+
+Technical Patterns: The commits show incremental configuration refinements
+with a focus on tooling updates and environment optimization...
+```
+
+### Backup & Restore
+
+#### `dot backup` - Create Backups
+```bash
+# Create timestamped backup
+dot backup
+
+# Create named backup
+dot backup pre-experiment
+
+# Backups are automatically compressed (tar.gz)
+```
+
+#### `dot restore` - Restore Configurations
+```bash
+# List available backups
+dot restore
+
+# Restore specific backup
+dot restore pre-experiment
+```
+
+#### `dot manage-backups` - Backup Management
+```bash
+# List all backups with details
+dot manage-backups list
+
+# Remove backups older than 30 days
+dot manage-backups clean
+
+# Compress legacy uncompressed backups
+dot manage-backups compress
+
+# Delete specific backup
+dot manage-backups delete old-backup
+```
+
+### Utility Commands
+
+#### `dot edit` - Open in Editor
+```bash
+dot edit
+```
+Opens the dotfiles directory in your default editor (defined by `$EDITOR`).
+
+#### `dot link` / `dot unlink` - Global Installation
+```bash
+# Install dot command globally
+dot link
+
+# Remove global installation
+dot unlink
+```
+
+## Configuration
+
+### Package Management
+
+The system uses two Brewfiles for different contexts:
+
+**`packages/bundle`** - Base packages for all machines:
+- Development tools: neovim, tmux, fish, git
+- CLI utilities: ripgrep, fd, fzf, starship
+- Applications: Arc browser, Raycast, OrbStack
+- AI tools: aider, claude-code
+
+**`packages/bundle.work`** - Work-specific additions:
+- AWS/Kubernetes tools
+- Enterprise development tools
+
+### Key Configurations
+
+- **Fish Shell**: Custom functions, environment variables, and plugin management via Fisher
+- **Neovim**: Lua-based configuration with lazy.nvim plugin manager
+- **Tmux**: Plugin management via TPM, session persistence, Vim-style navigation
+- **Git**: Conditional work configuration, custom aliases, GPG signing
+
+### Architecture Highlights
+
+- **GNU Stow**: Manages symlinks from `home/` to `~`
+- **Modular Design**: Separate configs for different tools
+- **Conditional Loading**: Work-specific Git config for `~/Code/work/`
+- **Plugin Managers**: Each tool uses its own (lazy.nvim, TPM, Fisher)
+- **Error Resilience**: Package installation continues despite individual failures
+
+## Environment Setup
+
+### Prerequisites
+
+- macOS (Intel or Apple Silicon)
+- Internet connection
+- Terminal access
+
+### First-Time Setup
+
+1. **Clone repository:**
+   ```bash
+   git clone https://github.com/dmmulroy/.dotfiles.git ~/.dotfiles
+   cd ~/.dotfiles
+   ```
+
+2. **Run installation:**
+   ```bash
+   ./dot init
+   ```
+
+3. **Restart shell or source Fish config:**
+   ```bash
+   # In Fish shell
+   source ~/.config/fish/config.fish
+   
+   # Or restart terminal
+   ```
+
+4. **Verify installation:**
+   ```bash
+   dot doctor
+   ```
+
+### Customization
+
+#### Adding Packages
+Edit `packages/bundle` or `packages/bundle.work`:
+```ruby
+# Add to packages/bundle
+brew "new-tool"
+cask "new-app"
+```
+
+Then run:
+```bash
+dot init  # or brew bundle --file=./packages/bundle
+```
+
+#### Modifying Configurations
+1. Edit files in `home/` directory (not your actual home directory)
+2. Re-stow changes: `dot init` or `stow -R -v -d . -t "$HOME" home`
+3. Test configuration changes
+
+#### Work-Specific Setup
+The system automatically applies work-specific Git configuration for repositories under `~/Code/work/`.
+
+## Troubleshooting
+
+### Common Issues
+
+**Command not found: `dot`**
+```bash
+# Source Fish configuration
+source ~/.config/fish/config.fish
+
+# Or add to PATH manually
+export PATH="$HOME/.dotfiles:$PATH"
+```
+
+**Package installation failures:**
+```bash
+# Check what failed
+dot check-packages
+
+# Retry failed packages
+dot retry-failed
+```
+
+**Broken symlinks:**
+```bash
+# Diagnose issues
+dot doctor
+
+# Re-create symlinks
+stow -R -v -d ~/.dotfiles -t "$HOME" home
+```
+
+**Claude Code authentication:**
+```bash
+# If summary command fails
+claude auth login
+```
+
+### Getting Help
+
+- Run `dot help` for command overview
+- Run `dot <command> --help` for specific command help
+- Check `dot doctor` for environment issues
+- Review logs in failed package files: `packages/failed_packages_*.txt`
+
+## Development
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make changes in the `home/` directory structure
+4. Test with `dot doctor` and `dot check-packages`
+5. Submit a pull request
+
+### Testing Changes
+
+```bash
+# Create backup before testing
+dot backup test-changes
+
+# Make modifications
+# ...
+
+# Test changes
+dot doctor
+
+# If issues occur, restore backup
+dot restore test-changes
+```
+
+## Advanced Usage
+
+### Selective Installation
+
+```bash
+# Install only base packages, skip optional components
+dot init --skip-ssh --skip-font
+
+# Check what's missing
+dot check-packages
+
+# Install work packages later
+brew bundle --file=./packages/bundle.work
+```
+
+### Backup Strategies
+
+```bash
+# Before major changes
+dot backup stable-config
+
+# Before experiments
+dot backup pre-nvim-changes
+
+# Clean up old backups
+dot manage-backups clean
+```
+
+### AI-Powered Workflows
+
+```bash
+# Review recent work
+dot summary -v
+
+# Detailed analysis for release notes
+dot summary -n 10 -d
+
+# Quick daily standup summary
+dot summary -n 5
+```
+
+## License
+
+This repository is for personal use. Feel free to fork and adapt for your own needs.
+
+## Acknowledgments
+
+- [GNU Stow](https://www.gnu.org/software/stow/) for symlink management
+- [Homebrew](https://brew.sh/) for package management
+- [Claude Code](https://claude.ai/code) for AI assistance
+- The dotfiles community for inspiration and best practices
