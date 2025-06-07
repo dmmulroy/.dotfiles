@@ -1003,6 +1003,27 @@ cmd_unlink() {
     fi
 }
 
+cmd_stow() {
+    print_header "Stowing dotfiles"
+    
+    if ! command_exists stow; then
+        print_error "GNU Stow is not installed"
+        print_info "Install it first: brew install stow"
+        return 1
+    fi
+    
+    print_info "Creating symlinks for dotfiles..."
+    
+    if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
+        print_success "Dotfiles stowed successfully"
+        print_info "Configuration files are now symlinked to your home directory"
+    else
+        print_error "Failed to stow dotfiles"
+        print_info "Check for conflicting files in your home directory"
+        return 1
+    fi
+}
+
 cmd_edit() {
     print_header "Opening dotfiles in editor"
     
@@ -1054,11 +1075,12 @@ complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management c
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
+complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
-complete -c dot -n "__fish_use_subcommand" -a "link" -d "Create global symlink for dotfiles command"
-complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Remove global symlink"
-complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
+complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
+complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot command (remove symlink)"
+complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
 complete -c dot -n "__fish_use_subcommand" -a "help" -d "Show help message"
 
 # Global options
@@ -1252,7 +1274,7 @@ EOF
     fi
     
     # Build prompt for Claude
-    local claude_prompt="Please provide a concise summary of these recent Git commits. Focus on:
+    local claude_prompt="You are a technical writer. Provide ONLY a concise 2-3 paragraph summary of these Git commits. Do NOT ask questions or provide additional commentary. Focus on:
 1. What changes were made (features, fixes, improvements)
 2. Overall patterns or themes in the development
 3. Any notable technical decisions or architectural changes
@@ -1263,6 +1285,12 @@ Here are the commits (most recent first):
     
     # Add commit details to prompt
     local commit_count=0
+    local temp_commits_file
+    temp_commits_file=$(mktemp)
+    echo "$commits_info" > "$temp_commits_file"
+    
+    # Process commits with better error handling
+    set +e  # Temporarily disable exit on error for this section
     while IFS='|' read -r hash author email date subject; do
         ((commit_count++))
         local short_hash="${hash:0:8}"
@@ -1274,7 +1302,7 @@ Author: $author
         # Add diff if requested
         if [[ "$include_diff" == true ]]; then
             local diff_output
-            diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null)
+            diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null || true)
             if [[ -n "$diff_output" ]]; then
                 claude_prompt+="Files changed:
 $diff_output
@@ -1285,10 +1313,15 @@ $diff_output
         
         claude_prompt+="
 "
-    done <<< "$commits_info"
+    done < "$temp_commits_file"
+    set -e  # Re-enable exit on error
+    
+    rm "$temp_commits_file"
     
     # Add instructions
-    claude_prompt+="Please provide a summary in 2-3 paragraphs. Be specific about what was accomplished and avoid generic language."
+    claude_prompt+="
+
+INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do not ask questions or provide additional commentary."
     
     # Create temporary file for the prompt
     local temp_file
@@ -1297,16 +1330,33 @@ $diff_output
     
     print_info "Generating summary with Claude Code..."
     
-    # Call Claude Code
-    local claude_output
-    local claude_error
-    if claude_output=$(claude --print < "$temp_file" 2>&1); then
+    # Call Claude Code with explicit error handling
+    local claude_output=""
+    local claude_error=""
+    local exit_code=0
+    
+    # Temporarily disable set -e to capture the exit code properly
+    set +e
+    claude_output=$(claude --model sonnet --print < "$temp_file" 2>&1)
+    exit_code=$?
+    set -e
+    
+    if [[ $exit_code -eq 0 && -n "$claude_output" ]]; then
         print_header "Summary of Recent Changes"
         echo ""
         echo "$claude_output"
         echo ""
     else
-        print_error "Failed to generate summary with Claude Code"
+        print_error "Failed to generate summary with Claude Code (exit code: $exit_code)"
+        if [[ -n "$claude_output" ]]; then
+            claude_error="$claude_output"
+        else
+            claude_error="No output received from Claude Code"
+        fi
+    fi
+    
+    # Handle errors if any occurred
+    if [[ -n "${claude_error:-}" ]]; then
         
         # Check if it's an authentication issue
         if echo "$claude_output" | grep -q -i "auth\|login\|api"; then
@@ -1981,10 +2031,11 @@ cmd_help() {
     echo "    check-packages      Check which packages are installed/missing"
     echo "    retry-failed        Retry failed package installations"
     echo "    summary             Summarize recent git commits using Claude Code"
+    echo "    stow                Create symlinks for dotfiles using GNU Stow"
     echo "    backup              Backup management commands (create, restore, list, clean, etc.)"
     echo "    completions         Generate Fish shell completions"
-    echo "    link                Create global symlink for dotfiles command"
-    echo "    unlink              Remove global symlink"
+    echo "    link                Install dot command globally (create symlink in PATH)"
+    echo "    unlink              Uninstall global dot command (remove symlink)"
     echo "    edit                Open dotfiles in editor"
     echo "    help                Show this help message (default)"
     echo ""
@@ -2009,6 +2060,7 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
     echo "    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI"
     echo "    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits"
+    echo "    ${SCRIPT_NAME} stow                      # Create symlinks for dotfiles"
     echo "    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup"
     echo "    ${SCRIPT_NAME} backup create mybackup    # Create named compressed backup"
     echo "    ${SCRIPT_NAME} backup restore            # List available backups"
@@ -2018,7 +2070,7 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} backup compress           # Compress legacy uncompressed backups"
     echo "    ${SCRIPT_NAME} backup delete foo         # Delete specific backup"
     echo "    ${SCRIPT_NAME} completions               # Generate Fish shell completions"
-    echo "    ${SCRIPT_NAME} link                      # Install dot command globally"
+    echo "    ${SCRIPT_NAME} link                      # Install dot command globally in PATH"
     echo ""
     
     echo -e "${BOLD}CONFIGURATION:${RESET}"
@@ -2092,6 +2144,9 @@ main() {
             ;;
         summary)
             cmd_summary "$@"
+            ;;
+        stow)
+            cmd_stow "$@"
             ;;
         backup)
             cmd_backup "$@"

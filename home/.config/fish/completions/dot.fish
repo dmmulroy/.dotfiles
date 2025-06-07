@@ -12,11 +12,12 @@ complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management c
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
+complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
-complete -c dot -n "__fish_use_subcommand" -a "link" -d "Create global symlink for dotfiles command"
-complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Remove global symlink"
-complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
+complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
+complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot command (remove symlink)"
+complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
 complete -c dot -n "__fish_use_subcommand" -a "help" -d "Show help message"
 
 # Global options
