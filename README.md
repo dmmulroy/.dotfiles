@@ -200,6 +200,16 @@ dot backup help
 
 ### Utility Commands
 
+#### `dot completions` - Generate Fish Shell Completions
+```bash
+dot completions
+```
+Generates comprehensive Fish shell completions for the `dot` command, including:
+- All commands and subcommands
+- Dynamic completions for installed packages
+- Dynamic completions for available backups
+- Option completions with descriptions
+
 #### `dot edit` - Open in Editor
 ```bash
 dot edit
@@ -443,6 +453,18 @@ dot backup create pre-nvim-changes
 
 # Clean up old backups
 dot backup clean
+```
+
+### Shell Completions
+
+```bash
+# Generate Fish shell completions
+dot completions
+
+# Completions include dynamic suggestions for:
+# - Package names when using package remove/update
+# - Backup names when using backup restore/delete
+# - All commands, subcommands, and options
 ```
 
 ### AI-Powered Workflows
