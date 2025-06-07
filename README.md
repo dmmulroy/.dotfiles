@@ -155,39 +155,47 @@ with a focus on tooling updates and environment optimization...
 
 ### Backup & Restore
 
-#### `dot backup` - Create Backups
+The `dot backup` command provides comprehensive backup management with subcommands for all backup operations.
+
+#### Create Backups
 ```bash
-# Create timestamped backup
+# Create timestamped backup (default)
 dot backup
 
 # Create named backup
+dot backup create pre-experiment
+
+# Shorthand for named backup
 dot backup pre-experiment
 
-# Backups are automatically compressed (tar.gz)
+# All backups are automatically compressed (tar.gz)
 ```
 
-#### `dot restore` - Restore Configurations
+#### Restore Configurations
 ```bash
 # List available backups
-dot restore
+dot backup restore
 
 # Restore specific backup
-dot restore pre-experiment
+dot backup restore pre-experiment
 ```
 
-#### `dot manage-backups` - Backup Management
+#### Backup Management
 ```bash
 # List all backups with details
-dot manage-backups list
+dot backup list
 
 # Remove backups older than 30 days
-dot manage-backups clean
+dot backup clean
 
 # Compress legacy uncompressed backups
-dot manage-backups compress
+dot backup compress
 
 # Delete specific backup
-dot manage-backups delete old-backup
+dot backup delete old-backup
+
+# Show backup help
+dot backup help
 ```
 
 ### Utility Commands
@@ -353,7 +361,7 @@ claude auth login
 
 ```bash
 # Create backup before testing
-dot backup test-changes
+dot backup create test-changes
 
 # Make modifications
 # ...
@@ -362,7 +370,7 @@ dot backup test-changes
 dot doctor
 
 # If issues occur, restore backup
-dot restore test-changes
+dot backup restore test-changes
 ```
 
 ## Advanced Usage
@@ -384,13 +392,13 @@ brew bundle --file=./packages/bundle.work
 
 ```bash
 # Before major changes
-dot backup stable-config
+dot backup create stable-config
 
-# Before experiments
-dot backup pre-nvim-changes
+# Before experiments  
+dot backup create pre-nvim-changes
 
 # Clean up old backups
-dot manage-backups clean
+dot backup clean
 ```
 
 ### AI-Powered Workflows
