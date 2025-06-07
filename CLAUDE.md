@@ -42,6 +42,9 @@ stow -R -v -d . -t "$HOME" home
 # Manage backups
 ./dot backup
 ./dot restore
+
+# Generate Fish shell completions
+./dot completions
 ```
 
 ### Development Workflow
@@ -81,3 +84,4 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Updating packages can target all packages, specific packages, or packages from specific bundles
 - Update command includes Homebrew refresh and optional cleanup of old versions
 - Removing packages from bundles optionally uninstalls them from the system
+- The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
