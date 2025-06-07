@@ -15,8 +15,15 @@ brew bundle --file=./packages/bundle
 # Install work packages (in addition to base)
 brew bundle --file=./packages/bundle.work
 
-# Update symlinks 
-stow -R -v -d . -t "$HOME" home
+# Update symlinks for dotfiles
+./dot stow
+# OR manually: stow -R -v -d . -t "$HOME" home
+
+# Install dot command globally (add to PATH)
+./dot link
+
+# Uninstall global dot command
+./dot unlink
 
 # Check installation health
 ./dot doctor
@@ -50,8 +57,13 @@ stow -R -v -d . -t "$HOME" home
 ### Development Workflow
 When modifying configurations:
 1. Edit files in the `./home/` directory (NOT in your actual home directory)
-2. Run `./dot init` or `stow -R -v -d . -t "$HOME" home` to update symlinks
+2. Run `./dot stow` to update symlinks (or `./dot init` for full setup)
 3. Test changes in the relevant application
+
+### Command Clarification
+- `./dot stow` - Create symlinks for dotfiles (configs) from `home/` to `~/`
+- `./dot link` - Install the `dot` command globally so you can run `dot` from anywhere
+- `./dot init` - Full system setup (includes both stowing and package installation)
 
 ## Architecture
 
@@ -85,3 +97,6 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Update command includes Homebrew refresh and optional cleanup of old versions
 - Removing packages from bundles optionally uninstalls them from the system
 - The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
+
+## Memories
+- Anytime dot cli is updated always update the cli help flags/commands/text, CLAUDE.md, README.md, and the fish completions for dot

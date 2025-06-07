@@ -216,14 +216,22 @@ dot edit
 ```
 Opens the dotfiles directory in your default editor (defined by `$EDITOR`).
 
-#### `dot link` / `dot unlink` - Global Installation
+#### `dot stow` - Update Dotfiles Symlinks
 ```bash
-# Install dot command globally
+# Create/update symlinks for configuration files
+dot stow
+```
+Re-creates symlinks from `home/` directory to your home directory (`~`). Use this after editing configuration files.
+
+#### `dot link` / `dot unlink` - Global dot Command Installation
+```bash
+# Install dot command globally (add to PATH)
 dot link
 
 # Remove global installation
 dot unlink
 ```
+Makes the `dot` command available from any directory by creating a symlink in `/usr/local/bin` or `~/.local/bin`.
 
 ## Configuration
 
@@ -351,7 +359,7 @@ dot init  # or brew bundle --file=./packages/bundle
 
 #### Modifying Configurations
 1. Edit files in `home/` directory (not your actual home directory)
-2. Re-stow changes: `dot init` or `stow -R -v -d . -t "$HOME" home`
+2. Re-stow changes: `dot stow` (or `dot init` for full setup)
 3. Test configuration changes
 
 #### Work-Specific Setup
@@ -385,7 +393,7 @@ dot retry-failed
 dot doctor
 
 # Re-create symlinks
-stow -R -v -d ~/.dotfiles -t "$HOME" home
+dot stow
 ```
 
 **Claude Code authentication:**
