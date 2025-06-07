@@ -29,7 +29,7 @@ cd ~/.dotfiles
 ./dot init --skip-ssh --skip-font
 ```
 
-After installation, the `dot` command will be available globally for ongoing management.
+After installation, the `dot` command will be available globally for ongoing management. Running `dot` without arguments shows help.
 
 ## Repository Structure
 

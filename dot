@@ -1323,7 +1323,7 @@ ${BOLD}USAGE:${RESET}
     ${SCRIPT_NAME} [OPTIONS] COMMAND [ARGS]
 
 ${BOLD}COMMANDS:${RESET}
-    init                Initialize and install dotfiles (default)
+    init                Initialize and install dotfiles
     update              Update dotfiles and packages
     doctor              Run diagnostics and check installation
     check-packages      Check which packages are installed/missing
@@ -1333,7 +1333,7 @@ ${BOLD}COMMANDS:${RESET}
     link                Create global symlink for dotfiles command
     unlink              Remove global symlink
     edit                Open dotfiles in editor
-    help                Show this help message
+    help                Show this help message (default)
 
 ${BOLD}OPTIONS:${RESET}
     --skip-ssh      Skip SSH key generation
@@ -1406,7 +1406,7 @@ main() {
     done
     
     # Get command
-    local cmd="${1:-init}"
+    local cmd="${1:-help}"
     shift || true
     
     # Execute command
