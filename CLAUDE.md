@@ -98,5 +98,15 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Removing packages from bundles optionally uninstalls them from the system
 - The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
 
+## Development Guidelines
+
+### Shell Script Best Practices
+- **ALWAYS run shellcheck when modifying the `dot` script**: `shellcheck dot` 
+- Fix all shellcheck warnings and errors before committing changes
+- Use proper quoting for variables and paths to prevent word splitting
+- Use `command -v` instead of deprecated `which` command
+- Implement proper trap cleanup for temporary files and directories
+
 ## Memories
 - Anytime dot cli is updated always update the cli help flags/commands/text, CLAUDE.md, README.md, and the fish completions for dot
+- Always run `shellcheck dot` when making changes to the dot script to ensure code quality and safety
