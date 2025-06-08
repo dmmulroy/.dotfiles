@@ -15,7 +15,8 @@ readonly BOLD='\033[1m'
 # Script metadata
 readonly SCRIPT_NAME="dot"
 readonly VERSION="1.0.0"
-readonly DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DOTFILES_DIR
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Configuration
 readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
@@ -269,7 +270,7 @@ stow_dotfiles() {
     
     # Check for existing files that would be overwritten
     while IFS= read -r -d '' file; do
-        local relative_path="${file#${HOME_DIR}/}"
+        local relative_path="${file#"${HOME_DIR}"/}"
         local target_path="${HOME}/${relative_path}"
         
         if [[ -e "$target_path" && ! -L "$target_path" ]]; then
@@ -716,7 +717,7 @@ cmd_backup_create() {
     # Find all symlinks pointing to our dotfiles
     local count=0
     while IFS= read -r -d '' file; do
-        local relative_path="${file#${HOME_DIR}/}"
+        local relative_path="${file#"${HOME_DIR}"/}"
         local source_path="${HOME}/${relative_path}"
         
         if [[ -L "$source_path" ]]; then
@@ -839,7 +840,7 @@ cmd_backup_restore() {
     print_info "Restoring files..."
     local count=0
     while IFS= read -r -d '' file; do
-        local relative_path="${file#${backup_dir}/}"
+        local relative_path="${file#"${backup_dir}"/}"
         local target_path="${HOME}/${relative_path}"
         
         mkdir -p "$(dirname "$target_path")"
@@ -1373,7 +1374,7 @@ EOF
     # Show verbose info if requested
     if [[ "$verbose" == true ]]; then
         print_info "Recent commits:"
-        echo "$commits_info" | while IFS='|' read -r hash author email date subject; do
+        echo "$commits_info" | while IFS='|' read -r hash author _ date subject; do
             local short_hash="${hash:0:8}"
             echo "  $short_hash - $subject ($author, $date)"
         done
@@ -1399,7 +1400,7 @@ Here are the commits (most recent first):
     
     # Process commits with better error handling
     set +e  # Temporarily disable exit on error for this section
-    while IFS='|' read -r hash author email date subject; do
+    while IFS='|' read -r hash author _ date subject; do
         ((commit_count++))
         local short_hash="${hash:0:8}"
         claude_prompt+="Commit $commit_count ($short_hash, $date):
@@ -1856,7 +1857,7 @@ cmd_package_update() {
         if brew list --formula | grep -q "^${package_name}$"; then
             is_formula=true
         elif brew list --cask | grep -q "^${package_name}$"; then
-            is_cask=true
+            is_cask=true  # Used in conditional logic below
         else
             print_error "Package '$package_name' is not installed"
             return 1
@@ -1870,7 +1871,7 @@ cmd_package_update() {
             else
                 print_warning "Failed to update $package_name (may already be latest version)"
             fi
-        else
+        elif [[ "$is_cask" == true ]]; then
             print_info "Updating cask: $package_name"
             if brew upgrade --cask "$package_name"; then
                 print_success "Updated $package_name successfully"
