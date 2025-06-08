@@ -701,7 +701,8 @@ cmd_backup_create() {
     print_header "Creating backup of current configuration"
     
     local backup_name="${1:-backup-$(date +%Y%m%d-%H%M%S)}"
-    local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+    local backup_root="${HOME}/.dotbackups"
+    local backup_dir="${backup_root}/${backup_name}"
     local backup_archive="${backup_dir}.tar.gz"
     
     # Create temporary directory for staging with proper cleanup
@@ -738,7 +739,7 @@ cmd_backup_create() {
     
     # Create compressed archive
     print_info "Compressing backup ($count files)..."
-    mkdir -p "${DOTFILES_DIR}/backups"
+    mkdir -p "$backup_root"
     
     if tar -czf "$backup_archive" -C "$temp_dir" "$backup_name"; then
         local archive_size
@@ -760,11 +761,11 @@ cmd_backup_restore() {
     if [[ -z "$backup_name" ]]; then
         # List available backups
         print_info "Available backups:"
-        if [[ -d "${DOTFILES_DIR}/backups" ]]; then
+        if [[ -d "${HOME}/.dotbackups" ]]; then
             local found_backups=false
             
             # List compressed backups
-            for backup in "${DOTFILES_DIR}/backups"/*.tar.gz; do
+            for backup in "${HOME}/.dotbackups"/*.tar.gz; do
                 if [[ -f "$backup" ]]; then
                     local name
                     name=$(basename "$backup" .tar.gz)
@@ -778,7 +779,7 @@ cmd_backup_restore() {
             done
             
             # List uncompressed backups (legacy)
-            for backup in "${DOTFILES_DIR}/backups"/*; do
+            for backup in "${HOME}/.dotbackups"/*; do
                 if [[ -d "$backup" ]]; then
                     local name
                     name=$(basename "$backup")
@@ -791,14 +792,14 @@ cmd_backup_restore() {
                 print_warning "No backups found"
             fi
         else
-            print_warning "No backups directory found"
+            print_warning "No backups directory found at ${HOME}/.dotbackups"
         fi
         return 0
     fi
     
     # Check for compressed backup first
-    local backup_archive="${DOTFILES_DIR}/backups/${backup_name}.tar.gz"
-    local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+    local backup_archive="${HOME}/.dotbackups/${backup_name}.tar.gz"
+    local backup_dir="${HOME}/.dotbackups/${backup_name}"
     local temp_dir
     
     # Set up cleanup trap for temporary directory
@@ -854,11 +855,11 @@ cmd_backup_restore() {
 cmd_backup_list() {
     print_header "Listing available backups"
     
-    if [[ -d "${DOTFILES_DIR}/backups" ]]; then
+    if [[ -d "${HOME}/.dotbackups" ]]; then
         local found_backups=false
         
         # List compressed backups
-        for backup in "${DOTFILES_DIR}/backups"/*.tar.gz; do
+        for backup in "${HOME}/.dotbackups"/*.tar.gz; do
             if [[ -f "$backup" ]]; then
                 local name
                 name=$(basename "$backup" .tar.gz)
@@ -872,7 +873,7 @@ cmd_backup_list() {
         done
         
         # List uncompressed backups (legacy)
-        for backup in "${DOTFILES_DIR}/backups"/*; do
+        for backup in "${HOME}/.dotbackups"/*; do
             if [[ -d "$backup" ]]; then
                 local name
                 name=$(basename "$backup")
@@ -892,8 +893,8 @@ cmd_backup_list() {
 cmd_backup_clean() {
     print_header "Cleaning up old backups"
     
-    if [[ ! -d "${DOTFILES_DIR}/backups" ]]; then
-        print_info "No backups directory found"
+    if [[ ! -d "${HOME}/.dotbackups" ]]; then
+        print_info "No backups directory found at ${HOME}/.dotbackups"
         return 0
     fi
     
@@ -902,7 +903,7 @@ cmd_backup_clean() {
     cutoff_date=$(date -d "30 days ago" +%Y%m%d 2>/dev/null || date -v-30d +%Y%m%d 2>/dev/null)
     
     # Find old compressed backups
-    for backup in "${DOTFILES_DIR}/backups"/*.tar.gz; do
+    for backup in "${HOME}/.dotbackups"/*.tar.gz; do
         if [[ -f "$backup" ]]; then
             local name
             name=$(basename "$backup" .tar.gz)
@@ -938,13 +939,13 @@ cmd_backup_clean() {
 cmd_backup_compress() {
     print_header "Compressing legacy backups"
     
-    if [[ ! -d "${DOTFILES_DIR}/backups" ]]; then
-        print_info "No backups directory found"
+    if [[ ! -d "${HOME}/.dotbackups" ]]; then
+        print_info "No backups directory found at ${HOME}/.dotbackups"
         return 0
     fi
     
     local legacy_backups=()
-    for backup in "${DOTFILES_DIR}/backups"/*; do
+    for backup in "${HOME}/.dotbackups"/*; do
         if [[ -d "$backup" ]]; then
             legacy_backups+=("$backup")
         fi
@@ -964,7 +965,7 @@ cmd_backup_compress() {
         
         print_info "Compressing $backup_name..."
         
-        if tar -czf "$backup_archive" -C "${DOTFILES_DIR}/backups" "$backup_name"; then
+        if tar -czf "$backup_archive" -C "${HOME}/.dotbackups" "$backup_name"; then
             local original_size
             local compressed_size
             original_size=$(du -sh "$backup_dir" | cut -f1)
@@ -991,8 +992,8 @@ cmd_backup_delete() {
     
     print_header "Deleting backup: $backup_name"
     
-    local backup_archive="${DOTFILES_DIR}/backups/${backup_name}.tar.gz"
-    local backup_dir="${DOTFILES_DIR}/backups/${backup_name}"
+    local backup_archive="${HOME}/.dotbackups/${backup_name}.tar.gz"
+    local backup_dir="${HOME}/.dotbackups/${backup_name}"
     
     if [[ -f "$backup_archive" ]]; then
         if confirm "Delete compressed backup '${backup_name}'?" "n"; then
@@ -1246,13 +1247,13 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 
 # Dynamic completions for available backups (when restoring or deleting)
 function __dot_available_backups
-    if test -d ~/.dotfiles/backups
-        for backup in ~/.dotfiles/backups/*.tar.gz
+    if test -d ~/.dotbackups
+        for backup in ~/.dotbackups/*.tar.gz
             if test -f "$backup"
                 basename "$backup" .tar.gz
             end
         end
-        for backup in ~/.dotfiles/backups/*
+        for backup in ~/.dotbackups/*
             if test -d "$backup"
                 basename "$backup"
             end
@@ -1676,10 +1677,10 @@ cmd_package_add() {
     # Auto-detect package type if not specified
     if [[ "$package_type" == "auto" ]]; then
         print_info "Detecting package type..."
-        # Use brew info to check if package exists (safer than search with grep)
-        if brew info --formula "$package_name" >/dev/null 2>&1; then
+        # Use brew info --json for more precise package detection
+        if brew info --json=v2 --formula "$package_name" >/dev/null 2>&1; then
             package_type="brew"
-        elif brew info --cask "$package_name" >/dev/null 2>&1; then
+        elif brew info --json=v2 --cask "$package_name" >/dev/null 2>&1; then
             package_type="cask"
         else
             print_warning "Package '$package_name' not found in either formulas or casks"
