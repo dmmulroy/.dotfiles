@@ -7,7 +7,6 @@ readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly BLUE='\033[0;34m'
-readonly MAGENTA='\033[0;35m'
 readonly CYAN='\033[0;36m'
 readonly RESET='\033[0m'
 readonly BOLD='\033[1m'
@@ -15,8 +14,8 @@ readonly BOLD='\033[1m'
 # Script metadata
 readonly SCRIPT_NAME="dot"
 readonly VERSION="1.0.0"
-readonly DOTFILES_DIR
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DOTFILES_DIR
 
 # Configuration
 readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
@@ -215,7 +214,8 @@ install_packages() {
             printf "  - %s\n" "${failed_packages[@]}"
             
             # Save failed packages to a file for reference
-            local failed_file="${PACKAGES_DIR}/failed_packages_$(date +%Y%m%d_%H%M%S).txt"
+            local failed_file
+            failed_file="${PACKAGES_DIR}/failed_packages_$(date +%Y%m%d_%H%M%S).txt"
             printf "%s\n" "${failed_packages[@]}" > "$failed_file"
             print_info "Failed packages saved to: $failed_file"
         fi
@@ -265,7 +265,8 @@ stow_dotfiles() {
     print_info "Stowing files from ${HOME_DIR} to ${HOME}..."
     
     # Create backup directory for existing configs
-    local backup_dir="${DOTFILES_DIR}/backups/$(date +%Y%m%d_%H%M%S)"
+    local backup_dir
+    backup_dir="${DOTFILES_DIR}/backups/$(date +%Y%m%d_%H%M%S)"
     local files_to_backup=()
     
     # Check for existing files that would be overwritten
@@ -721,7 +722,8 @@ cmd_backup_create() {
         local source_path="${HOME}/${relative_path}"
         
         if [[ -L "$source_path" ]]; then
-            local target_dir="$temp_dir/$backup_name/$(dirname "$relative_path")"
+            local target_dir
+            target_dir="$temp_dir/$backup_name/$(dirname "$relative_path")"
             mkdir -p "$target_dir"
             # Copy the actual file content, not the symlink itself
             if cp -L "$source_path" "$temp_dir/$backup_name/${relative_path}" 2>/dev/null; then
@@ -1266,7 +1268,7 @@ complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcomma
 complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcommand_from delete" -xa "(__dot_available_backups)"
 EOF
 
-    if [[ $? -eq 0 ]]; then
+    if [[ -f "$completions_file" ]]; then
         print_success "Fish completions generated at ${completions_file}"
         print_info "Completions will be available in new Fish shell sessions"
         print_info "To reload completions in current session, run: source ${completions_file}"
@@ -1559,7 +1561,8 @@ cmd_check_packages() {
             [[ -z "${line// }" ]] && continue
             
             if [[ "$line" =~ ^brew[[:space:]] ]]; then
-                local package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
+                local package
+                package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
                 if [[ -n "$package" ]]; then
                     if echo "$installed_formulas" | grep -q "^${package}$"; then
                         installed_brew+=("$package")
@@ -1568,7 +1571,8 @@ cmd_check_packages() {
                     fi
                 fi
             elif [[ "$line" =~ ^cask[[:space:]] ]]; then
-                local package=$(echo "$line" | sed -n 's/^cask "\([^"]*\)".*/\1/p')
+                local package
+                package=$(echo "$line" | sed -n 's/^cask "\([^"]*\)".*/\1/p')
                 if [[ -n "$package" ]]; then
                     if echo "$installed_casks" | grep -q "^${package}$"; then
                         installed_cask+=("$package")
@@ -1589,7 +1593,8 @@ cmd_check_packages() {
             [[ -z "${line// }" ]] && continue
             
             if [[ "$line" =~ ^brew[[:space:]] ]]; then
-                local package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
+                local package
+                package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
                 if [[ -n "$package" ]]; then
                     if echo "$installed_formulas" | grep -q "^${package}$"; then
                         installed_brew+=("$package (work)")
