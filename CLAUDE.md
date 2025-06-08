@@ -79,7 +79,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Fish shell configurations load custom functions from `home/.config/fish/functions/`
 - Neovim uses Lua-based configuration with modular plugin definitions in `home/.config/nvim/lua/plugins/`
 - Git configuration conditionally includes work-specific settings based on directory path
-- The `init.sh` script orchestrates the entire setup process in a specific order (Homebrew → packages → stow → shell setup)
+- The `init.sh` script orchestrates the entire setup process in a specific order (Homebrew → packages → stow → Bun → Claude Code → shell setup)
 
 ### Non-obvious Implementation Details
 - Homebrew path differs between ARM64 (`/opt/homebrew`) and x86 (`/usr/local`) - the init script handles this
@@ -89,8 +89,8 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - The `dot` CLI tool is in PATH via Fish config (`fish_add_path ~/.dotfiles`)
 - Backups are automatically compressed using gzip for space efficiency
 - Package installation has fallback logic - continues even if individual packages fail
-- Claude Code CLI is included for AI assistance
-- The `dot doctor` command performs comprehensive health checks of the development environment
+- Claude Code CLI is installed globally via Bun/npm package manager for AI assistance
+- The `dot doctor` command performs comprehensive health checks of the development environment, including Claude Code installation method verification
 - Package management commands (`dot package add/remove/update/list`) automatically detect package type (brew vs cask) and maintain sorted bundle files
 - Adding packages installs them immediately and updates the appropriate bundle file
 - Updating packages can target all packages, specific packages, or packages from specific bundles
