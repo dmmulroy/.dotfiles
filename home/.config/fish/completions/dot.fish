@@ -12,6 +12,7 @@ complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management c
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
+complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
@@ -68,6 +69,11 @@ complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "In
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "v" -l "verbose" -d "Show detailed commit info"
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Show summary help"
 
+# Benchmark-shell command options
+complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
+complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "v" -l "verbose" -d "Show detailed timing for each run"
+complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "h" -l "help" -d "Show benchmark-shell help"
+
 # Dynamic completions for installed packages (when removing or updating)
 function __dot_installed_packages
     if command -q brew
@@ -81,13 +87,13 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 
 # Dynamic completions for available backups (when restoring or deleting)
 function __dot_available_backups
-    if test -d ~/.dotfiles/backups
-        for backup in ~/.dotfiles/backups/*.tar.gz
+    if test -d ~/.dotbackups
+        for backup in ~/.dotbackups/*.tar.gz
             if test -f "$backup"
                 basename "$backup" .tar.gz
             end
         end
-        for backup in ~/.dotfiles/backups/*
+        for backup in ~/.dotbackups/*
             if test -d "$backup"
                 basename "$backup"
             end

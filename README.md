@@ -199,6 +199,49 @@ dot backup delete old-backup
 dot backup help
 ```
 
+### Performance & Development Tools
+
+#### `dot benchmark-shell` - Fish Shell Performance Benchmarking
+```bash
+# Run 10 benchmarks (default)
+dot benchmark-shell
+
+# Run specific number of benchmarks
+dot benchmark-shell -r 20
+
+# Show verbose output with individual timings  
+dot benchmark-shell -v
+
+# Combine options
+dot benchmark-shell -r 15 -v
+```
+
+Measures Fish shell startup performance with detailed analysis:
+- **High-precision timing** via Python3 or Perl
+- **Performance assessment** with color-coded results (excellent ≤50ms, good ≤100ms, fair ≤200ms)
+- **Optimization tips** for slow performance
+- **Statistical analysis** including average, min, max, and range
+- **Profiling guidance** for detailed bottleneck identification
+
+**Example Output:**
+```
+=> Fish Shell Startup Benchmark Results
+
+Configuration:
+  Shell: fish, version 4.0.2
+  Runs: 10
+  Test: Empty script execution
+
+Performance Results:
+  Average time: 0.061 seconds
+  Fastest time: 0.048 seconds
+  Slowest time: 0.078 seconds
+  Time range:   0.030 seconds
+
+Performance Assessment:
+✓ Good startup performance (≤100ms)
+```
+
 ### Utility Commands
 
 #### `dot completions` - Generate Fish Shell Completions
