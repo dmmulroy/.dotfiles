@@ -289,6 +289,10 @@ install_bun() {
 install_claude_code() {
     print_step "Installing Claude Code CLI"
     
+    # Save current shell options and set up trap to restore them
+    local _saved_opts="$-"
+    trap 'set +e; set -"$_saved_opts"' RETURN
+    
     # Check if Claude Code is already installed
     if command_exists claude; then
         print_success "Claude Code is already installed"
@@ -302,6 +306,9 @@ install_claude_code() {
     fi
     
     print_info "Installing Claude Code CLI..."
+    
+    # Temporarily disable exit on error for installation attempts
+    set +e
     
     # Try bun first (faster), fallback to npm
     if command_exists bun; then
@@ -1246,6 +1253,10 @@ EOF
 cmd_summary() {
     print_header "Summarizing recent changes"
     
+    # Save current shell options and set up trap to restore them
+    local _saved_opts="$-"
+    trap 'set +e; set -"$_saved_opts"' RETURN
+    
     # Check if Claude Code is available
     if ! command_exists claude; then
         print_error "Claude Code is not installed"
@@ -1375,7 +1386,7 @@ $diff_output
         claude_prompt+="
 "
     done < "$temp_commits_file"
-    set -e  # Re-enable exit on error
+    # Note: shell options will be restored by the trap
     
     rm "$temp_commits_file"
     
@@ -1400,7 +1411,7 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
     set +e
     claude_output=$(claude --model sonnet --print < "$temp_file" 2>&1)
     exit_code=$?
-    set -e
+    # Note: shell options will be restored by the trap
     
     if [[ $exit_code -eq 0 && -n "$claude_output" ]]; then
         print_header "Summary of Recent Changes"
