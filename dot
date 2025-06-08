@@ -707,13 +707,12 @@ cmd_backup_create() {
     local backup_dir="${backup_root}/${backup_name}"
     local backup_archive="${backup_dir}.tar.gz"
     
-    # Create temporary directory for staging with proper cleanup
-    local temp_dir
-    temp_dir=$(mktemp -d -t DOT_backup_XXXXXX)
-    trap 'rm -rf "$temp_dir"' EXIT
+    # Create temporary directory for staging
+    local backup_temp_dir
+    backup_temp_dir=$(mktemp -d -t DOT_backup_XXXXXX)
     
     print_info "Creating backup..."
-    mkdir -p "$temp_dir/$backup_name"
+    mkdir -p "$backup_temp_dir/$backup_name"
     
     # Find all symlinks pointing to our dotfiles
     local count=0
@@ -723,20 +722,21 @@ cmd_backup_create() {
         
         if [[ -L "$source_path" ]]; then
             local target_dir
-            target_dir="$temp_dir/$backup_name/$(dirname "$relative_path")"
+            target_dir="$backup_temp_dir/$backup_name/$(dirname "$relative_path")"
             mkdir -p "$target_dir"
             # Copy the actual file content, not the symlink itself
-            if cp -L "$source_path" "$temp_dir/$backup_name/${relative_path}" 2>/dev/null; then
+            if cp -L "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null; then
                 ((count++))
             else
                 # Fallback: if the symlink target doesn't exist, copy the link
-                cp -P "$source_path" "$temp_dir/$backup_name/${relative_path}" 2>/dev/null && ((count++))
+                cp -P "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null && ((count++))
             fi
         fi
     done < <(find "${HOME_DIR}" -type f -print0)
     
     if [[ $count -eq 0 ]]; then
         print_warning "No symlinks found to backup"
+        rm -rf "$backup_temp_dir"
         return 0
     fi
     
@@ -744,17 +744,17 @@ cmd_backup_create() {
     print_info "Compressing backup ($count files)..."
     mkdir -p "$backup_root"
     
-    if tar -czf "$backup_archive" -C "$temp_dir" "$backup_name"; then
+    if tar -czf "$backup_archive" -C "$backup_temp_dir" "$backup_name"; then
         local archive_size
         archive_size=$(du -h "$backup_archive" | cut -f1)
         print_success "Backup created: ${backup_archive} (${archive_size})"
         print_info "Backed up $count configuration files"
+        rm -rf "$backup_temp_dir"
     else
         print_error "Failed to create backup archive"
+        rm -rf "$backup_temp_dir"
         return 1
     fi
-    
-    # Cleanup handled by trap
 }
 
 cmd_backup_restore() {
@@ -803,10 +803,7 @@ cmd_backup_restore() {
     # Check for compressed backup first
     local backup_archive="${HOME}/.dotbackups/${backup_name}.tar.gz"
     local backup_dir="${HOME}/.dotbackups/${backup_name}"
-    local temp_dir
-    
-    # Set up cleanup trap for temporary directory
-    trap 'test -n "$temp_dir" && rm -rf "$temp_dir"' EXIT
+    local restore_temp_dir=""
     
     if [[ -f "$backup_archive" ]]; then
         print_info "Found compressed backup: $backup_name"
@@ -817,15 +814,16 @@ cmd_backup_restore() {
         fi
         
         # Extract to temporary directory
-        temp_dir=$(mktemp -d -t DOT_restore_XXXXXX)
+        restore_temp_dir=$(mktemp -d -t DOT_restore_XXXXXX)
         print_info "Extracting backup..."
         
-        if ! tar -xzf "$backup_archive" -C "$temp_dir"; then
+        if ! tar -xzf "$backup_archive" -C "$restore_temp_dir"; then
             print_error "Failed to extract backup"
+            rm -rf "$restore_temp_dir"
             return 1
         fi
         
-        backup_dir="$temp_dir/$backup_name"
+        backup_dir="$restore_temp_dir/$backup_name"
     elif [[ -d "$backup_dir" ]]; then
         print_info "Found uncompressed backup: $backup_name"
         
@@ -852,7 +850,10 @@ cmd_backup_restore() {
     
     print_success "Restored $count files from backup"
     
-    # Cleanup handled by trap
+    # Manual cleanup
+    if [[ -n "$restore_temp_dir" ]]; then
+        rm -rf "$restore_temp_dir"
+    fi
 }
 
 cmd_backup_list() {
