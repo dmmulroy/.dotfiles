@@ -323,9 +323,8 @@ install_bun() {
 install_claude_code() {
     print_step "Installing Claude Code CLI"
     
-    # Save current shell options and set up trap to restore them
+    # Save current shell options for restoration
     local _saved_opts="$-"
-    trap 'set +e; set -"$_saved_opts"' RETURN
     
     # Check if Claude Code is already installed
     if command_exists claude; then
@@ -335,6 +334,8 @@ install_claude_code() {
         claude_path=$(command -v claude)
         if [[ "$claude_path" == *".bun"* ]] || [[ "$claude_path" == *"node_modules"* ]]; then
             print_success "Claude Code is installed via package manager"
+            # Restore shell options before returning
+            set -"$_saved_opts" 2>/dev/null || true
             return 0
         fi
     fi
@@ -349,6 +350,8 @@ install_claude_code() {
         print_info "Installing via Bun..."
         if bun install -g @anthropic-ai/claude-code; then
             print_success "Claude Code installed successfully via Bun"
+            # Restore shell options before returning
+            set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
             print_warning "Bun installation failed, trying npm..."
@@ -360,14 +363,20 @@ install_claude_code() {
         print_info "Installing via npm..."
         if npm install -g @anthropic-ai/claude-code; then
             print_success "Claude Code installed successfully via npm"
+            # Restore shell options before returning
+            set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
             print_error "Failed to install Claude Code via npm"
+            # Restore shell options before returning
+            set -"$_saved_opts" 2>/dev/null || true
             return 1
         fi
     else
         print_error "Neither Bun nor npm is available for installing Claude Code"
         print_info "Please install Node.js/npm or Bun first"
+        # Restore shell options before returning
+        set -"$_saved_opts" 2>/dev/null || true
         return 1
     fi
 }
@@ -1516,9 +1525,8 @@ printf '%.3f', \$end - \$start;
 cmd_summary() {
     print_header "Summarizing recent changes"
     
-    # Save current shell options and set up trap to restore them
+    # Save current shell options for restoration
     local _saved_opts="$-"
-    trap 'set +e; set -"$_saved_opts"' RETURN
     
     # Check if Claude Code is available
     if ! command_exists claude; then
@@ -1622,7 +1630,6 @@ Here are the commits (most recent first):
     local commit_count=0
     local temp_commits_file
     temp_commits_file=$(mktemp -t DOT_commits_XXXXXX)
-    trap 'test -n "$temp_commits_file" && rm -f "$temp_commits_file"; test -n "$temp_file" && rm -f "$temp_file"' EXIT
     echo "$commits_info" > "$temp_commits_file"
     
     # Process commits with better error handling
@@ -1650,9 +1657,9 @@ $diff_output
         claude_prompt+="
 "
     done < "$temp_commits_file"
-    # Note: shell options will be restored by the trap
     
-    rm "$temp_commits_file"
+    # Clean up temp file
+    rm -f "$temp_commits_file"
     
     # Add instructions
     claude_prompt+="
@@ -1675,7 +1682,8 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
     set +e
     claude_output=$(claude --model sonnet --print < "$temp_file" 2>&1)
     exit_code=$?
-    # Note: shell options will be restored by the trap
+    # Restore original shell options
+    set -"$_saved_opts"
     
     if [[ $exit_code -eq 0 && -n "$claude_output" ]]; then
         print_header "Summary of Recent Changes"
@@ -1707,7 +1715,8 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
         return 1
     fi
     
-    # Cleanup handled by trap
+    # Clean up temp file
+    rm -f "$temp_file"
     
     # Show git log reference
     print_info "For detailed commit history, run: git log --oneline -n $num_commits"
