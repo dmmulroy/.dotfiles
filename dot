@@ -1356,7 +1356,7 @@ EOF
     local temp_script
     temp_script=$(mktemp -t DOT_fish_benchmark_XXXXXX.fish)
     # Use RETURN trap instead of EXIT to avoid conflicts with other functions
-    trap 'test -n "$temp_script" && rm -f "$temp_script"' RETURN
+    trap 'test -n "${temp_script:-}" && rm -f "$temp_script"' RETURN
     echo "exit 0" > "$temp_script"
     
     # Array to store timing results
