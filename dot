@@ -286,6 +286,51 @@ install_bun() {
     fi
 }
 
+install_claude_code() {
+    print_step "Installing Claude Code CLI"
+    
+    # Check if Claude Code is already installed
+    if command_exists claude; then
+        print_success "Claude Code is already installed"
+        # Check if it's the correct version (npm package)
+        local claude_path
+        claude_path=$(which claude)
+        if [[ "$claude_path" == *".bun"* ]] || [[ "$claude_path" == *"node_modules"* ]]; then
+            print_success "Claude Code is installed via package manager"
+            return 0
+        fi
+    fi
+    
+    print_info "Installing Claude Code CLI..."
+    
+    # Try bun first (faster), fallback to npm
+    if command_exists bun; then
+        print_info "Installing via Bun..."
+        if bun install -g @anthropic-ai/claude-code; then
+            print_success "Claude Code installed successfully via Bun"
+            return 0
+        else
+            print_warning "Bun installation failed, trying npm..."
+        fi
+    fi
+    
+    # Fallback to npm
+    if command_exists npm; then
+        print_info "Installing via npm..."
+        if npm install -g @anthropic-ai/claude-code; then
+            print_success "Claude Code installed successfully via npm"
+            return 0
+        else
+            print_error "Failed to install Claude Code via npm"
+            return 1
+        fi
+    else
+        print_error "Neither Bun nor npm is available for installing Claude Code"
+        print_info "Please install Node.js/npm or Bun first"
+        return 1
+    fi
+}
+
 generate_ssh_key() {
     print_step "Generating SSH key for GitHub"
     
@@ -396,7 +441,7 @@ setup_fish_shell() {
 cmd_init() {
     print_header "Initializing dotfiles"
     
-    TOTAL_STEPS=7
+    TOTAL_STEPS=8
     CURRENT_STEP=0
     
     # Run all installation steps
@@ -404,6 +449,7 @@ cmd_init() {
     install_packages || return 1
     stow_dotfiles || return 1
     install_bun || return 1
+    install_claude_code || print_warning "Claude Code installation failed (continuing)"
     
     if [[ "${SKIP_SSH:-}" != "true" ]]; then
         generate_ssh_key || print_warning "SSH key generation failed (continuing)"
@@ -481,14 +527,29 @@ cmd_doctor() {
     # Check Claude Code
     if command_exists claude; then
         print_success "Claude Code installed"
+        
+        # Check installation method
+        local claude_path
+        claude_path=$(which claude)
+        if [[ "$claude_path" == *".bun"* ]]; then
+            print_success "Claude Code installed via Bun (recommended)"
+        elif [[ "$claude_path" == *"node_modules"* ]]; then
+            print_success "Claude Code installed via npm (recommended)"
+        else
+            print_warning "Claude Code installed via non-standard method"
+            print_info "Consider reinstalling via: bun install -g @anthropic-ai/claude-code"
+        fi
+        
         # Check if we can get version (indicates it's working)
         if claude --version >/dev/null 2>&1; then
             print_success "Claude Code is functional"
         else
             print_warning "Claude Code may need authentication"
+            print_info "Run 'claude auth login' to authenticate"
         fi
     else
         print_warning "Claude Code not installed"
+        print_info "Install with: bun install -g @anthropic-ai/claude-code (or npm install -g @anthropic-ai/claude-code)"
     fi
     
     # Check symlinks
@@ -1188,7 +1249,7 @@ cmd_summary() {
     # Check if Claude Code is available
     if ! command_exists claude; then
         print_error "Claude Code is not installed"
-        print_info "Install it with: brew install claude-code"
+        print_info "Install it with: bun install -g @anthropic-ai/claude-code (or npm install -g @anthropic-ai/claude-code)"
         return 1
     fi
     
@@ -1437,6 +1498,12 @@ cmd_check_packages() {
     local installed_brew=()
     local installed_cask=()
     
+    # Get lists of installed packages once to avoid repeated calls
+    local installed_formulas
+    local installed_casks
+    installed_formulas=$(brew list --formula 2>/dev/null || true)
+    installed_casks=$(brew list --cask 2>/dev/null || true)
+    
     # Check base packages
     if [[ -f "${PACKAGES_DIR}/bundle" ]]; then
         print_info "Checking base packages..."
@@ -1445,19 +1512,23 @@ cmd_check_packages() {
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "${line// }" ]] && continue
             
-            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                if brew list --formula | grep -q "^${package}$"; then
-                    installed_brew+=("$package")
-                else
-                    missing_brew+=("$package")
+            if [[ "$line" =~ ^brew[[:space:]] ]]; then
+                local package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
+                if [[ -n "$package" ]]; then
+                    if echo "$installed_formulas" | grep -q "^${package}$"; then
+                        installed_brew+=("$package")
+                    else
+                        missing_brew+=("$package")
+                    fi
                 fi
-            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                if brew list --cask | grep -q "^${package}$"; then
-                    installed_cask+=("$package")
-                else
-                    missing_cask+=("$package")
+            elif [[ "$line" =~ ^cask[[:space:]] ]]; then
+                local package=$(echo "$line" | sed -n 's/^cask "\([^"]*\)".*/\1/p')
+                if [[ -n "$package" ]]; then
+                    if echo "$installed_casks" | grep -q "^${package}$"; then
+                        installed_cask+=("$package")
+                    else
+                        missing_cask+=("$package")
+                    fi
                 fi
             fi
         done < "${PACKAGES_DIR}/bundle"
@@ -1471,12 +1542,14 @@ cmd_check_packages() {
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "${line// }" ]] && continue
             
-            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                if brew list --formula | grep -q "^${package}$"; then
-                    installed_brew+=("$package (work)")
-                else
-                    missing_brew+=("$package (work)")
+            if [[ "$line" =~ ^brew[[:space:]] ]]; then
+                local package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
+                if [[ -n "$package" ]]; then
+                    if echo "$installed_formulas" | grep -q "^${package}$"; then
+                        installed_brew+=("$package (work)")
+                    else
+                        missing_brew+=("$package (work)")
+                    fi
                 fi
             fi
         done < "${PACKAGES_DIR}/bundle.work"
@@ -2085,7 +2158,7 @@ cmd_help() {
     echo "    - Backups are automatically compressed using gzip"
     echo "    - Legacy uncompressed backups are still supported"
     echo "    - SHA verification is disabled for better reliability"
-    echo "    - Includes Claude Code CLI for AI assistance"
+    echo "    - Claude Code CLI installed globally via Bun/npm during init"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
     echo ""

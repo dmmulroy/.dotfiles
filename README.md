@@ -80,9 +80,10 @@ dot init --skip-ssh --skip-font
 2. Installs packages from Brewfiles
 3. Creates symlinks with GNU Stow
 4. Installs Bun runtime
-5. Generates SSH key for GitHub (optional)
-6. Installs MonoLisa font (optional)
-7. Sets up Fish shell with plugins
+5. Installs Claude Code CLI via Bun/npm
+6. Generates SSH key for GitHub (optional)
+7. Installs MonoLisa font (optional)
+8. Sets up Fish shell with plugins
 
 ### Maintenance Commands
 
@@ -101,7 +102,7 @@ dot doctor
 Comprehensive diagnostics including:
 - ✅ Homebrew installation
 - ✅ Essential tools (git, nvim, tmux, node, etc.)
-- ✅ Claude Code functionality
+- ✅ Claude Code installation method and functionality
 - ✅ Fish shell configuration
 - ✅ PATH configuration
 - ⚠️ Broken symlinks detection
@@ -269,7 +270,7 @@ dot package remove docker base  # Remove docker from base bundle only
 - Development tools: neovim, tmux, fish, git
 - CLI utilities: ripgrep, fd, fzf, starship
 - Applications: Arc browser, Raycast, OrbStack
-- AI tools: aider, claude-code
+- AI tools: aider
 
 **`packages/bundle.work`** - Work-specific additions:
 - AWS/Kubernetes tools
@@ -400,6 +401,15 @@ dot stow
 ```bash
 # If summary command fails
 claude auth login
+```
+
+**Claude Code installation issues:**
+```bash
+# Reinstall via Bun (recommended)
+bun install -g @anthropic-ai/claude-code
+
+# Or via npm
+npm install -g @anthropic-ai/claude-code
 ```
 
 ### Getting Help
