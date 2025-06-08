@@ -113,7 +113,15 @@ install_homebrew() {
     
     print_info "Homebrew is not installed. Installing now..."
     
-    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+    # Create temporary log file for installation output
+    local log_file
+    log_file=$(mktemp)
+    local exit_code=0
+    
+    print_info "Running Homebrew installer (non-interactive mode)..."
+    
+    # Run installer with non-interactive flag and capture output
+    if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > "$log_file" 2>&1; then
         print_success "Homebrew installation successful"
         
         # Configure Homebrew environment for the current session
@@ -125,9 +133,33 @@ install_homebrew() {
         fi
         print_success "Homebrew environment configured"
     else
-        print_error "Homebrew installation failed"
+        exit_code=$?
+        print_error "Homebrew installation failed (exit code: $exit_code)"
+        
+        # Surface errors from the log
+        print_info "Installation output:"
+        if [[ -s "$log_file" ]]; then
+            # Show last 20 lines of output for context
+            tail -20 "$log_file" | while IFS= read -r line; do
+                echo "  $line"
+            done
+        else
+            print_warning "No installation output captured"
+        fi
+        
+        # Common troubleshooting hints
+        print_info "Troubleshooting:"
+        print_info "  - Check if you have sufficient disk space"
+        print_info "  - Ensure you have admin privileges"
+        print_info "  - Check network connectivity"
+        print_info "  - Try running manually: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        
+        rm "$log_file"
         return 1
     fi
+    
+    # Cleanup log file
+    rm "$log_file"
 }
 
 install_packages() {
