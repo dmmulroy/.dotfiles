@@ -12,6 +12,7 @@ This repository contains my personal development environment configuration, mana
 - 🤖 **AI Integration** - Claude Code for commit summaries and assistance
 - 📦 **Resilient Package Management** - Continues installation even if packages fail
 - 💾 **Compressed Backups** - Create and restore configuration snapshots
+- 🔒 **Encrypted Secrets** - Secure storage for API keys and sensitive data
 - 🔍 **Health Monitoring** - Comprehensive environment diagnostics
 - 🛠️ **Modular Design** - Separate work and personal configurations
 
@@ -242,6 +243,57 @@ Performance Assessment:
 ✓ Good startup performance (≤100ms)
 ```
 
+### Secrets Management
+
+The dotfiles system includes built-in encrypted secrets management for storing sensitive information like API keys, tokens, and passwords.
+
+#### `dot secrets` - Encrypted Secrets Management
+```bash
+# Encrypt a secrets file
+dot secrets encrypt secrets.txt
+
+# Decrypt to default file (secrets.txt)
+dot secrets decrypt
+
+# Decrypt to custom filename
+dot secrets decrypt my-secrets.txt
+
+# Edit encrypted secrets interactively
+dot secrets edit
+
+# Check encrypted secrets file status
+dot secrets status
+```
+
+**Features:**
+- **AES-256-CBC encryption** with PBKDF2 key derivation for secure storage
+- **Interactive editing** with automatic re-encryption
+- **Password-protected** operations with confirmation prompts
+- **Git-ignored** encrypted files (`.secrets.enc` and `secrets.txt`)
+- **Flexible file formats** - supports any plain text format (.env, YAML, JSON, etc.)
+
+**Security best practices:**
+- Use strong, unique passwords for encryption
+- Always delete decrypted files when done (commands will prompt for this)
+- Never commit the `.secrets.enc` file to public repositories
+- Regularly rotate sensitive credentials stored in secrets
+- Consider using different encryption passwords for different environments
+
+**Example secrets file format:**
+```bash
+# API Keys
+OPENAI_API_KEY=sk-1234567890abcdef
+GITHUB_TOKEN=ghp_abcdefghijklmnop
+
+# Database credentials  
+DB_PASSWORD=super-secret-password
+DB_CONNECTION_STRING=postgresql://user:pass@host:5432/db
+
+# Environment-specific secrets
+STAGING_API_URL=https://api-staging.example.com
+PROD_API_URL=https://api.example.com
+```
+
 ### Utility Commands
 
 #### `dot completions` - Generate Fish Shell Completions
@@ -250,8 +302,8 @@ dot completions
 ```
 Generates comprehensive Fish shell completions for the `dot` command, including:
 - All commands and subcommands
-- Dynamic completions for installed packages
-- Dynamic completions for available backups
+- Dynamic completions for installed packages and backups
+- Dynamic completions for secrets commands
 - Option completions with descriptions
 
 #### `dot edit` - Open in Editor
@@ -522,9 +574,15 @@ dot backup clean
 # Generate Fish shell completions
 dot completions
 
+# Manage encrypted secrets
+dot secrets encrypt secrets.txt
+dot secrets edit
+dot secrets status
+
 # Completions include dynamic suggestions for:
 # - Package names when using package remove/update
 # - Backup names when using backup restore/delete
+# - Secrets file names for encrypt/decrypt commands
 # - All commands, subcommands, and options
 ```
 
