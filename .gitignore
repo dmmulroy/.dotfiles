@@ -6,3 +6,7 @@ lazy-lock.json
 backups/
 packages/failed_packages_*.txt
 .DS_STORE
+
+# Encrypted secrets (never commit these)
+.secrets.enc
+secrets.txt
