@@ -2,12 +2,7 @@ return {
 	{
 		"L3MON4D3/LuaSnip",
 		event = "InsertEnter",
-		build = (function()
-			if vim.fn.executable("make") == 0 then
-				return
-			end
-			return "make install_jsregexp"
-		end)(),
+		build = "make install_jsregexp",
 		dependencies = {
 			{
 				"rafamadriz/friendly-snippets",
