@@ -1,1 +1,1 @@
-/Applications/OrbStack.app/Contents/MacOS/../Resources/completions/kubectl.fish
+/Applications/OrbStack.app/Contents/MacOS/../Resources/completions/fish/kubectl.fish
