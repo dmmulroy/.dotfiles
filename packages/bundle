@@ -2,8 +2,8 @@
 # Note: require_sha disabled to prevent installation failures
 cask_args appdir: "~/Applications"
 
-brew "aider"
 brew "awscli"
+brew "cloc"
 brew "cmake"
 brew "direnv"
 brew "doggo"
