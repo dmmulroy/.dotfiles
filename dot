@@ -20,6 +20,7 @@ readonly DOTFILES_DIR
 # Configuration
 readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
 readonly HOME_DIR="${DOTFILES_DIR}/home"
+readonly SECRETS_FILE="${DOTFILES_DIR}/.secrets.enc"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
@@ -484,6 +485,89 @@ setup_fish_shell() {
         print_success "Fish plugins installed"
     else
         print_warning "Failed to install some Fish plugins"
+    fi
+}
+
+# Secrets management functions
+encrypt_secrets() {
+    local secrets_file="${1:-secrets.txt}"
+    
+    if [[ ! -f "$secrets_file" ]]; then
+        print_error "Secrets file '$secrets_file' not found"
+        return 1
+    fi
+    
+    if ! command_exists openssl; then
+        print_error "OpenSSL is required for encryption but not found"
+        return 1
+    fi
+    
+    print_info "Encrypting secrets from '$secrets_file'..."
+    
+    # Prompt for password
+    echo -n "Enter encryption password: "
+    read -r -s password
+    echo
+    echo -n "Confirm password: "
+    read -r -s password_confirm
+    echo
+    
+    if [[ "$password" != "$password_confirm" ]]; then
+        print_error "Passwords do not match"
+        return 1
+    fi
+    
+    # Encrypt the file
+    if openssl aes-256-cbc -a -salt -pbkdf2 -in "$secrets_file" -out "$SECRETS_FILE" -pass pass:"$password"; then
+        print_success "Secrets encrypted and saved to '$SECRETS_FILE'"
+        print_warning "Remember to delete the original unencrypted file: '$secrets_file'"
+        if confirm "Delete the original unencrypted secrets file?" "n"; then
+            rm "$secrets_file"
+            print_success "Original file deleted"
+        fi
+    else
+        print_error "Failed to encrypt secrets"
+        return 1
+    fi
+}
+
+decrypt_secrets() {
+    local output_file="${1:-secrets.txt}"
+    
+    if [[ ! -f "$SECRETS_FILE" ]]; then
+        print_error "Encrypted secrets file not found at '$SECRETS_FILE'"
+        print_info "Use 'dot secrets encrypt <file>' to create encrypted secrets first"
+        return 1
+    fi
+    
+    if ! command_exists openssl; then
+        print_error "OpenSSL is required for decryption but not found"
+        return 1
+    fi
+    
+    if [[ -f "$output_file" ]]; then
+        print_warning "Output file '$output_file' already exists"
+        if ! confirm "Overwrite existing file?" "n"; then
+            return 1
+        fi
+    fi
+    
+    print_info "Decrypting secrets to '$output_file'..."
+    
+    # Prompt for password
+    echo -n "Enter decryption password: "
+    read -r -s password
+    echo
+    
+    # Decrypt the file
+    if openssl aes-256-cbc -d -a -pbkdf2 -in "$SECRETS_FILE" -out "$output_file" -pass pass:"$password"; then
+        print_success "Secrets decrypted and saved to '$output_file'"
+        print_warning "Remember to delete the decrypted file when done: '$output_file'"
+    else
+        print_error "Failed to decrypt secrets (wrong password or corrupted file)"
+        # Clean up failed output file
+        [[ -f "$output_file" ]] && rm "$output_file"
+        return 1
     fi
 }
 
@@ -1195,6 +1279,7 @@ complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fi
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
+complete -c dot -n "__fish_use_subcommand" -a "secrets" -d "Encrypted secrets management"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
 complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot command (remove symlink)"
 complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
@@ -1241,6 +1326,17 @@ complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subc
 complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "compress" -d "Compress legacy uncompressed backups"
 complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "delete" -d "Delete specific backup"
 complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "help" -d "Show backup help"
+
+# Secrets subcommands
+complete -c dot -n "__fish_seen_subcommand_from secrets" -n "not __fish_seen_subcommand_from encrypt decrypt edit status help" -a "encrypt" -d "Encrypt a secrets file"
+complete -c dot -n "__fish_seen_subcommand_from secrets" -n "not __fish_seen_subcommand_from encrypt decrypt edit status help" -a "decrypt" -d "Decrypt secrets to a file"
+complete -c dot -n "__fish_seen_subcommand_from secrets" -n "not __fish_seen_subcommand_from encrypt decrypt edit status help" -a "edit" -d "Decrypt, edit, and re-encrypt secrets"
+complete -c dot -n "__fish_seen_subcommand_from secrets" -n "not __fish_seen_subcommand_from encrypt decrypt edit status help" -a "status" -d "Show encrypted secrets file status"
+complete -c dot -n "__fish_seen_subcommand_from secrets" -n "not __fish_seen_subcommand_from encrypt decrypt edit status help" -a "help" -d "Show secrets help"
+
+# Secrets file completions for encrypt/decrypt commands
+complete -c dot -n "__fish_seen_subcommand_from secrets; and __fish_seen_subcommand_from encrypt" -xa "(__fish_complete_suffix .txt .env)"
+complete -c dot -n "__fish_seen_subcommand_from secrets; and __fish_seen_subcommand_from decrypt" -xa "(__fish_complete_suffix .txt .env)"
 
 # Summary command options
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
@@ -1302,6 +1398,91 @@ EOF
         print_error "Failed to generate completions file"
         return 1
     fi
+}
+
+cmd_secrets() {
+    local subcommand="${1:-help}"
+    
+    case "$subcommand" in
+        encrypt)
+            shift
+            local input_file="${1:-secrets.txt}"
+            encrypt_secrets "$input_file"
+            ;;
+        decrypt)
+            shift
+            local output_file="${1:-secrets.txt}"
+            decrypt_secrets "$output_file"
+            ;;
+        edit)
+            if [[ ! -f "$SECRETS_FILE" ]]; then
+                print_error "No encrypted secrets file found"
+                print_info "Use 'dot secrets encrypt <file>' to create encrypted secrets first"
+                return 1
+            fi
+            
+            # Create temporary file
+            local temp_file
+            temp_file=$(mktemp)
+            
+            # Set up cleanup trap
+            trap "rm -f '$temp_file'" EXIT
+            
+            # Decrypt to temp file
+            if decrypt_secrets "$temp_file"; then
+                # Open in editor
+                local editor="${EDITOR:-nano}"
+                "$editor" "$temp_file"
+                
+                # Re-encrypt if file was modified
+                if [[ -s "$temp_file" ]]; then
+                    if confirm "Save changes back to encrypted secrets?" "y"; then
+                        encrypt_secrets "$temp_file"
+                    fi
+                fi
+            fi
+            ;;
+        status)
+            print_header "Secrets Status"
+            if [[ -f "$SECRETS_FILE" ]]; then
+                print_success "Encrypted secrets file exists: $SECRETS_FILE"
+                local file_size
+                file_size=$(du -h "$SECRETS_FILE" | cut -f1)
+                print_info "File size: $file_size"
+                local mod_time
+                mod_time=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$SECRETS_FILE" 2>/dev/null || stat -c "%y" "$SECRETS_FILE" 2>/dev/null | cut -d'.' -f1)
+                print_info "Last modified: $mod_time"
+            else
+                print_warning "No encrypted secrets file found"
+                print_info "Use 'dot secrets encrypt <file>' to create encrypted secrets"
+            fi
+            ;;
+        help|*)
+            echo -e "${BOLD}dot secrets${RESET} - Encrypted secrets management"
+            echo ""
+            echo -e "${BOLD}USAGE:${RESET}"
+            echo "    dot secrets COMMAND [OPTIONS]"
+            echo ""
+            echo -e "${BOLD}COMMANDS:${RESET}"
+            echo "    encrypt [file]    Encrypt a secrets file (default: secrets.txt)"
+            echo "    decrypt [file]    Decrypt secrets to a file (default: secrets.txt)"
+            echo "    edit              Decrypt, edit, and re-encrypt secrets in one command"
+            echo "    status            Show information about encrypted secrets file"
+            echo "    help              Show this help message"
+            echo ""
+            echo -e "${BOLD}EXAMPLES:${RESET}"
+            echo "    dot secrets encrypt my-secrets.txt    # Encrypt my-secrets.txt"
+            echo "    dot secrets decrypt                   # Decrypt to secrets.txt"
+            echo "    dot secrets edit                      # Edit secrets interactively"
+            echo "    dot secrets status                    # Check secrets file status"
+            echo ""
+            echo -e "${BOLD}NOTES:${RESET}"
+            echo "    - Uses AES-256-CBC encryption with PBKDF2 key derivation"
+            echo "    - Encrypted file is stored as .secrets.enc in dotfiles directory"
+            echo "    - Always delete unencrypted files when done with them"
+            echo "    - Use strong, unique passwords for encryption"
+            ;;
+    esac
 }
 
 cmd_benchmark_shell() {
@@ -2394,6 +2575,7 @@ cmd_help() {
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
     echo "    backup              Backup management commands (create, restore, list, clean, etc.)"
     echo "    completions         Generate Fish shell completions"
+    echo "    secrets             Encrypted secrets management (encrypt, decrypt, edit, status)"
     echo "    link                Install dot command globally (create symlink in PATH)"
     echo "    unlink              Uninstall global dot command (remove symlink)"
     echo "    edit                Open dotfiles in editor"
@@ -2432,6 +2614,10 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} backup compress           # Compress legacy uncompressed backups"
     echo "    ${SCRIPT_NAME} backup delete foo         # Delete specific backup"
     echo "    ${SCRIPT_NAME} completions               # Generate Fish shell completions"
+    echo "    ${SCRIPT_NAME} secrets encrypt secrets.txt # Encrypt a secrets file"
+    echo "    ${SCRIPT_NAME} secrets decrypt           # Decrypt secrets to file"
+    echo "    ${SCRIPT_NAME} secrets edit              # Edit encrypted secrets interactively"
+    echo "    ${SCRIPT_NAME} secrets status            # Check encrypted secrets status"
     echo "    ${SCRIPT_NAME} link                      # Install dot command globally in PATH"
     echo ""
     
@@ -2518,6 +2704,9 @@ main() {
             ;;
         completions)
             cmd_completions "$@"
+            ;;
+        secrets)
+            cmd_secrets "$@"
             ;;
         link)
             cmd_link "$@"

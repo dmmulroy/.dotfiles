@@ -56,6 +56,13 @@ brew bundle --file=./packages/bundle.work
 
 # Generate Fish shell completions
 ./dot completions
+
+# Secrets management (encrypted storage)
+./dot secrets encrypt secrets.txt        # Encrypt a secrets file
+./dot secrets decrypt                    # Decrypt to secrets.txt (default)
+./dot secrets decrypt my-secrets.txt     # Decrypt to custom filename
+./dot secrets edit                       # Edit encrypted secrets interactively
+./dot secrets status                     # Check encrypted secrets file status
 ```
 
 ### Development Workflow
@@ -78,6 +85,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - **Brewfile package management**: Packages defined in `packages/bundle` (base) and `packages/bundle.work` (optional)
 - **Conditional Git configuration**: Work projects under `~/Code/work/` get different Git config via includeIf
 - **Plugin managers**: Each tool uses its own (lazy.nvim for Neovim, TPM for Tmux, Fisher for Fish)
+- **Encrypted secrets storage**: Sensitive data encrypted with AES-256-CBC and stored as `.secrets.enc`
 
 ### Important Relationships
 - Fish shell configurations load custom functions from `home/.config/fish/functions/`
@@ -101,6 +109,38 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Update command includes Homebrew refresh and optional cleanup of old versions
 - Removing packages from bundles optionally uninstalls them from the system
 - The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
+
+### Secrets Management
+The dotfiles system includes built-in encrypted secrets management for storing sensitive information like API keys, tokens, and passwords:
+
+- **Encryption**: Uses AES-256-CBC with PBKDF2 key derivation for secure storage
+- **Storage location**: Encrypted secrets are stored as `.secrets.enc` in the dotfiles directory
+- **File format**: Plain text files (e.g., `.env` format, YAML, JSON, or any text format)
+- **Interactive editing**: The `edit` command provides secure temporary decryption for editing
+- **Password-protected**: Each encryption/decryption requires a password prompt
+- **Git-ignored**: The `.secrets.enc` file should be added to `.gitignore` to prevent accidental commits
+
+**Security best practices:**
+- Use strong, unique passwords for encryption
+- Always delete decrypted files when done (`dot secrets` commands will prompt for this)
+- Never commit the `.secrets.enc` file to public repositories
+- Regularly rotate sensitive credentials stored in secrets
+- Consider using different encryption passwords for different environments (dev/staging/prod)
+
+**Example secrets file format:**
+```bash
+# API Keys
+OPENAI_API_KEY=sk-1234567890abcdef
+GITHUB_TOKEN=ghp_abcdefghijklmnop
+
+# Database credentials  
+DB_PASSWORD=super-secret-password
+DB_CONNECTION_STRING=postgresql://user:pass@host:5432/db
+
+# Environment-specific secrets
+STAGING_API_URL=https://api-staging.example.com
+PROD_API_URL=https://api.example.com
+```
 
 ## Development Guidelines
 
