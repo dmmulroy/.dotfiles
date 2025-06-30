@@ -2,6 +2,7 @@
 # Note: require_sha disabled to prevent installation failures
 cask_args appdir: "~/Applications"
 
+brew "ast-grep"
 brew "awscli"
 brew "cloc"
 brew "cmake"
