@@ -102,14 +102,6 @@ vim.keymap.set("n", "U", "<C-r>", { desc = "Redo last change" })
 -- Turn off highlighted search results
 vim.keymap.set("n", "<leader>no", "<cmd>noh<cr>", { desc = "Toggle search highlighting" })
 
--- Code Companion
-vim.keymap.set(
-	"n",
-	"<leader>ai",
-	"<cmd>CodeCompanionChat Toggle<cr>",
-	{ desc = "Toggle Code Companion chat", noremap = true, silent = true }
-)
-
 vim.keymap.set("n", "<leader>ts", function()
 	if twoslash.config.is_enabled then
 		vim.cmd("TwoslashQueriesDisable")
