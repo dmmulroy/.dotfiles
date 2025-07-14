@@ -8,6 +8,8 @@ return {
 				-- bin_path = "/Users/dmmulroy/.bun/bin/tsgo",
 				auto_open_qflist = true,
 				pretty_errors = false,
+				-- bin_path = "/Users/dmmulroy/.bun/bin/tsgo",
+				flags = "--noEmit --pretty false", -- This just works
 			})
 		end,
 	},
