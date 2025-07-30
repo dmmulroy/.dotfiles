@@ -15,6 +15,11 @@ return {
 
 			require("telescope").setup({
 				defaults = {
+					layout_config = {
+						prompt_position = "top",
+					},
+					sorting_strategy = "ascending",
+					winblend = 05,
 					mappings = {
 						i = {
 							["<C-k>"] = actions.move_selection_previous,
