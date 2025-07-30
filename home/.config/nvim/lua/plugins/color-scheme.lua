@@ -42,6 +42,16 @@ return {
 			vim.api.nvim_set_hl(0, "BlinkCmpDocSeparator", { fg = palette.blue, bg = palette.base })
 			vim.api.nvim_set_hl(0, "BlinkCmpGhostText", { fg = palette.overlay2 })
 
+			-- Telescope highlights to match editor background
+			vim.api.nvim_set_hl(0, "TelescopeNormal", { bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopeBorder", { fg = palette.blue, bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopePromptNormal", { bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopePromptBorder", { fg = palette.blue, bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopeResultsNormal", { bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopeResultsBorder", { fg = palette.blue, bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopePreviewNormal", { bg = palette.base })
+			vim.api.nvim_set_hl(0, "TelescopePreviewBorder", { fg = palette.blue, bg = palette.base })
+
 			-- Hide all semantic highlights until upstream issues are resolved (https://github.com/catppuccin/nvim/issues/480)
 			for _, group in ipairs(vim.fn.getcompletion("@lsp", "highlight")) do
 				vim.api.nvim_set_hl(0, group, {})
