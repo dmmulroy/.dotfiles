@@ -14,3 +14,7 @@ home/.claude/*
 # But whitelist these specific files
 !home/.claude/CLAUDE.md
 !home/.claude/settings.json
+!home/.claude/agents
+!home/.claude/agents/*
+!home/.claude/commands
+!home/.claude/commands/*
