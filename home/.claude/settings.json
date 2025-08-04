@@ -2,6 +2,6 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "sonnet",
   "feedbackSurveyState": {
-    "lastShownTime": 1754020786073
+    "lastShownTime": 1754076483100
   }
 }
