@@ -1,5 +1,7 @@
 local twoslash = require("twoslash-queries")
-local copy_line_diagnostics_to_clipboard = require("dmmulroy.prelude").copy_line_diagnostics_to_clipboard
+local prelude = require("dmmulroy.prelude")
+local copy_line_diagnostics_to_clipboard = prelude.copy_line_diagnostics_to_clipboard
+local open_link = prelude.open_link
 
 local M = {}
 
@@ -187,8 +189,8 @@ end, { desc = "Format the current buffer" })
 -- Rotate open windows
 vim.keymap.set("n", "<leader>rw", ":RotateWindows<cr>", { desc = "Rotate open windows" })
 
--- Open link under cursor
-vim.keymap.set("n", "gx", ":sil !open <cWORD><cr>", { silent = true, desc = "Open link under cursor" })
+-- Open link under cursor (supports markdown links and links in parens)
+vim.keymap.set("n", "gx", open_link, { silent = true, desc = "Open link under cursor (supports markdown and parens)" })
 
 -- Run TypeScript compiler
 vim.keymap.set("n", "<leader>tc", ":TSC<cr>", { desc = "Run TypeScript compile" })
@@ -301,7 +303,7 @@ M.map_lsp_keybinds = function(buffer_number)
 end
 
 -- Symbol Outline keybind
-vim.keymap.set("n", "<leader>so", ":SymbolsOutline<cr>", { desc = "Toggle symbol outline" })
+vim.keymap.set("n", "<leader>so", ":Outline<cr>", { desc = "Toggle symbol outline" })
 
 -- Toggle inlay hints
 -- vim.keymap.set("n", "<leader>ih", function()
