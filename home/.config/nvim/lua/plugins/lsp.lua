@@ -16,16 +16,6 @@ return {
 		config = function()
 			local map_lsp_keybinds = require("dmmulroy.keymaps").map_lsp_keybinds
 
-			local vtsls_inlay_hints = {
-				enumMemberValues = { enabled = true },
-				functionLikeReturnTypes = { enabled = true },
-				functionParameterTypes = { enabled = true },
-				parameterNames = { enabled = "all" },
-				parameterNameWhenArgumentMatchesNames = { enabled = true },
-				propertyDeclarationTypes = { enabled = true },
-				variableTypes = { enabled = true },
-				variableTypeWhenTypeMatchesNames = { enabled = true },
-			}
 
 			-- on_attach: call your custom keymap binding function
 			local on_attach = function(_client, buffer_number)
@@ -77,34 +67,6 @@ return {
 				sqlls = {},
 				tailwindcss = {
 					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte" },
-				},
-				vtsls = {
-					on_attach = function(client, buffer_number)
-						require("twoslash-queries").attach(client, buffer_number)
-						return on_attach(client, buffer_number)
-					end,
-					settings = {
-						complete_function_calls = true,
-						vtsls = {
-							autoUseWorkspaceTsdk = true,
-							experimental = {
-								completion = {
-									enableServerSideFuzzyMatch = true,
-								},
-							},
-						},
-						typescript = {
-							updateImportOnFileMove = { enabled = "always" },
-							suggest = {
-								completeFunctionCalls = true,
-							},
-							tsserver = {
-								maxTsServerMemory = 12288,
-							},
-							inlayHints = vtsls_inlay_hints,
-						},
-						javascript = { inlayHints = vtsls_inlay_hints },
-					},
 				},
 				yamlls = {},
 				svelte = {},
