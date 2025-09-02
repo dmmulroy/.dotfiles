@@ -10,7 +10,7 @@ return {
 					require("dmmulroy.keymaps").map_lsp_keybinds(buffer_number)
 				end,
 				settings = {
-					tsserver_path = "~/.bun/bin/tsgo",
+					-- tsserver_path = "~/.bun/bin/tsgo",
 					-- Performance: separate diagnostic server for large projects
 					separate_diagnostic_server = true,
 					-- When to publish diagnostics
@@ -40,7 +40,6 @@ return {
 					code_lens = "off",
 					disable_member_code_lens = true,
 					tsserver_max_memory = 12288,
-					expose_as_code_action = "all",
 				},
 			})
 		end,
