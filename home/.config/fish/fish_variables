@@ -9,4 +9,4 @@ SETUVAR fish_color_history_current:\x2d\x2dbold
 SETUVAR fish_color_valid_path:\x2d\x2dunderline
 SETUVAR fish_key_bindings:fish_default_key_bindings
 SETUVAR fish_pager_color_selected_background:\x2dr
-SETUVAR fish_user_paths:/opt/homebrew/bin\x1e/Users/dmmulroy/\x2edotfiles
+SETUVAR fish_user_paths:/opt/homebrew/bin\x1e/Users/dmmulroy/\x2edotfiles\x1e/Applications/Ghostty\x2eapp/Contents/MacOS
