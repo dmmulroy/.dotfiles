@@ -71,7 +71,11 @@ return {
 				yamlls = {},
 				svelte = {},
 				rust_analyzer = {
-					check = { command = "clippy", features = "all" },
+					settings = {
+						["rust-analyzer"] = {
+							check = { command = "clippy", features = "all" },
+						},
+					},
 				},
 			}
 
