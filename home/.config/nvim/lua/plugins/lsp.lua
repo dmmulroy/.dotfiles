@@ -16,20 +16,11 @@ return {
 		config = function()
 			local map_lsp_keybinds = require("dmmulroy.keymaps").map_lsp_keybinds
 
-
-			-- on_attach: call your custom keymap binding function
-			local on_attach = function(_client, buffer_number)
-				map_lsp_keybinds(buffer_number)
-			end
-
 			-- List your LSP servers here.
 			local servers = {
 				bashls = {},
 				biome = {},
 				cssls = {},
-				gleam = {
-					settings = { inlayHints = true },
-				},
 				eslint = {
 					autostart = false,
 					cmd = { "vscode-eslint-language-server", "--stdio", "--max-old-space-size=12288" },
@@ -62,9 +53,7 @@ return {
 						syntaxDocumentation = { enable = true },
 					},
 				},
-				nil_ls = {},
-				pyright = {},
-				sqlls = {},
+				sqls = {},
 				tailwindcss = {
 					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte" },
 				},
@@ -105,27 +94,37 @@ return {
 			local capabilities = vim.lsp.protocol.make_client_capabilities()
 			capabilities = vim.tbl_deep_extend("force", capabilities, require("cmp_nvim_lsp").default_capabilities())
 
-			-- Setup each LSP server. We merge in any server-specific capabilities by passing
-			-- the existing config.capabilities to blink.cmp.get_lsp_capabilities.
+			-- Setup LspAttach autocmd for keybindings (replaces on_attach)
+			vim.api.nvim_create_autocmd("LspAttach", {
+				group = vim.api.nvim_create_augroup("lsp-attach", { clear = true }),
+				callback = function(event)
+					map_lsp_keybinds(event.buf)
+				end,
+			})
+
+			-- Setup each LSP server using the new vim.lsp.config API
 			for name, config in pairs(servers) do
-				require("lspconfig")[name].setup({
-					autostart = config.autostart,
+				-- Configure the server
+				vim.lsp.config(name, {
 					cmd = config.cmd,
 					capabilities = capabilities,
 					filetypes = config.filetypes,
-					handlers = vim.tbl_deep_extend("force", {}, config.handlers or {}),
-					on_attach = config.on_attach or on_attach,
 					settings = config.settings,
 					root_dir = config.root_dir,
 				})
+
+				-- Enable the server (with autostart setting if specified)
+				if config.autostart == false then
+					-- Don't auto-enable servers with autostart = false
+					-- Users can manually enable with :lua vim.lsp.enable(name)
+				else
+					vim.lsp.enable(name)
+				end
 			end
 
 			-- Setup Mason for managing external LSP servers
 			require("mason").setup({ ui = { border = "rounded" } })
 			require("mason-lspconfig").setup()
-
-			-- Configure borders for LspInfo UI and diagnostics
-			require("lspconfig.ui.windows").default_options.border = "rounded"
 		end,
 	},
 }

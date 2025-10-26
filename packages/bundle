@@ -1,6 +1,6 @@
 # set arguments for all 'brew install --cask' commands
 # Note: require_sha disabled to prevent installation failures
-cask_args appdir: "~/Applications"
+cask_args appdir: "/Applications"
 
 brew "ast-grep"
 brew "awscli"
@@ -35,13 +35,10 @@ cask "discord"
 cask "elgato-camera-hub"
 cask "elgato-control-center"
 cask "elgato-stream-deck"
-# cask "linear"
-cask "notion"
 cask "obs"
 cask "orbstack"
 cask "raycast"
 cask "scroll-reverser"
-cask "slack"
 # cask "spotify"
 cask "yaak@beta"
 
