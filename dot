@@ -406,34 +406,34 @@ generate_ssh_key() {
 
 install_font() {
     print_step "Installing MonoLisa font"
-    
+
     if [[ ! -f "$GITHUB_KEY_PATH" ]]; then
         print_warning "GitHub SSH key not found. Skipping font installation"
         return 0
     fi
-    
+
     if ! confirm "Have you added the SSH key to your GitHub account?" "n"; then
         print_warning "Skipping font installation"
         return 0
     fi
-    
+
     local font_temp_dir
     font_temp_dir=$(mktemp -d)
     local font_install_dir="${HOME}/Library/Fonts"
-    
+
     print_info "Cloning font repository..."
     if GIT_SSH_COMMAND="ssh -i $GITHUB_KEY_PATH -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
         print_success "Repository cloned successfully"
-        
+
         mkdir -p "$font_install_dir"
         print_info "Installing font files..."
-        
+
         local font_count=0
         while IFS= read -r -d '' font_file; do
             cp "$font_file" "$font_install_dir/"
             ((font_count++))
         done < <(find "$font_temp_dir" -name '*.otf' -print0)
-        
+
         if [[ $font_count -gt 0 ]]; then
             print_success "Installed $font_count font files"
         else
@@ -442,8 +442,158 @@ install_font() {
     else
         print_error "Failed to clone font repository"
     fi
-    
+
     rm -rf "$font_temp_dir"
+}
+
+cmd_gen_ssh_key() {
+    print_header "Generating SSH key for GitHub"
+
+    # Parse options
+    local email=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+${BOLD}USAGE:${RESET}
+    ${SCRIPT_NAME} gen-ssh-key [EMAIL]
+
+${BOLD}DESCRIPTION:${RESET}
+    Generate a new SSH key for GitHub, GitLab, or other Git services.
+    The key will be automatically added to ssh-agent and the public key
+    will be copied to your clipboard for easy pasting.
+
+${BOLD}ARGUMENTS:${RESET}
+    EMAIL               Email address to associate with the SSH key (optional)
+                        If not provided, you will be prompted for it
+
+${BOLD}EXAMPLES:${RESET}
+    ${SCRIPT_NAME} gen-ssh-key                          # Prompts for email
+    ${SCRIPT_NAME} gen-ssh-key user@github.com          # Uses provided email
+    ${SCRIPT_NAME} gen-ssh-key work@company.com         # Creates work key
+
+${BOLD}NOTES:${RESET}
+    - Key name is derived from email domain (e.g., user@github.com → id_ed25519_github)
+    - Keys are stored in ~/.ssh/
+    - Public key is automatically copied to clipboard
+    - Key is automatically added to ssh-agent
+    - If a key already exists, you will be prompted to overwrite
+
+EOF
+                return 0
+                ;;
+            *)
+                email="$1"
+                shift
+                ;;
+        esac
+    done
+
+    # Get email if not provided
+    if [[ -z "$email" ]]; then
+        read -r -p "Enter email address for SSH key: " email
+        if [[ -z "$email" ]]; then
+            print_error "Email is required"
+            return 1
+        fi
+    fi
+
+    # Validate email format (basic check)
+    if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        print_error "Invalid email format: $email"
+        return 1
+    fi
+
+    # Extract domain from email for key naming
+    local domain
+    domain=$(echo "$email" | sed 's/.*@//' | sed 's/\..*//')
+    if [[ -z "$domain" ]]; then
+        domain="key"
+    fi
+
+    # Sanitize domain name (remove special characters)
+    domain=$(echo "$domain" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
+
+    # Set key path
+    local key_name="id_ed25519_${domain}"
+    local key_path="${HOME}/.ssh/${key_name}"
+
+    print_info "Key will be created at: $key_path"
+
+    # Check if key already exists
+    if [[ -f "$key_path" ]]; then
+        print_warning "SSH key already exists at $key_path"
+        if ! confirm "Overwrite existing key?" "n"; then
+            print_info "Key generation cancelled"
+            return 0
+        fi
+
+        # Backup existing key
+        local backup_path
+        backup_path="${key_path}.backup.$(date +%Y%m%d_%H%M%S)"
+        print_info "Backing up existing key to $(basename "$backup_path")"
+        cp "$key_path" "$backup_path"
+        cp "${key_path}.pub" "${backup_path}.pub" 2>/dev/null || true
+    fi
+
+    # Ensure .ssh directory exists with correct permissions
+    mkdir -p "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
+
+    # Generate SSH key
+    print_info "Generating SSH key..."
+    if ssh-keygen -t ed25519 -C "$email" -f "$key_path" -N ""; then
+        print_success "SSH key generated successfully"
+    else
+        print_error "Failed to generate SSH key"
+        return 1
+    fi
+
+    # Add key to ssh-agent
+    print_info "Adding key to ssh-agent..."
+
+    # Start ssh-agent if not running
+    if ! pgrep -u "$USER" ssh-agent > /dev/null 2>&1; then
+        print_info "Starting ssh-agent..."
+        eval "$(ssh-agent -s)" > /dev/null
+    fi
+
+    if ssh-add "$key_path" 2>/dev/null; then
+        print_success "Key added to ssh-agent"
+    else
+        print_warning "Failed to add key to ssh-agent (you may need to start ssh-agent)"
+    fi
+
+    # Copy public key to clipboard
+    if command_exists pbcopy; then
+        pbcopy < "${key_path}.pub"
+        print_success "Public key copied to clipboard!"
+    else
+        print_warning "pbcopy not available, skipping clipboard copy"
+    fi
+
+    # Display instructions
+    echo ""
+    print_info "Next steps:"
+    echo "  1. The public key has been copied to your clipboard"
+    echo "  2. Go to your Git service (GitHub, GitLab, etc.):"
+    echo "     - GitHub: Settings > SSH and GPG keys > New SSH key"
+    echo "     - GitLab: Preferences > SSH Keys"
+    echo "  3. Paste the key and save"
+    echo ""
+    print_info "Key details:"
+    echo "  Private key: $key_path"
+    echo "  Public key:  ${key_path}.pub"
+    echo "  Email:       $email"
+    echo ""
+
+    # Show public key
+    print_info "Public key contents:"
+    cat "${key_path}.pub"
+    echo ""
+
+    print_success "SSH key generation complete!"
 }
 
 setup_fish_shell() {
@@ -1192,6 +1342,7 @@ complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which p
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
+complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
@@ -1252,6 +1403,9 @@ complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Sh
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "v" -l "verbose" -d "Show detailed timing for each run"
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "h" -l "help" -d "Show benchmark-shell help"
+
+# Gen-ssh-key command options
+complete -c dot -n "__fish_seen_subcommand_from gen-ssh-key" -s "h" -l "help" -d "Show gen-ssh-key help"
 
 # Dynamic completions for installed packages (when removing or updating)
 function __dot_installed_packages
@@ -2391,6 +2545,7 @@ cmd_help() {
     echo "    retry-failed        Retry failed package installations"
     echo "    summary             Summarize recent git commits using Claude Code"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
+    echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
     echo "    backup              Backup management commands (create, restore, list, clean, etc.)"
     echo "    completions         Generate Fish shell completions"
@@ -2422,6 +2577,8 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits"
     echo "    ${SCRIPT_NAME} benchmark-shell           # Benchmark Fish shell startup time"
     echo "    ${SCRIPT_NAME} benchmark-shell -r 20 -v  # Run 20 benchmarks with verbose output"
+    echo "    ${SCRIPT_NAME} gen-ssh-key               # Generate SSH key (prompts for email)"
+    echo "    ${SCRIPT_NAME} gen-ssh-key user@github.com  # Generate SSH key with email"
     echo "    ${SCRIPT_NAME} stow                      # Create symlinks for dotfiles"
     echo "    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup"
     echo "    ${SCRIPT_NAME} backup create mybackup    # Create named compressed backup"
@@ -2509,6 +2666,9 @@ main() {
             ;;
         benchmark-shell)
             cmd_benchmark_shell "$@"
+            ;;
+        gen-ssh-key)
+            cmd_gen_ssh_key "$@"
             ;;
         stow)
             cmd_stow "$@"

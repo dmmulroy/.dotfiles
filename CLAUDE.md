@@ -50,6 +50,11 @@ brew bundle --file=./packages/bundle.work
 ./dot benchmark-shell
 ./dot benchmark-shell -r 20 -v
 
+# Generate SSH key for GitHub/GitLab
+./dot gen-ssh-key                    # Prompts for email
+./dot gen-ssh-key user@github.com    # Uses provided email
+./dot gen-ssh-key work@company.com   # Creates work-specific key
+
 # Manage backups
 ./dot backup
 ./dot restore
@@ -101,6 +106,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Update command includes Homebrew refresh and optional cleanup of old versions
 - Removing packages from bundles optionally uninstalls them from the system
 - The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
+- The `dot gen-ssh-key` command automatically derives key names from email domains (e.g., user@github.com → id_ed25519_github), adds keys to ssh-agent, copies public keys to clipboard, and backs up existing keys before overwriting
 
 ## Development Guidelines
 
