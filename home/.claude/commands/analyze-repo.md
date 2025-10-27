@@ -1,4 +1,4 @@
-Please perform a comprehensive analysis of this code repository and create detailed documentation written to REPO_ANALYSIS.MD covering the following aspects:
+Please perform a comprehensive analysis of this code repository and create detailed documentation written to REPO_ANALYSIS.MD. Spawn concurrent tasks/sub-agents to research and author each of the following sections:
 
 ## 1. Repository Overview
 - Provide a high-level summary of the project's purpose and functionality
@@ -26,10 +26,9 @@ For each major module or component:
 - Identify its dependencies (both internal and external)
 - Note any design patterns implemented
 
-## 5. Class/Interface Hierarchy
+## 5. Interface/Abstraction Hierarchy
 Create Mermaid class diagrams for core abstractions showing:
 - Important classes and interfaces
-- Inheritance relationships
 - Key associations and dependencies
 - Critical methods and properties
 
@@ -103,6 +102,6 @@ Identify:
 - Missing documentation or tests
 - Potential architectural improvements
 
-For all diagrams, use Mermaid syntax and ensure they are clear, properly labeled, and include legends where necessary. Provide context and explanations for each diagram to help readers understand the visualizations.
+For all diagrams, use GitHub compatible Mermaid syntax and ensure they are clear, properly labeled, and include legends where necessary. Use a dark theme consisting of black, gray, and whites. Provide context and explanations for each diagram to help readers understand the visualizations.
 
 Please organize the output in a clear, hierarchical structure with appropriate markdown formatting. Use code blocks for file examples and ensure all technical terms are explained for readers who may be new to the codebase.
