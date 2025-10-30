@@ -19,6 +19,7 @@ return {
 				timeout = 3000,
 				style = "fancy",
 			},
+			rename = { enabled = true },
 			toggle = { enabled = true },
 			scratch = { enabled = true },
 			statuscolumn = { enabled = true },

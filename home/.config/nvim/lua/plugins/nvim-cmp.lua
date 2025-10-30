@@ -27,8 +27,6 @@ return {
 				},
 			})
 
-			luasnip.config.setup({})
-
 			cmp.setup({
 				snippet = {
 					expand = function(args)

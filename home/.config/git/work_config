@@ -1,4 +1,4 @@
 [user]
-	email = "dillon@TBD.com"
+	email = "dillon@cloudflare.com"
 	name = "Dillon Mulroy"
 	signingkey = "~/.ssh/key.pub"

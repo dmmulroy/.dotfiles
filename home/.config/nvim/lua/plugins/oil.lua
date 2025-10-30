@@ -21,7 +21,8 @@ return {
 					border = "rounded",
 				},
 				keymaps = {
-					["<C-_>"] = { "actions.select", opts = { vertical = true } },
+					["<C-l>"] = false,
+					["<C-r>"] = "actions.refresh",
 				},
 				view_options = {
 					show_hidden = true,

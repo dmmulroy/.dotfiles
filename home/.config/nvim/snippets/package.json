@@ -1,0 +1,8 @@
+{
+  "name": "custom-snippets",
+  "version": "1.0.0",
+  "description": "Custom VSCode-style snippets",
+  "contributes": {
+    "snippets": []
+  }
+}
