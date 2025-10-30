@@ -55,7 +55,7 @@ return {
 				},
 				sqls = {},
 				tailwindcss = {
-					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte" },
+					filetypes = { "typescriptreact", "javascriptreact", "html", "svelte", "astro" },
 				},
 				yamlls = {},
 				svelte = {},
