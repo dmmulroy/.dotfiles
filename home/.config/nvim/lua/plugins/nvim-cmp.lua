@@ -30,7 +30,10 @@ return {
 			cmp.setup({
 				snippet = {
 					expand = function(args)
-						luasnip.lsp_expand(args.body)
+						local ok, err = pcall(luasnip.lsp_expand, args.body)
+						if not ok then
+							vim.notify("Snippet parse error: " .. tostring(err), vim.log.levels.WARN)
+						end
 					end,
 				},
 				window = {
