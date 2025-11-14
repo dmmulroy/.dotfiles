@@ -2404,13 +2404,19 @@ cmd_package_update() {
 
 cmd_package_list() {
     local bundle_file="${1:-all}"
-    
+
     print_header "Listing packages"
-    
+
+    # Cache brew list output once to avoid SIGPIPE issues with pipefail
+    local installed_formulas
+    local installed_casks
+    installed_formulas=$(brew list --formula 2>/dev/null || true)
+    installed_casks=$(brew list --cask 2>/dev/null || true)
+
     # Determine which bundle files to list
     local bundle_files=()
     local bundle_names=()
-    
+
     if [[ "$bundle_file" == "work" ]]; then
         bundle_files=("${PACKAGES_DIR}/bundle.work")
         bundle_names=("work")
@@ -2422,56 +2428,56 @@ cmd_package_list() {
         bundle_files=("${PACKAGES_DIR}/bundle" "${PACKAGES_DIR}/bundle.work")
         bundle_names=("base" "work")
     fi
-    
+
     for i in "${!bundle_files[@]}"; do
         local target_bundle="${bundle_files[$i]}"
         local bundle_name="${bundle_names[$i]}"
-        
+
         if [[ ! -f "$target_bundle" ]]; then
             if [[ "$bundle_file" != "all" ]]; then
                 print_warning "Bundle file not found: $(basename "$target_bundle")"
             fi
             continue
         fi
-        
+
         echo -e "\n${BOLD}${bundle_name^} packages ($(basename "$target_bundle")):${RESET}"
-        
+
         local brew_packages=()
         local cask_packages=()
-        
+
         while IFS= read -r line; do
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "${line// }" ]] && continue
-            
+
             if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
                 brew_packages+=("${BASH_REMATCH[1]}")
             elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
                 cask_packages+=("${BASH_REMATCH[1]}")
             fi
         done < "$target_bundle"
-        
+
         if [[ ${#brew_packages[@]} -gt 0 ]]; then
             echo -e "  ${BOLD}Brew formulas (${#brew_packages[@]}):${RESET}"
             for package in "${brew_packages[@]}"; do
-                if brew list --formula | grep -q "^${package}$"; then
+                if echo "$installed_formulas" | grep -q "^${package}$"; then
                     print_success "    $package"
                 else
                     print_error "    $package (not installed)"
                 fi
             done
         fi
-        
+
         if [[ ${#cask_packages[@]} -gt 0 ]]; then
             echo -e "  ${BOLD}Casks (${#cask_packages[@]}):${RESET}"
             for package in "${cask_packages[@]}"; do
-                if brew list --cask | grep -q "^${package}$"; then
+                if echo "$installed_casks" | grep -q "^${package}$"; then
                     print_success "    $package"
                 else
                     print_error "    $package (not installed)"
                 fi
             done
         fi
-        
+
         if [[ ${#brew_packages[@]} -eq 0 && ${#cask_packages[@]} -eq 0 ]]; then
             print_info "  No packages found"
         fi
