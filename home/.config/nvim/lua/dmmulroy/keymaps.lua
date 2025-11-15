@@ -58,8 +58,8 @@ end, { desc = "Toggle Oil file explorer" })
 -- Map Undotree
 vim.keymap.set("n", "<leader>ut", ":UndotreeToggle<CR>", { desc = "Toggle UndoTree" })
 
--- InspectTwoslashQueries
-vim.keymap.set("n", "<leader>ti", ":InspectTwoslashQueries<CR>", { desc = "[I]nspect [T]woslash Query" })
+-- TwoSlashQueriesInspect
+vim.keymap.set("n", "<leader>ti", ":TwoslashQueriesInspect<CR>", { desc = "[I]nspect [T]woslash Query" })
 
 -- Center buffer while navigating
 vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "Scroll up and center cursor" })
