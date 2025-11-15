@@ -85,6 +85,10 @@ vim.opt.guicursor = {
 	"sm:block-blinkwait175-blinkoff150-blinkon175", -- Showmatch: block cursor with specific blinking settings
 }
 
--- Disable virtual_text EARLY to prevent tiny-inline-diagnostic race condition
--- Must be table (not false) to avoid indexing bug in nvim 0.11.5:1666
-vim.diagnostic.config({ virtual_text = {} })
+-- Enable virtual lines for diagnostics
+vim.diagnostic.config({
+	float = { border = "rounded" },
+	virtual_text = true,
+	-- virtual_text = { current_line = true },
+	virtual_lines = false,
+})
