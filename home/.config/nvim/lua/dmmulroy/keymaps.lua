@@ -117,42 +117,42 @@ end, { desc = "Toggle [T]wo [S]lash queries" })
 
 -- Diagnostics --
 vim.keymap.set("n", "]d", function()
-	local ok = pcall(vim.diagnostic.jump, { count = 1, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = 1, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
 end, { desc = "Go to next diagnostic and center" })
 
 vim.keymap.set("n", "[d", function()
-	local ok = pcall(vim.diagnostic.jump, { count = -1, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = -1, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
 end, { desc = "Go to previous diagnostic and center" })
 
 vim.keymap.set("n", "]e", function()
-	local ok = pcall(vim.diagnostic.jump, { count = 1, severity = vim.diagnostic.severity.ERROR, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = 1, severity = vim.diagnostic.severity.ERROR, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
 end, { desc = "Go to next error diagnostic and center" })
 
 vim.keymap.set("n", "[e", function()
-	local ok = pcall(vim.diagnostic.jump, { count = -1, severity = vim.diagnostic.severity.ERROR, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = -1, severity = vim.diagnostic.severity.ERROR, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
 end, { desc = "Go to previous error diagnostic and center" })
 
 vim.keymap.set("n", "]w", function()
-	local ok = pcall(vim.diagnostic.jump, { count = 1, severity = vim.diagnostic.severity.WARN, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = 1, severity = vim.diagnostic.severity.WARN, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
 end, { desc = "Go to next warning diagnostic and center" })
 
 vim.keymap.set("n", "[w", function()
-	local ok = pcall(vim.diagnostic.jump, { count = -1, severity = vim.diagnostic.severity.WARN, float = true })
+	local ok = pcall(vim.diagnostic.jump, { count = -1, severity = vim.diagnostic.severity.WARN, float = false })
 	if ok then
 		vim.api.nvim_feedkeys("zz", "n", false)
 	end
