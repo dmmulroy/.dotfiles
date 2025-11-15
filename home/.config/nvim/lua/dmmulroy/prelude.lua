@@ -23,12 +23,10 @@ end
 M.get_cursor_position = get_cursor_position
 
 local function copy_line_diagnostics_to_clipboard()
-	-- Get the current buffer and cursor position
-	local bufnr = vim.api.nvim_get_current_buf()
-	local line = get_cursor_position({ zero_indexed = true }).row
+	local diag = require("tiny-inline-diagnostic")
 
 	-- Get diagnostics for the current line
-	local diagnostics = vim.diagnostic.get(bufnr, { lnum = line })
+	local diagnostics = diag.get_diagnostic_under_cursor()
 
 	if #diagnostics == 0 then
 		print("No diagnostics on the current line.")
