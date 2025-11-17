@@ -21,7 +21,7 @@ readonly DOTFILES_DIR
 readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
 readonly HOME_DIR="${DOTFILES_DIR}/home"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
-readonly GITHUB_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
+readonly GITHUB_KEY_PATH="${HOME}/.ssh/cloudflare/id_ed25519.pub"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
 
 # Progress indicators
@@ -173,7 +173,7 @@ install_packages() {
     print_info "Installing base packages..."
     
     # Try to install all packages at once first
-    if brew bundle --file="${PACKAGES_DIR}/bundle" --no-lock; then
+    if brew bundle --file="${PACKAGES_DIR}/bundle"; then
         print_success "All base packages installed successfully"
     else
         print_warning "Some packages failed to install, trying individually..."

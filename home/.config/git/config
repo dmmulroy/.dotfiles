@@ -49,7 +49,6 @@
 	email = "dillon.mulroy@gmail.com"
 	name = "Dillon Mulroy"
 	signingKey = "~/.ssh/key.pub"
-	signingkey = "~/.ssh/key.pub"
 
 [includeIf "gitdir:~/Code/work/"]
 	path = "~/.config/git/work_config"
