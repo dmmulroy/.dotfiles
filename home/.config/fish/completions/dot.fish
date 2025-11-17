@@ -13,6 +13,7 @@ complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which p
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
+complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
@@ -73,6 +74,9 @@ complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Sh
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "v" -l "verbose" -d "Show detailed timing for each run"
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "h" -l "help" -d "Show benchmark-shell help"
+
+# Gen-ssh-key command options
+complete -c dot -n "__fish_seen_subcommand_from gen-ssh-key" -s "h" -l "help" -d "Show gen-ssh-key help"
 
 # Dynamic completions for installed packages (when removing or updating)
 function __dot_installed_packages
