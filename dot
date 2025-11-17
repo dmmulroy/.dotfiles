@@ -432,7 +432,7 @@ install_font() {
         while IFS= read -r -d '' font_file; do
             cp "$font_file" "$font_install_dir/"
             ((font_count++))
-        done < <(find "$font_temp_dir" -name '*.otf' -print0)
+        done < <(find "$font_temp_dir" -type f \( -name '*.otf' -o -name '*.ttf' \) -print0)
 
         if [[ $font_count -gt 0 ]]; then
             print_success "Installed $font_count font files"
