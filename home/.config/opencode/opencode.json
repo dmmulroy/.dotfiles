@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
   "theme": "catppuccin",
   "keybinds": {
     "messages_half_page_up": "ctrl+u",
