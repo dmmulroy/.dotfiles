@@ -6,6 +6,10 @@ return {
 			require("cloak").setup({
 				patterns = {
 					{
+						file_pattern = "**/*.vars*",
+						cloak_pattern = "=.+",
+					},
+					{
 						file_pattern = "**/*.env*",
 						cloak_pattern = "=.+",
 					},
