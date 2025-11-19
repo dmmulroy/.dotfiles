@@ -40,6 +40,7 @@ return {
 				}
 			end,
 			formatters_by_ft = {
+				astro = { "biome" },
 				javascript = { "biome" },
 				typescript = { "biome" },
 				typescriptreact = { "biome" },
