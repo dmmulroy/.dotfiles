@@ -40,11 +40,11 @@ return {
 				}
 			end,
 			formatters_by_ft = {
-				astro = { "biome" },
-				javascript = { "biome" },
-				typescript = { "biome" },
-				typescriptreact = { "biome" },
-				svelte = { "prettierd", "prettier " },
+				astro = { "biome", "prettierd" },
+				javascript = { "biome", "prettierd" },
+				typescript = { "biome", "prettierd" },
+				typescriptreact = { "biome", "prettierd" },
+				svelte = { "prettier", "prettier " },
 				lua = { "stylua" },
 			},
 		},
