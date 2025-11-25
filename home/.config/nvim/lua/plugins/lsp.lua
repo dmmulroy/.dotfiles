@@ -20,6 +20,12 @@ return {
 			local servers = {
 				bashls = {},
 				biome = {},
+				-- cf_lsp = {
+				-- 	manual_install = true,
+				-- 	cmd = { "bun", "run", "/Users/dillon/Code/work/lsp-exploration/cf-lsp/src/server.ts", "--stdio" },
+				-- 	filetypes = { "typescript", "typescriptreact" },
+				-- 	root_markers = { "wrangler.toml", "wrangler.json", "wrangler.jsonc" },
+				-- },
 				cssls = {},
 				eslint = {
 					autostart = false,
@@ -73,7 +79,7 @@ return {
 				stylua = {},
 			}
 
-			local manually_installed_servers = { "ocamllsp", "gleam", "rust_analyzer" }
+			local manually_installed_servers = { "ocamllsp", "gleam", "rust_analyzer", "cf_lsp" }
 			local mason_tools_to_install = vim.tbl_keys(vim.tbl_deep_extend("force", {}, servers, formatters))
 			local ensure_installed = vim.tbl_filter(function(name)
 				return not vim.tbl_contains(manually_installed_servers, name)
@@ -111,6 +117,7 @@ return {
 					filetypes = config.filetypes,
 					settings = config.settings,
 					root_dir = config.root_dir,
+					root_markers = config.root_markers,
 				})
 
 				-- Enable the server (with autostart setting if specified)

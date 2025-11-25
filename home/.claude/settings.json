@@ -1,6 +1,5 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "alwaysThinkingEnabled": true,
   "permissions": {
     "allow": [
       "Bash(cat:*)",
@@ -15,6 +14,7 @@
     ],
     "deny": []
   },
+  "alwaysThinkingEnabled": false,
   "feedbackSurveyState": {
     "lastShownTime": 1754076483100
   }
