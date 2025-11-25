@@ -10,7 +10,7 @@
       "Bash(rg:*)",
       "Bash(tree:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:grep.app)",
+      "WebFetch(domain:grep.app)"
     ],
     "deny": []
   },
