@@ -14,9 +14,9 @@
     ],
     "deny": []
   },
-  "alwaysThinkingEnabled": false,
+  "model": "opus",
+  "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754076483100
-  },
-  "model": "opus"
+  }
 }

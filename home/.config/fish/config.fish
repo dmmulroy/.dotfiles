@@ -10,4 +10,4 @@ set -gx MANPAGER 'nvim +Man!'
 # Add dotfiles directory to PATH for 'dot' command
 fish_add_path ~/.dotfiles
 
-alias claude="/Users/dmmulroy/.claude/local/claude"
+
