@@ -32,6 +32,9 @@ return {
 						includeInlayFunctionParameterTypeHints = true,
 						includeInlayEnumMemberValueHints = true,
 						includeInlayFunctionLikeReturnTypeHints = true,
+						-- Enable auto imports
+						includeCompletionsForModuleExports = true,
+						includeCompletionsForImportStatements = true,
 					},
 
 					tsserver_format_options = {
