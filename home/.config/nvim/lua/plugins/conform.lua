@@ -40,12 +40,41 @@ return {
 				}
 			end,
 			formatters_by_ft = {
-				astro = { "biome", "prettierd" },
-				javascript = { "biome", "prettierd" },
-				typescript = { "biome", "prettierd" },
-				typescriptreact = { "biome", "prettierd" },
-				svelte = { "prettier", "prettier " },
+				astro = { "biome", "prettierd", stop_after_first = true },
+				javascript = { "biome", "prettierd", stop_after_first = true },
+				typescript = { "biome", "prettierd", stop_after_first = true },
+				typescriptreact = { "biome", "prettierd", stop_after_first = true },
+				svelte = { "prettierd" },
 				lua = { "stylua" },
+			},
+			formatters = {
+				biome = {
+					condition = function(_, ctx)
+						return vim.fs.find({ "biome.json", "biome.jsonc" }, {
+							path = ctx.filename,
+							upward = true,
+							stop = vim.uv.os_homedir(),
+						})[1] ~= nil
+					end,
+				},
+				prettierd = {
+					condition = function(_, ctx)
+						return vim.fs.find({
+							".prettierrc",
+							".prettierrc.json",
+							".prettierrc.js",
+							".prettierrc.cjs",
+							".prettierrc.mjs",
+							"prettier.config.js",
+							"prettier.config.cjs",
+							"prettier.config.mjs",
+						}, {
+							path = ctx.filename,
+							upward = true,
+							stop = vim.uv.os_homedir(),
+						})[1] ~= nil
+					end,
+				},
 			},
 		},
 	},
