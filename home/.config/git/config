@@ -1,4 +1,3 @@
-
 [alias]
 	fomo = "!fish -c 'git fetch origin $(__git.default_branch) && git rebase origin/$(__git.default_branch) --autostash'"
 	lg = "!fish -c 'git_log_n $argv'"
