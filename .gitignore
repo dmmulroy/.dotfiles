@@ -15,5 +15,7 @@ home/.claude/*
 !home/.claude/CLAUDE.md
 !home/.claude/agents
 !home/.claude/agents/*
+!home/.claude/sounds
+!home/.claude/sounds/*
 !home/.claude/commands
 !home/.claude/commands/*
