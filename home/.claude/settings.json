@@ -14,8 +14,30 @@
     ],
     "deny": []
   },
-  "model": "opus",
-  "alwaysThinkingEnabled": true,
+  "model": "haiku",
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3"
+          }
+        ]
+      }
+    ]
+  },
+  "alwaysThinkingEnabled": false,
   "feedbackSurveyState": {
     "lastShownTime": 1754076483100
   }
