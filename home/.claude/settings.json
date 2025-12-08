@@ -14,7 +14,7 @@
     ],
     "deny": []
   },
-  "model": "haiku",
+  "model": "opus",
   "hooks": {
     "Notification": [
       {

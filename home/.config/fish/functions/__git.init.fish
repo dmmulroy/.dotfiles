@@ -91,6 +91,7 @@ function __git.init
   __git.create_abbr gp!        git push --force-with-lease
   __git.create_abbr gpo        git push origin
   __git.create_abbr gpo!       git push --force-with-lease origin
+  __git.create_abbr gpfwl      git push --force-with-lease
   __git.create_abbr gpv        git push --no-verify
   __git.create_abbr gpv!       git push --no-verify --force-with-lease
   __git.create_abbr ggp        git push origin \(__git.current_branch\)
