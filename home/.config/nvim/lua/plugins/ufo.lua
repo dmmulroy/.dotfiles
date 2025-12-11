@@ -6,9 +6,18 @@ return {
 			"kevinhwang91/promise-async",
 		},
 		config = function()
-			--- @diagnostic disable: unused-local
+			local lsp_filetypes = {
+				typescript = true,
+				typescriptreact = true,
+				javascript = true,
+				javascriptreact = true,
+			}
+
 			require("ufo").setup({
-				provider_selector = function(_bufnr, _filetype, _buftype)
+				provider_selector = function(_bufnr, filetype, _buftype)
+					if lsp_filetypes[filetype] then
+						return { "lsp", "treesitter" }
+					end
 					return { "treesitter", "indent" }
 				end,
 			})
