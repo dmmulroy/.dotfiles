@@ -29,12 +29,6 @@ return {
 			local servers = {
 				bashls = {},
 				biome = {},
-				-- cf_lsp = {
-				-- 	manual_install = true,
-				-- 	cmd = { "bun", "run", "/Users/dillon/Code/work/lsp-exploration/cf-lsp/src/server.ts", "--stdio" },
-				-- 	filetypes = { "typescript", "typescriptreact" },
-				-- 	root_markers = { "wrangler.toml", "wrangler.json", "wrangler.jsonc" },
-				-- },
 				cssls = {},
 				eslint = {
 					autostart = false,
