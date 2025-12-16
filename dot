@@ -679,6 +679,15 @@ cmd_update() {
     # Update packages
     if confirm "Update Homebrew packages?" "y"; then
         print_info "Updating Homebrew..."
+        # WARP adds latency that triggers brew's curl speed-limit abort
+        # Pre-download API files to work around this
+        if pgrep -q "Cloudflare WARP"; then
+            print_info "Cloudflare WARP detected, pre-downloading Homebrew API..."
+            local api_cache="$HOME/Library/Caches/Homebrew/api"
+            mkdir -p "$api_cache"
+            curl -fsSL -o "$api_cache/formula.jws.json" "https://formulae.brew.sh/api/formula.jws.json" 2>/dev/null
+            curl -fsSL -o "$api_cache/cask.jws.json" "https://formulae.brew.sh/api/cask.jws.json" 2>/dev/null
+        fi
         brew update
         brew upgrade
         print_success "Packages updated"
