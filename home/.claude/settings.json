@@ -1,5 +1,32 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "alwaysThinkingEnabled": true,
+  "feedbackSurveyState": {
+    "lastShownTime": 1754076483100
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "model": "opus",
   "permissions": {
     "allow": [
       "Bash(cat:*)",
@@ -13,32 +40,5 @@
       "WebFetch(domain:grep.app)"
     ],
     "deny": []
-  },
-  "model": "opus",
-  "hooks": {
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay ~/.claude/sounds/gow_active_reload.mp3"
-          }
-        ]
-      }
-    ]
-  },
-  "alwaysThinkingEnabled": true,
-  "feedbackSurveyState": {
-    "lastShownTime": 1754076483100
   }
 }
