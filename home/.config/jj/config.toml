@@ -1,0 +1,31 @@
+#:schema https://docs.jj-vcs.dev/latest/config-schema.json
+
+[user]
+name = "Dillon Mulroy"
+email = "dillon.mulroy@gmail.com"
+
+[ui]
+editor = "nvim"
+diff-editor = ":builtin"
+diff-formatter = ":git"
+pager = "less -FRX"
+default-command = ["log"]
+graph.style = "curved"
+
+[template-aliases]
+'format_short_id(id)' = 'id.shortest(8)'
+
+[signing]
+behavior = "own"
+backend = "ssh"
+key = "~/.ssh/key.pub"
+
+[git]
+colocate = true
+sign-on-push = true
+
+[[--scope]]
+--when.repositories = ["~/Code/work"]
+
+[--scope.user]
+email = "dillon@cloudflare.com"
