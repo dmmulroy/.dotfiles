@@ -5,25 +5,43 @@ name = "Dillon Mulroy"
 email = "dillon.mulroy@gmail.com"
 
 [ui]
+# Use neovim for editing commit messages
 editor = "nvim"
+# Use jj's built-in side-by-side diff editor
 diff-editor = ":builtin"
+# Format diffs in git-compatible style
 diff-formatter = ":git"
+# Skip pager for short output, preserve colors, don't clear screen on exit
 pager = "less -FRX"
+# Run `jj log` when no command specified
 default-command = ["log"]
+# Use curved lines for commit graph visualization
 graph.style = "curved"
 
 [template-aliases]
+# Display commit IDs as shortest unique 8-char prefix
 'format_short_id(id)' = 'id.shortest(8)'
 
 [signing]
+# Only sign commits authored by you
 behavior = "own"
+# Use SSH keys for commit signing
 backend = "ssh"
 key = "~/.ssh/key.pub"
 
 [git]
+# Keep jj and git repos in same directory for interop
 colocate = true
+# Sign commits when pushing to remote
 sign-on-push = true
+# Only auto-track new remote bookmarks with your prefix
+push-bookmark-prefix = "dmmulroy/"
 
+[revset-aliases]
+# Find commits authored by you
+'mine()' = 'author(dmmulroy)'
+
+# Work-specific overrides for repos in ~/Code/work
 [[--scope]]
 --when.repositories = ["~/Code/work"]
 
