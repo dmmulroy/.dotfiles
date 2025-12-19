@@ -34,8 +34,6 @@ key = "~/.ssh/key.pub"
 colocate = true
 # Sign commits when pushing to remote
 sign-on-push = true
-# Only auto-track new remote bookmarks with your prefix
-push-bookmark-prefix = "dmmulroy/"
 
 [revset-aliases]
 # Find commits authored by you
