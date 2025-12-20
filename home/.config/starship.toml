@@ -1,3 +1,6 @@
+# Put custom.scm right after directory
+format = "$directory${custom.scm}$all"
+
 [buf]
 disabled = true
 
@@ -12,8 +15,21 @@ truncate_to_repo = false
 detect_files = ["global.json", "Directory.Build.props", "Directory.Build.targets", "Packages.props"]
 
 [git_branch]
+disabled = true
 symbol = " "
 truncation_length = 18
+
+[git_status]
+disabled = true
+
+[git_commit]
+disabled = true
+
+[custom.scm]
+command = "jj-starship"
+when = "jj-starship detect"
+format = "$output "
+unsafe_no_escape = true
 
 [golang]
 symbol = " "
@@ -26,3 +42,4 @@ symbol = " "
 
 [package]
 disabled = true
+
