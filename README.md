@@ -80,7 +80,7 @@ dot init --skip-ssh --skip-font
 2. Installs packages from Brewfiles
 3. Creates symlinks with GNU Stow
 4. Installs Bun runtime
-5. Installs Claude Code CLI via Bun/npm
+5. Installs Claude Code CLI via native installer (with bun/npm fallback)
 6. Generates SSH key for GitHub (optional)
 7. Installs MonoLisa font (optional)
 8. Sets up Fish shell with plugins
@@ -448,7 +448,10 @@ claude auth login
 
 **Claude Code installation issues:**
 ```bash
-# Reinstall via Bun (recommended)
+# Install via native installer (recommended)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Or reinstall via Bun
 bun install -g @anthropic-ai/claude-code
 
 # Or via npm
