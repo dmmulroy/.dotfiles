@@ -13,7 +13,7 @@ font-style-bold = Bold
 font-style-bold-italic = Bold Italic
 
 # Font size
-font-size = 20
+font-size = 18
 
 # Opacity of split windows
 unfocused-split-opacity = 0.97  
