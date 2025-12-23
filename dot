@@ -320,37 +320,138 @@ install_bun() {
     fi
 }
 
+# Helper to determine Claude Code installation method
+get_claude_install_method() {
+    local claude_path
+    claude_path=$(command -v claude 2>/dev/null) || { echo "not_installed"; return; }
+    
+    case "$claude_path" in
+        "${HOME}/.claude"*) echo "native" ;;
+        *".bun"*) echo "bun" ;;
+        *"node_modules"*|*"/npm/"*) echo "npm" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# Helper to check for multiple Claude installations
+check_claude_conflicts() {
+    local found_paths=()
+    
+    # Check native installation
+    if [[ -x "${HOME}/.claude/bin/claude" ]]; then
+        found_paths+=("${HOME}/.claude/bin/claude (native)")
+    fi
+    
+    # Check bun global installation
+    local bun_path="${HOME}/.bun/bin/claude"
+    if [[ -x "$bun_path" ]]; then
+        found_paths+=("$bun_path (bun)")
+    fi
+    
+    # Check npm global installation (common locations)
+    local npm_paths=(
+        "/usr/local/bin/claude"
+        "${HOME}/.npm-global/bin/claude"
+        "${HOME}/.local/bin/claude"
+    )
+    for npm_path in "${npm_paths[@]}"; do
+        if [[ -x "$npm_path" && "$npm_path" != "${HOME}/.claude"* ]]; then
+            found_paths+=("$npm_path (npm)")
+        fi
+    done
+    
+    if [[ ${#found_paths[@]} -gt 1 ]]; then
+        echo "${found_paths[*]}"
+        return 0
+    fi
+    return 1
+}
+
 install_claude_code() {
     print_step "Installing Claude Code CLI"
     
     # Save current shell options for restoration
     local _saved_opts="$-"
     
-    # Check if Claude Code is already installed
-    if command_exists claude; then
-        print_success "Claude Code is already installed"
-        # Check if it's the correct version (npm package)
-        local claude_path
-        claude_path=$(command -v claude)
-        if [[ "$claude_path" == *".bun"* ]] || [[ "$claude_path" == *"node_modules"* ]]; then
-            print_success "Claude Code is installed via package manager"
-            # Restore shell options before returning
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        fi
-    fi
+    # Check current installation status
+    local install_method
+    install_method=$(get_claude_install_method)
     
-    print_info "Installing Claude Code CLI..."
+    case "$install_method" in
+        native)
+            print_success "Claude Code is already installed via native installer (recommended)"
+            return 0
+            ;;
+        bun|npm)
+            print_warning "Claude Code is installed via $install_method package manager"
+            print_info "The native installer is now recommended for better updates and integration"
+            
+            if confirm "Migrate to native installer?" "y"; then
+                print_info "Migrating Claude Code to native installer..."
+                
+                # Temporarily disable exit on error
+                set +e
+                
+                # Remove old installation
+                if [[ "$install_method" == "bun" ]] && command_exists bun; then
+                    print_info "Removing bun installation..."
+                    bun remove -g @anthropic-ai/claude-code 2>/dev/null
+                elif command_exists npm; then
+                    print_info "Removing npm installation..."
+                    npm uninstall -g @anthropic-ai/claude-code 2>/dev/null
+                fi
+                
+                # Install via native installer
+                print_info "Installing via native installer..."
+                if curl -fsSL https://claude.ai/install.sh | bash; then
+                    print_success "Claude Code migrated to native installer successfully"
+                    print_info "You may need to restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
+                    set -"$_saved_opts" 2>/dev/null || true
+                    return 0
+                else
+                    print_error "Native installer failed, reinstalling via $install_method..."
+                    # Reinstall via original method
+                    if [[ "$install_method" == "bun" ]]; then
+                        bun install -g @anthropic-ai/claude-code
+                    else
+                        npm install -g @anthropic-ai/claude-code
+                    fi
+                    set -"$_saved_opts" 2>/dev/null || true
+                    return 1
+                fi
+            else
+                print_info "Keeping existing $install_method installation"
+                return 0
+            fi
+            ;;
+        unknown)
+            print_success "Claude Code is already installed"
+            return 0
+            ;;
+    esac
+    
+    # Fresh installation - try native installer first
+    print_info "Installing Claude Code CLI via native installer..."
     
     # Temporarily disable exit on error for installation attempts
     set +e
     
-    # Try bun first (faster), fallback to npm
+    # Try native installer first (recommended)
+    print_info "Running native installer..."
+    if curl -fsSL https://claude.ai/install.sh | bash; then
+        print_success "Claude Code installed successfully via native installer"
+        print_info "You may need to restart your shell or add ~/.claude/bin to your PATH"
+        set -"$_saved_opts" 2>/dev/null || true
+        return 0
+    else
+        print_warning "Native installer failed, trying package manager fallback..."
+    fi
+    
+    # Fallback to bun (faster than npm)
     if command_exists bun; then
         print_info "Installing via Bun..."
         if bun install -g @anthropic-ai/claude-code; then
             print_success "Claude Code installed successfully via Bun"
-            # Restore shell options before returning
             set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
@@ -363,19 +464,16 @@ install_claude_code() {
         print_info "Installing via npm..."
         if npm install -g @anthropic-ai/claude-code; then
             print_success "Claude Code installed successfully via npm"
-            # Restore shell options before returning
             set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
             print_error "Failed to install Claude Code via npm"
-            # Restore shell options before returning
             set -"$_saved_opts" 2>/dev/null || true
             return 1
         fi
     else
-        print_error "Neither Bun nor npm is available for installing Claude Code"
-        print_info "Please install Node.js/npm or Bun first"
-        # Restore shell options before returning
+        print_error "All installation methods failed"
+        print_info "Try manually: curl -fsSL https://claude.ai/install.sh | bash"
         set -"$_saved_opts" 2>/dev/null || true
         return 1
     fi
@@ -737,16 +835,38 @@ cmd_doctor() {
     if command_exists claude; then
         print_success "Claude Code installed"
         
-        # Check installation method
-        local claude_path
-        claude_path=$(command -v claude)
-        if [[ "$claude_path" == *".bun"* ]]; then
-            print_success "Claude Code installed via Bun (recommended)"
-        elif [[ "$claude_path" == *"node_modules"* ]]; then
-            print_success "Claude Code installed via npm (recommended)"
-        else
-            print_warning "Claude Code installed via non-standard method"
-            print_info "Consider reinstalling via: bun install -g @anthropic-ai/claude-code"
+        # Check installation method using helper function
+        local install_method
+        install_method=$(get_claude_install_method)
+        
+        case "$install_method" in
+            native)
+                print_success "Claude Code installed via native installer (recommended)"
+                ;;
+            bun)
+                print_warning "Claude Code installed via Bun"
+                print_info "Consider migrating to native installer: curl -fsSL https://claude.ai/install.sh | bash"
+                print_info "Or run 'dot init' to migrate automatically"
+                ;;
+            npm)
+                print_warning "Claude Code installed via npm"
+                print_info "Consider migrating to native installer: curl -fsSL https://claude.ai/install.sh | bash"
+                print_info "Or run 'dot init' to migrate automatically"
+                ;;
+            *)
+                print_warning "Claude Code installed via unknown method"
+                print_info "Consider reinstalling via: curl -fsSL https://claude.ai/install.sh | bash"
+                ;;
+        esac
+        
+        # Check for multiple installations (potential conflicts)
+        local conflicts
+        if conflicts=$(check_claude_conflicts); then
+            print_warning "Multiple Claude Code installations detected:"
+            for path in $conflicts; do
+                print_info "  - $path"
+            done
+            print_info "This may cause version conflicts. Consider removing duplicate installations."
         fi
         
         # Check if we can get version (indicates it's working)
@@ -758,7 +878,8 @@ cmd_doctor() {
         fi
     else
         print_warning "Claude Code not installed"
-        print_info "Install with: bun install -g @anthropic-ai/claude-code (or npm install -g @anthropic-ai/claude-code)"
+        print_info "Install with: curl -fsSL https://claude.ai/install.sh | bash"
+        print_info "Or run 'dot init' to install automatically"
     fi
     
     # Check symlinks
@@ -1694,7 +1815,8 @@ cmd_summary() {
     # Check if Claude Code is available
     if ! command_exists claude; then
         print_error "Claude Code is not installed"
-        print_info "Install it with: bun install -g @anthropic-ai/claude-code (or npm install -g @anthropic-ai/claude-code)"
+        print_info "Install it with: curl -fsSL https://claude.ai/install.sh | bash"
+        print_info "Or run 'dot init' to install automatically"
         return 1
     fi
     
@@ -2619,7 +2741,7 @@ cmd_help() {
     echo "    - Backups are automatically compressed using gzip"
     echo "    - Legacy uncompressed backups are still supported"
     echo "    - SHA verification is disabled for better reliability"
-    echo "    - Claude Code CLI installed globally via Bun/npm during init"
+    echo "    - Claude Code CLI installed via native installer (with bun/npm fallback)"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
     echo ""
