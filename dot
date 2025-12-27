@@ -192,7 +192,7 @@ install_packages() {
                 local package="${BASH_REMATCH[1]}"
                 print_info "Installing brew package: $package"
                 if brew install "$package" 2>/dev/null; then
-                    ((installed_count++))
+                    ((++installed_count))
                 else
                     print_warning "Failed to install: $package"
                     failed_packages+=("brew:$package")
@@ -201,7 +201,7 @@ install_packages() {
                 local package="${BASH_REMATCH[1]}"
                 print_info "Installing cask: $package"
                 if brew install --cask "$package" 2>/dev/null; then
-                    ((installed_count++))
+                    ((++installed_count))
                 else
                     print_warning "Failed to install: $package"
                     failed_packages+=("cask:$package")
@@ -289,7 +289,10 @@ stow_dotfiles() {
                 local src="${HOME}/${file}"
                 local dst="${backup_dir}/${file}"
                 mkdir -p "$(dirname "$dst")"
-                cp -p "$src" "$dst"
+                if ! cp -p "$src" "$dst"; then
+                    print_error "Failed to backup: $src"
+                    return 1
+                fi
             done
             print_success "Backups created in ${backup_dir}"
         fi
@@ -520,7 +523,7 @@ install_font() {
     local font_install_dir="${HOME}/Library/Fonts"
 
     print_info "Cloning font repository..."
-    if GIT_SSH_COMMAND="ssh -i $GITHUB_KEY_PATH -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
+    if GIT_SSH_COMMAND="ssh -i '$GITHUB_KEY_PATH' -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
         print_success "Repository cloned successfully"
 
         mkdir -p "$font_install_dir"
@@ -529,7 +532,7 @@ install_font() {
         local font_count=0
         while IFS= read -r -d '' font_file; do
             cp "$font_file" "$font_install_dir/"
-            ((font_count++))
+            ((++font_count))
         done < <(find "$font_temp_dir" -type f \( -name '*.otf' -o -name '*.ttf' \) -print0)
 
         if [[ $font_count -gt 0 ]]; then
@@ -807,7 +810,7 @@ cmd_doctor() {
         print_success "Homebrew installed"
     else
         print_error "Homebrew not installed"
-        ((issues++))
+        ((++issues))
     fi
     
     # Check Stow
@@ -815,7 +818,7 @@ cmd_doctor() {
         print_success "GNU Stow installed"
     else
         print_error "GNU Stow not installed"
-        ((issues++))
+        ((++issues))
     fi
     
     # Check Fish
@@ -828,7 +831,7 @@ cmd_doctor() {
         fi
     else
         print_error "Fish shell not installed"
-        ((issues++))
+        ((++issues))
     fi
     
     # Check Claude Code
@@ -886,7 +889,7 @@ cmd_doctor() {
     local broken_links=0
     while IFS= read -r -d '' link; do
         if [[ ! -e "$link" ]]; then
-            ((broken_links++))
+            ((++broken_links))
         fi
     done < <(find "${HOME}" -maxdepth 3 -type l -print0 2>/dev/null)
     
@@ -1015,10 +1018,10 @@ cmd_backup_create() {
             mkdir -p "$target_dir"
             # Copy the actual file content, not the symlink itself
             if cp -L "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null; then
-                ((count++))
+                ((++count))
             else
                 # Fallback: if the symlink target doesn't exist, copy the link
-                cp -P "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null && ((count++))
+                cp -P "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null && ((++count))
             fi
         fi
     done < <(find "${HOME_DIR}" -type f -print0)
@@ -1064,12 +1067,12 @@ cmd_backup_restore() {
                     local size
                     size=$(du -h "$backup" | cut -f1)
                     local date
-                    date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+                    date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1 || echo "unknown")
                     echo "  - $name (${size}, $date)"
                     found_backups=true
                 fi
             done
-            
+
             # List uncompressed backups (legacy)
             for backup in "${HOME}/.dotbackups"/*; do
                 if [[ -d "$backup" ]]; then
@@ -1104,11 +1107,11 @@ cmd_backup_restore() {
         
         # Extract to temporary directory
         restore_temp_dir=$(mktemp -d -t DOT_restore_XXXXXX)
+        trap 'test -n "${restore_temp_dir:-}" && rm -rf "$restore_temp_dir"' RETURN
         print_info "Extracting backup..."
-        
+
         if ! tar -xzf "$backup_archive" -C "$restore_temp_dir"; then
             print_error "Failed to extract backup"
-            rm -rf "$restore_temp_dir"
             return 1
         fi
         
@@ -1130,19 +1133,14 @@ cmd_backup_restore() {
     local count=0
     while IFS= read -r -d '' file; do
         local relative_path="${file#"${backup_dir}"/}"
-        local target_path="${HOME}/${relative_path}"
-        
+        local target_path="${HOME_DIR}/${relative_path}"
+
         mkdir -p "$(dirname "$target_path")"
-        cp -P "$file" "$target_path"
-        ((count++))
+        cp "$file" "$target_path"
+        ((++count))
     done < <(find "$backup_dir" -type f -print0)
     
     print_success "Restored $count files from backup"
-    
-    # Manual cleanup
-    if [[ -n "$restore_temp_dir" ]]; then
-        rm -rf "$restore_temp_dir"
-    fi
 }
 
 cmd_backup_list() {
@@ -1159,12 +1157,12 @@ cmd_backup_list() {
                 local size
                 size=$(du -h "$backup" | cut -f1)
                 local date
-                date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+                date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1 || echo "unknown")
                 echo "  - $name (${size}, $date)"
                 found_backups=true
             fi
         done
-        
+
         # List uncompressed backups (legacy)
         for backup in "${HOME}/.dotbackups"/*; do
             if [[ -d "$backup" ]]; then
@@ -1194,7 +1192,11 @@ cmd_backup_clean() {
     local old_backups=()
     local cutoff_date
     cutoff_date=$(date -d "30 days ago" +%Y%m%d 2>/dev/null || date -v-30d +%Y%m%d 2>/dev/null)
-    
+    if [[ -z "$cutoff_date" ]]; then
+        print_error "Could not calculate cutoff date"
+        return 1
+    fi
+
     # Find old compressed backups
     for backup in "${HOME}/.dotbackups"/*.tar.gz; do
         if [[ -f "$backup" ]]; then
@@ -1649,8 +1651,12 @@ EOF
     # Create temporary script that exits immediately
     local temp_script
     temp_script=$(mktemp -t DOT_fish_benchmark_XXXXXX.fish)
+    if [[ -z "$temp_script" ]]; then
+        print_error "Failed to create temp file"
+        return 1
+    fi
     # Use RETURN trap instead of EXIT to avoid conflicts with other functions
-    trap 'test -n "${temp_script:-}" && rm -f "$temp_script"' RETURN
+    trap 'rm -f "$temp_script"' RETURN
     echo "exit 0" > "$temp_script"
     
     # Array to store timing results
@@ -1920,7 +1926,7 @@ Here are the commits (most recent first):
     # Process commits with better error handling
     set +e  # Temporarily disable exit on error for this section
     while IFS='|' read -r hash author _ date subject; do
-        ((commit_count++))
+        ((++commit_count))
         local short_hash="${hash:0:8}"
         claude_prompt+="Commit $commit_count ($short_hash, $date):
 Subject: $subject
@@ -1954,8 +1960,9 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
     # Create temporary file for the prompt
     local temp_file
     temp_file=$(mktemp -t DOT_prompt_XXXXXX)
+    trap 'rm -f "$temp_file"' RETURN
     echo "$claude_prompt" > "$temp_file"
-    
+
     print_info "Generating summary with Claude Code..."
     
     # Call Claude Code with explicit error handling
@@ -1999,10 +2006,7 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
         
         return 1
     fi
-    
-    # Clean up temp file
-    rm -f "$temp_file"
-    
+
     # Show git log reference
     print_info "For detailed commit history, run: git log --oneline -n $num_commits"
 }
@@ -2026,14 +2030,14 @@ cmd_retry_failed() {
     local success_count=0
     
     while IFS= read -r package_info; do
-        ((retry_count++))
+        ((++retry_count))
         
         if [[ "$package_info" =~ ^brew:(.+)$ ]]; then
             local package="${BASH_REMATCH[1]}"
             print_info "Retrying brew package: $package"
             if brew install "$package" 2>/dev/null; then
                 print_success "Successfully installed: $package"
-                ((success_count++))
+                ((++success_count))
             else
                 print_warning "Still failing: $package"
             fi
@@ -2042,7 +2046,7 @@ cmd_retry_failed() {
             print_info "Retrying cask: $package"
             if brew install --cask "$package" 2>/dev/null; then
                 print_success "Successfully installed: $package"
-                ((success_count++))
+                ((++success_count))
             else
                 print_warning "Still failing: $package"
             fi
@@ -2287,7 +2291,11 @@ cmd_package_add() {
 cmd_package_remove() {
     local package_name="$1"
     local bundle_file="${2:-auto}"
-    
+    # Escape regex metacharacters in package name
+    local escaped_package
+    # shellcheck disable=SC2016 # Single quotes intentional - \& is sed backreference
+    escaped_package=$(printf '%s' "$package_name" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+
     if [[ -z "$package_name" ]]; then
         print_error "Package name required"
         print_info "Usage: ${SCRIPT_NAME} package remove <package-name> [base|work|auto]"
@@ -2317,21 +2325,21 @@ cmd_package_remove() {
         fi
         
         # Check if package exists
-        if grep -q "^\\(brew\\|cask\\)[[:space:]]*\"${package_name}\"" "$target_bundle"; then
+        if grep -q "^\\(brew\\|cask\\)[[:space:]]*\"${escaped_package}\"" "$target_bundle"; then
             found=true
-            
+
             # Determine package type
-            if grep -q "^brew[[:space:]]*\"${package_name}\"" "$target_bundle"; then
+            if grep -q "^brew[[:space:]]*\"${escaped_package}\"" "$target_bundle"; then
                 package_type="formula"
             else
                 package_type="cask"
             fi
-            
+
             # Remove from bundle file
             print_info "Removing from $(basename "$target_bundle")..."
             local temp_file
             temp_file=$(mktemp)
-            grep -v "^\\(brew\\|cask\\)[[:space:]]*\"${package_name}\"" "$target_bundle" > "$temp_file"
+            grep -v "^\\(brew\\|cask\\)[[:space:]]*\"${escaped_package}\"" "$target_bundle" > "$temp_file"
             mv "$temp_file" "$target_bundle"
             
             print_success "Removed '$package_name' from $(basename "$target_bundle")"
