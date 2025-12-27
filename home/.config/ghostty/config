@@ -1,6 +1,9 @@
 # Ghostty theme
 theme = Catppuccin Macchiato
 
+# Updates
+auto-update-channel = tip
+
 # Shell integrations
 shell-integration = fish
 quit-after-last-window-closed = true
