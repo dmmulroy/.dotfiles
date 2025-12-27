@@ -25,11 +25,14 @@ disabled = true
 [git_commit]
 disabled = true
 
+[git_state]
+disabled = true
+
 [custom.scm]
 command = "jj-starship"
-when = "jj-starship detect"
+detect_folders = [".jj", ".git"]
+shell = ["sh"]
 format = "$output "
-unsafe_no_escape = true
 
 [golang]
 symbol = " "
