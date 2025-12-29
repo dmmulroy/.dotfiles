@@ -2,37 +2,20 @@ function ulid -d "Generate a ULID (Universally Unique Lexicographically Sortable
   # ULID format: 26 characters (10 timestamp + 16 random)
   # Crockford's Base32 alphabet (excluding I, L, O, U to avoid confusion)
   set -l alphabet "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-  
-  # Check if python3 is available
-  if not command -v python3 &>/dev/null
-    echo "Error: python3 is required for ULID generation"
-    return 1
+
+  # Get timestamp in ms and generate ULID via python (avoids fish math float issues)
+  if command -v python3 &>/dev/null
+    python3 -c "
+import time, random
+alphabet = '$alphabet'
+t = int(time.time() * 1000)
+ts = ''.join(alphabet[(t >> (45 - 5*i)) & 31] for i in range(10))
+rnd = ''.join(random.choice(alphabet) for _ in range(16))
+print(ts + rnd)
+"
+    return 0
   end
-  
-  # Get current timestamp in milliseconds
-  set -l timestamp_ms (python3 -c "import time; print(int(time.time() * 1000))" 2>/dev/null)
-  
-  # Verify timestamp was generated successfully
-  if test -z "$timestamp_ms"
-    echo "Error: Failed to generate timestamp"
-    return 1
-  end
-  
-  # Encode timestamp (48 bits = 10 Base32 characters)
-  set -l timestamp_part ""
-  set -l ts $timestamp_ms
-  for i in (seq 10)
-    set -l idx (math "$ts % 32")
-    set timestamp_part (string sub -s (math "$idx + 1") -l 1 $alphabet)$timestamp_part
-    set ts (math "$ts / 32")
-  end
-  
-  # Generate random part (80 bits = 16 Base32 characters)
-  set -l random_part ""
-  for i in (seq 16)
-    set -l idx (random 0 31)
-    set random_part "$random_part"(string sub -s (math "$idx + 1") -l 1 $alphabet)
-  end
-  
-  echo "$timestamp_part$random_part"
+
+  echo "Error: python3 required for ULID generation"
+  return 1
 end
