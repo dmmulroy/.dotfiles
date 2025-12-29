@@ -10,7 +10,13 @@ function ulid -d "Generate a ULID (Universally Unique Lexicographically Sortable
   end
   
   # Get current timestamp in milliseconds
-  set -l timestamp_ms (python3 -c "import time; print(int(time.time() * 1000))")
+  set -l timestamp_ms (python3 -c "import time; print(int(time.time() * 1000))" 2>/dev/null)
+  
+  # Verify timestamp was generated successfully
+  if test -z "$timestamp_ms"
+    echo "Error: Failed to generate timestamp"
+    return 1
+  end
   
   # Encode timestamp (48 bits = 10 Base32 characters)
   set -l timestamp_part ""

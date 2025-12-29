@@ -28,8 +28,12 @@ function timer -d "Countdown timer with notification"
   sleep $seconds
   echo "⏰ Time's up!"
   
-  # Send notification
-  notify "Timer finished!" "⏰ Timer"
+  # Send notification if notify function is available
+  if type -q notify
+    notify "Timer finished!" "⏰ Timer"
+  else if command -v osascript &>/dev/null
+    osascript -e "display notification \"Timer finished!\" with title \"⏰ Timer\""
+  end
   
   # Try to make a sound
   if command -v afplay &>/dev/null

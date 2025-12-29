@@ -55,10 +55,18 @@ function nato -d "Convert text to NATO phonetic alphabet"
       set result $result "/"
     else if string match -qr '^[a-z]$' $char
       set -l var_name "nato_$char"
-      set result $result $$var_name
+      if set -q $var_name
+        set result $result $$var_name
+      else
+        set result $result $char
+      end
     else if string match -qr '^[0-9]$' $char
       set -l var_name "nato_$char"
-      set result $result $$var_name
+      if set -q $var_name
+        set result $result $$var_name
+      else
+        set result $result $char
+      end
     else
       set result $result $char
     end
