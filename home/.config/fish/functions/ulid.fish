@@ -3,6 +3,12 @@ function ulid -d "Generate a ULID (Universally Unique Lexicographically Sortable
   # Crockford's Base32 alphabet (excluding I, L, O, U to avoid confusion)
   set -l alphabet "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
   
+  # Check if python3 is available
+  if not command -v python3 &>/dev/null
+    echo "Error: python3 is required for ULID generation"
+    return 1
+  end
+  
   # Get current timestamp in milliseconds
   set -l timestamp_ms (python3 -c "import time; print(int(time.time() * 1000))")
   
