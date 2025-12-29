@@ -1,5 +1,6 @@
 */**/.undodir
 lazy-lock.json
+home/.config/fish/fish_variables
 .aider*
 .envrc
 */**/tmux/plugins/*
