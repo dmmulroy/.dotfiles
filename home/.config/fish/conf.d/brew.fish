@@ -1,6 +1,4 @@
 # Brew
-set -U fish_user_paths /opt/homebrew/bin $fish_user_paths
-
 set --global --export HOMEBREW_PREFIX "/opt/homebrew";
 set --global --export HOMEBREW_CELLAR "/opt/homebrew/Cellar";
 set --global --export HOMEBREW_REPOSITORY "/opt/homebrew";
