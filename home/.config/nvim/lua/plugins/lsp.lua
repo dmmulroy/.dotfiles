@@ -49,6 +49,9 @@ return {
 					},
 				},
 				marksman = {},
+				oxlint = {
+					root_markers = { ".oxlintrc.json" },
+				},
 				ocamllsp = {
 					manual_install = true,
 					cmd = { "dune", "exec", "ocamllsp" },
@@ -78,7 +81,7 @@ return {
 				stylua = {},
 			}
 
-			local manually_installed_servers = { "ocamllsp", "gleam", "rust_analyzer", "cf_lsp" }
+			local manually_installed_servers = { "ocamllsp" }
 			local mason_tools_to_install = vim.tbl_keys(vim.tbl_deep_extend("force", {}, servers, formatters))
 			local ensure_installed = vim.tbl_filter(function(name)
 				return not vim.tbl_contains(manually_installed_servers, name)
