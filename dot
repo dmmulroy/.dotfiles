@@ -951,399 +951,6 @@ cmd_doctor() {
     fi
 }
 
-cmd_backup() {
-    local subcommand="${1:-create}"
-    shift || true
-    
-    case "$subcommand" in
-        create)
-            cmd_backup_create "$@"
-            ;;
-        restore)
-            cmd_backup_restore "$@"
-            ;;
-        list)
-            cmd_backup_list "$@"
-            ;;
-        clean)
-            cmd_backup_clean "$@"
-            ;;
-        compress)
-            cmd_backup_compress "$@"
-            ;;
-        delete)
-            cmd_backup_delete "$@"
-            ;;
-        -h|--help|help)
-            cmd_backup_help
-            ;;
-        *)
-            # If the subcommand looks like a backup name (no dashes, alphanumeric), 
-            # treat it as 'create <name>'
-            if [[ "$subcommand" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-                cmd_backup_create "$subcommand" "$@"
-            else
-                print_error "Unknown backup subcommand: $subcommand"
-                print_info "Run '${SCRIPT_NAME} backup help' for usage"
-                return 1
-            fi
-            ;;
-    esac
-}
-
-cmd_backup_create() {
-    print_header "Creating backup of current configuration"
-    
-    local backup_name="${1:-backup-$(date +%Y%m%d-%H%M%S)}"
-    local backup_root="${HOME}/.dotbackups"
-    local backup_dir="${backup_root}/${backup_name}"
-    local backup_archive="${backup_dir}.tar.gz"
-    
-    # Create temporary directory for staging
-    local backup_temp_dir
-    backup_temp_dir=$(mktemp -d -t DOT_backup_XXXXXX)
-    
-    print_info "Creating backup..."
-    mkdir -p "$backup_temp_dir/$backup_name"
-    
-    # Find all symlinks pointing to our dotfiles
-    local count=0
-    while IFS= read -r -d '' file; do
-        local relative_path="${file#"${HOME_DIR}"/}"
-        local source_path="${HOME}/${relative_path}"
-        
-        if [[ -L "$source_path" ]]; then
-            local target_dir
-            target_dir="$backup_temp_dir/$backup_name/$(dirname "$relative_path")"
-            mkdir -p "$target_dir"
-            # Copy the actual file content, not the symlink itself
-            if cp -L "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null; then
-                ((++count))
-            else
-                # Fallback: if the symlink target doesn't exist, copy the link
-                cp -P "$source_path" "$backup_temp_dir/$backup_name/${relative_path}" 2>/dev/null && ((++count))
-            fi
-        fi
-    done < <(find "${HOME_DIR}" -type f -print0)
-    
-    if [[ $count -eq 0 ]]; then
-        print_warning "No symlinks found to backup"
-        rm -rf "$backup_temp_dir"
-        return 0
-    fi
-    
-    # Create compressed archive
-    print_info "Compressing backup ($count files)..."
-    mkdir -p "$backup_root"
-    
-    if tar -czf "$backup_archive" -C "$backup_temp_dir" "$backup_name"; then
-        local archive_size
-        archive_size=$(du -h "$backup_archive" | cut -f1)
-        print_success "Backup created: ${backup_archive} (${archive_size})"
-        print_info "Backed up $count configuration files"
-        rm -rf "$backup_temp_dir"
-    else
-        print_error "Failed to create backup archive"
-        rm -rf "$backup_temp_dir"
-        return 1
-    fi
-}
-
-cmd_backup_restore() {
-    print_header "Restoring configuration from backup"
-    
-    local backup_name="${1:-}"
-    if [[ -z "$backup_name" ]]; then
-        # List available backups
-        print_info "Available backups:"
-        if [[ -d "${HOME}/.dotbackups" ]]; then
-            local found_backups=false
-            
-            # List compressed backups
-            for backup in "${HOME}/.dotbackups"/*.tar.gz; do
-                if [[ -f "$backup" ]]; then
-                    local name
-                    name=$(basename "$backup" .tar.gz)
-                    local size
-                    size=$(du -h "$backup" | cut -f1)
-                    local date
-                    date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1 || echo "unknown")
-                    echo "  - $name (${size}, $date)"
-                    found_backups=true
-                fi
-            done
-
-            # List uncompressed backups (legacy)
-            for backup in "${HOME}/.dotbackups"/*; do
-                if [[ -d "$backup" ]]; then
-                    local name
-                    name=$(basename "$backup")
-                    echo "  - $name (uncompressed, legacy)"
-                    found_backups=true
-                fi
-            done
-            
-            if [[ "$found_backups" == false ]]; then
-                print_warning "No backups found"
-            fi
-        else
-            print_warning "No backups directory found at ${HOME}/.dotbackups"
-        fi
-        return 0
-    fi
-    
-    # Check for compressed backup first
-    local backup_archive="${HOME}/.dotbackups/${backup_name}.tar.gz"
-    local backup_dir="${HOME}/.dotbackups/${backup_name}"
-    local restore_temp_dir=""
-    
-    if [[ -f "$backup_archive" ]]; then
-        print_info "Found compressed backup: $backup_name"
-        
-        if ! confirm "Restore from backup '${backup_name}'?" "n"; then
-            print_warning "Restore cancelled"
-            return 0
-        fi
-        
-        # Extract to temporary directory
-        restore_temp_dir=$(mktemp -d -t DOT_restore_XXXXXX)
-        trap 'test -n "${restore_temp_dir:-}" && rm -rf "$restore_temp_dir"' RETURN
-        print_info "Extracting backup..."
-
-        if ! tar -xzf "$backup_archive" -C "$restore_temp_dir"; then
-            print_error "Failed to extract backup"
-            return 1
-        fi
-        
-        backup_dir="$restore_temp_dir/$backup_name"
-    elif [[ -d "$backup_dir" ]]; then
-        print_info "Found uncompressed backup: $backup_name"
-        
-        if ! confirm "Restore from backup '${backup_name}'?" "n"; then
-            print_warning "Restore cancelled"
-            return 0
-        fi
-    else
-        print_error "Backup '${backup_name}' not found"
-        print_info "Run '${SCRIPT_NAME} backup restore' to see available backups"
-        return 1
-    fi
-    
-    print_info "Restoring files..."
-    local count=0
-    while IFS= read -r -d '' file; do
-        local relative_path="${file#"${backup_dir}"/}"
-        local target_path="${HOME_DIR}/${relative_path}"
-
-        mkdir -p "$(dirname "$target_path")"
-        cp "$file" "$target_path"
-        ((++count))
-    done < <(find "$backup_dir" -type f -print0)
-    
-    print_success "Restored $count files from backup"
-}
-
-cmd_backup_list() {
-    print_header "Listing available backups"
-    
-    if [[ -d "${HOME}/.dotbackups" ]]; then
-        local found_backups=false
-        
-        # List compressed backups
-        for backup in "${HOME}/.dotbackups"/*.tar.gz; do
-            if [[ -f "$backup" ]]; then
-                local name
-                name=$(basename "$backup" .tar.gz)
-                local size
-                size=$(du -h "$backup" | cut -f1)
-                local date
-                date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$backup" 2>/dev/null || stat -c "%y" "$backup" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1 || echo "unknown")
-                echo "  - $name (${size}, $date)"
-                found_backups=true
-            fi
-        done
-
-        # List uncompressed backups (legacy)
-        for backup in "${HOME}/.dotbackups"/*; do
-            if [[ -d "$backup" ]]; then
-                local name
-                name=$(basename "$backup")
-                echo "  - $name (uncompressed, legacy)"
-                found_backups=true
-            fi
-        done
-        
-        if [[ "$found_backups" == false ]]; then
-            print_warning "No backups found"
-        fi
-    else
-        print_warning "No backups directory found"
-    fi
-}
-
-cmd_backup_clean() {
-    print_header "Cleaning up old backups"
-    
-    if [[ ! -d "${HOME}/.dotbackups" ]]; then
-        print_info "No backups directory found at ${HOME}/.dotbackups"
-        return 0
-    fi
-    
-    local old_backups=()
-    local cutoff_date
-    cutoff_date=$(date -d "30 days ago" +%Y%m%d 2>/dev/null || date -v-30d +%Y%m%d 2>/dev/null)
-    if [[ -z "$cutoff_date" ]]; then
-        print_error "Could not calculate cutoff date"
-        return 1
-    fi
-
-    # Find old compressed backups
-    for backup in "${HOME}/.dotbackups"/*.tar.gz; do
-        if [[ -f "$backup" ]]; then
-            local name
-            name=$(basename "$backup" .tar.gz)
-            if [[ "$name" =~ backup-([0-9]{8}) ]]; then
-                local backup_date="${BASH_REMATCH[1]}"
-                if [[ "$backup_date" < "$cutoff_date" ]]; then
-                    old_backups+=("$backup")
-                fi
-            fi
-        fi
-    done
-    
-    if [[ ${#old_backups[@]} -eq 0 ]]; then
-        print_success "No old backups found (older than 30 days)"
-        return 0
-    fi
-    
-    print_warning "Found ${#old_backups[@]} old backups:"
-    for backup in "${old_backups[@]}"; do
-        local size
-        size=$(du -h "$backup" | cut -f1)
-        echo "  - $(basename "$backup") (${size})"
-    done
-    
-    if confirm "Delete these old backups?" "n"; then
-        for backup in "${old_backups[@]}"; do
-            rm "$backup"
-            print_success "Deleted $(basename "$backup")"
-        done
-    fi
-}
-
-cmd_backup_compress() {
-    print_header "Compressing legacy backups"
-    
-    if [[ ! -d "${HOME}/.dotbackups" ]]; then
-        print_info "No backups directory found at ${HOME}/.dotbackups"
-        return 0
-    fi
-    
-    local legacy_backups=()
-    for backup in "${HOME}/.dotbackups"/*; do
-        if [[ -d "$backup" ]]; then
-            legacy_backups+=("$backup")
-        fi
-    done
-    
-    if [[ ${#legacy_backups[@]} -eq 0 ]]; then
-        print_success "No legacy backups found"
-        return 0
-    fi
-    
-    print_info "Found ${#legacy_backups[@]} uncompressed backups"
-    
-    for backup_dir in "${legacy_backups[@]}"; do
-        local backup_name
-        backup_name=$(basename "$backup_dir")
-        local backup_archive="${backup_dir}.tar.gz"
-        
-        print_info "Compressing $backup_name..."
-        
-        if tar -czf "$backup_archive" -C "${HOME}/.dotbackups" "$backup_name"; then
-            local original_size
-            local compressed_size
-            original_size=$(du -sh "$backup_dir" | cut -f1)
-            compressed_size=$(du -sh "$backup_archive" | cut -f1)
-            
-            print_success "Compressed $backup_name: $original_size → $compressed_size"
-            
-            if confirm "Delete original uncompressed backup?" "y"; then
-                rm -rf "$backup_dir"
-            fi
-        else
-            print_error "Failed to compress $backup_name"
-        fi
-    done
-}
-
-cmd_backup_delete() {
-    local backup_name="$1"
-    if [[ -z "$backup_name" ]]; then
-        print_error "Backup name required for delete action"
-        print_info "Usage: ${SCRIPT_NAME} backup delete <backup-name>"
-        return 1
-    fi
-    
-    print_header "Deleting backup: $backup_name"
-    
-    local backup_archive="${HOME}/.dotbackups/${backup_name}.tar.gz"
-    local backup_dir="${HOME}/.dotbackups/${backup_name}"
-    
-    if [[ -f "$backup_archive" ]]; then
-        if confirm "Delete compressed backup '${backup_name}'?" "n"; then
-            rm "$backup_archive"
-            print_success "Deleted backup: $backup_name"
-        fi
-    elif [[ -d "$backup_dir" ]]; then
-        if confirm "Delete uncompressed backup '${backup_name}'?" "n"; then
-            rm -rf "$backup_dir"
-            print_success "Deleted backup: $backup_name"
-        fi
-    else
-        print_error "Backup '$backup_name' not found"
-        return 1
-    fi
-}
-
-cmd_backup_help() {
-    echo -e "${BOLD}${SCRIPT_NAME} backup${RESET} - Backup management commands"
-    echo ""
-    
-    echo -e "${BOLD}USAGE:${RESET}"
-    echo "    ${SCRIPT_NAME} backup [SUBCOMMAND] [OPTIONS]"
-    echo ""
-    
-    echo -e "${BOLD}SUBCOMMANDS:${RESET}"
-    echo "    create [NAME]       Create compressed backup of current configuration (default)"
-    echo "    restore [NAME]      Restore configuration from backup or list available backups"
-    echo "    list                List all backups with details"
-    echo "    clean               Remove backups older than 30 days"
-    echo "    compress            Compress legacy uncompressed backups"
-    echo "    delete NAME         Delete specific backup"
-    echo "    help                Show this help message"
-    echo ""
-    
-    echo -e "${BOLD}EXAMPLES:${RESET}"
-    echo "    ${SCRIPT_NAME} backup                    # Create timestamped backup"
-    echo "    ${SCRIPT_NAME} backup create mybackup    # Create named backup"
-    echo "    ${SCRIPT_NAME} backup mybackup           # Create named backup (shorthand)"
-    echo "    ${SCRIPT_NAME} backup restore            # List available backups"
-    echo "    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup"
-    echo "    ${SCRIPT_NAME} backup list               # List all backups with details"
-    echo "    ${SCRIPT_NAME} backup clean              # Remove old backups"
-    echo "    ${SCRIPT_NAME} backup compress           # Compress legacy backups"
-    echo "    ${SCRIPT_NAME} backup delete mybackup    # Delete specific backup"
-    echo ""
-    
-    echo -e "${BOLD}NOTES:${RESET}"
-    echo "    - Backups are automatically compressed using gzip for space efficiency"
-    echo "    - Legacy uncompressed backups are still supported"
-    echo "    - Clean command removes backups older than 30 days"
-    echo "    - All operations require confirmation for destructive actions"
-    echo ""
-}
-
 cmd_link() {
     print_header "Creating symlink for dot command"
     
@@ -1476,7 +1083,6 @@ complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
-complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
 complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot command (remove symlink)"
@@ -1516,15 +1122,6 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
 
-# Backup subcommands
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "create" -d "Create compressed backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "restore" -d "Restore configuration from backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "list" -d "List all backups with details"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "clean" -d "Remove backups older than 30 days"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "compress" -d "Compress legacy uncompressed backups"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "delete" -d "Delete specific backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "help" -d "Show backup help"
-
 # Summary command options
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "Include diff in analysis"
@@ -1549,25 +1146,6 @@ end
 
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_installed_packages)"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -xa "(__dot_installed_packages)"
-
-# Dynamic completions for available backups (when restoring or deleting)
-function __dot_available_backups
-    if test -d ~/.dotbackups
-        for backup in ~/.dotbackups/*.tar.gz
-            if test -f "$backup"
-                basename "$backup" .tar.gz
-            end
-        end
-        for backup in ~/.dotbackups/*
-            if test -d "$backup"
-                basename "$backup"
-            end
-        end
-    end
-end
-
-complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcommand_from restore" -xa "(__dot_available_backups)"
-complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcommand_from delete" -xa "(__dot_available_backups)"
 EOF
 
     if [[ -f "$completions_file" ]]; then
@@ -2692,7 +2270,6 @@ cmd_help() {
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
-    echo "    backup              Backup management commands (create, restore, list, clean, etc.)"
     echo "    completions         Generate Fish shell completions"
     echo "    link                Install dot command globally (create symlink in PATH)"
     echo "    unlink              Uninstall global dot command (remove symlink)"
@@ -2725,14 +2302,6 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} gen-ssh-key               # Generate SSH key (prompts for email)"
     echo "    ${SCRIPT_NAME} gen-ssh-key user@github.com  # Generate SSH key with email"
     echo "    ${SCRIPT_NAME} stow                      # Create symlinks for dotfiles"
-    echo "    ${SCRIPT_NAME} backup                    # Create timestamped compressed backup"
-    echo "    ${SCRIPT_NAME} backup create mybackup    # Create named compressed backup"
-    echo "    ${SCRIPT_NAME} backup restore            # List available backups"
-    echo "    ${SCRIPT_NAME} backup restore mybackup   # Restore specific backup"
-    echo "    ${SCRIPT_NAME} backup list               # List all backups with details"
-    echo "    ${SCRIPT_NAME} backup clean              # Remove backups older than 30 days"
-    echo "    ${SCRIPT_NAME} backup compress           # Compress legacy uncompressed backups"
-    echo "    ${SCRIPT_NAME} backup delete foo         # Delete specific backup"
     echo "    ${SCRIPT_NAME} completions               # Generate Fish shell completions"
     echo "    ${SCRIPT_NAME} link                      # Install dot command globally in PATH"
     echo ""
@@ -2746,8 +2315,6 @@ cmd_help() {
     echo -e "${BOLD}NOTES:${RESET}"
     echo "    - Package installation is resilient to failures"
     echo "    - Failed packages are logged and can be retried later"
-    echo "    - Backups are automatically compressed using gzip"
-    echo "    - Legacy uncompressed backups are still supported"
     echo "    - SHA verification is disabled for better reliability"
     echo "    - Claude Code CLI installed via native installer (with bun/npm fallback)"
     echo "    - Doctor command checks all critical development tools"
@@ -2817,9 +2384,6 @@ main() {
             ;;
         stow)
             cmd_stow "$@"
-            ;;
-        backup)
-            cmd_backup "$@"
             ;;
         completions)
             cmd_completions "$@"

@@ -55,10 +55,6 @@ brew bundle --file=./packages/bundle.work
 ./dot gen-ssh-key user@github.com    # Uses provided email
 ./dot gen-ssh-key work@company.com   # Creates work-specific key
 
-# Manage backups
-./dot backup
-./dot restore
-
 # Generate Fish shell completions
 ./dot completions
 ```
@@ -96,7 +92,6 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Tmux plugins are installed automatically on first launch via TPM
 - Work packages prompt is interactive - the script asks before installing work-specific tools
 - The `dot` CLI tool is in PATH via Fish config (`fish_add_path ~/.dotfiles`)
-- Backups are automatically compressed using gzip for space efficiency
 - Package installation has fallback logic - continues even if individual packages fail
 - Claude Code CLI is installed via native installer (`curl -fsSL https://claude.ai/install.sh | bash`) with bun/npm fallback
 - The `dot doctor` command performs comprehensive health checks of the development environment, including Claude Code installation method verification and conflict detection
@@ -105,7 +100,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Updating packages can target all packages, specific packages, or packages from specific bundles
 - Update command includes Homebrew refresh and optional cleanup of old versions
 - Removing packages from bundles optionally uninstalls them from the system
-- The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages and backups
+- The `dot completions` command generates comprehensive Fish shell completions with dynamic suggestions for packages
 - The `dot gen-ssh-key` command automatically derives key names from email domains (e.g., user@github.com → id_ed25519_github), adds keys to ssh-agent, copies public keys to clipboard, and backs up existing keys before overwriting
 
 ## Development Guidelines
