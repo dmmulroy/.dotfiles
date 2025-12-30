@@ -11,7 +11,6 @@ This repository contains my personal development environment configuration, mana
 - 🚀 **One-command setup** - Complete development environment in minutes
 - 🤖 **AI Integration** - Claude Code for commit summaries and assistance
 - 📦 **Resilient Package Management** - Continues installation even if packages fail
-- 💾 **Compressed Backups** - Create and restore configuration snapshots
 - 🔍 **Health Monitoring** - Comprehensive environment diagnostics
 - 🛠️ **Modular Design** - Separate work and personal configurations
 
@@ -47,7 +46,6 @@ After installation, the `dot` command will be available globally for ongoing man
 ├── packages/
 │   ├── bundle         # Base Brewfile
 │   └── bundle.work    # Work-specific packages
-├── backups/           # Configuration backups (compressed)
 ├── CLAUDE.md          # Instructions for Claude Code
 └── README.md          # This file
 ```
@@ -154,51 +152,6 @@ Technical Patterns: The commits show incremental configuration refinements
 with a focus on tooling updates and environment optimization...
 ```
 
-### Backup & Restore
-
-The `dot backup` command provides comprehensive backup management with subcommands for all backup operations.
-
-#### Create Backups
-```bash
-# Create timestamped backup (default)
-dot backup
-
-# Create named backup
-dot backup create pre-experiment
-
-# Shorthand for named backup
-dot backup pre-experiment
-
-# All backups are automatically compressed (tar.gz)
-```
-
-#### Restore Configurations
-```bash
-# List available backups
-dot backup restore
-
-# Restore specific backup
-dot backup restore pre-experiment
-```
-
-#### Backup Management
-```bash
-# List all backups with details
-dot backup list
-
-# Remove backups older than 30 days
-dot backup clean
-
-# Compress legacy uncompressed backups
-dot backup compress
-
-# Delete specific backup
-dot backup delete old-backup
-
-# Show backup help
-dot backup help
-```
-
 ### Performance & Development Tools
 
 #### `dot benchmark-shell` - Fish Shell Performance Benchmarking
@@ -251,7 +204,6 @@ dot completions
 Generates comprehensive Fish shell completions for the `dot` command, including:
 - All commands and subcommands
 - Dynamic completions for installed packages
-- Dynamic completions for available backups
 - Option completions with descriptions
 
 #### `dot edit` - Open in Editor
@@ -478,17 +430,14 @@ npm install -g @anthropic-ai/claude-code
 ### Testing Changes
 
 ```bash
-# Create backup before testing
-dot backup create test-changes
-
-# Make modifications
+# Make modifications to dotfiles
 # ...
 
 # Test changes
 dot doctor
 
-# If issues occur, restore backup
-dot backup restore test-changes
+# Re-stow if needed
+dot stow
 ```
 
 ## Advanced Usage
@@ -506,19 +455,6 @@ dot check-packages
 brew bundle --file=./packages/bundle.work
 ```
 
-### Backup Strategies
-
-```bash
-# Before major changes
-dot backup create stable-config
-
-# Before experiments  
-dot backup create pre-nvim-changes
-
-# Clean up old backups
-dot backup clean
-```
-
 ### Shell Completions
 
 ```bash
@@ -527,7 +463,6 @@ dot completions
 
 # Completions include dynamic suggestions for:
 # - Package names when using package remove/update
-# - Backup names when using backup restore/delete
 # - All commands, subcommands, and options
 ```
 

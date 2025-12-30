@@ -15,7 +15,6 @@ complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
-complete -c dot -n "__fish_use_subcommand" -a "backup" -d "Backup management commands"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
 complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot command (remove symlink)"
@@ -55,15 +54,6 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
 
-# Backup subcommands
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "create" -d "Create compressed backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "restore" -d "Restore configuration from backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "list" -d "List all backups with details"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "clean" -d "Remove backups older than 30 days"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "compress" -d "Compress legacy uncompressed backups"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "delete" -d "Delete specific backup"
-complete -c dot -n "__fish_seen_subcommand_from backup" -n "not __fish_seen_subcommand_from create restore list clean compress delete help" -a "help" -d "Show backup help"
-
 # Summary command options
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
 complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "Include diff in analysis"
@@ -88,22 +78,3 @@ end
 
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_installed_packages)"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -xa "(__dot_installed_packages)"
-
-# Dynamic completions for available backups (when restoring or deleting)
-function __dot_available_backups
-    if test -d ~/.dotbackups
-        for backup in ~/.dotbackups/*.tar.gz
-            if test -f "$backup"
-                basename "$backup" .tar.gz
-            end
-        end
-        for backup in ~/.dotbackups/*
-            if test -d "$backup"
-                basename "$backup"
-            end
-        end
-    end
-end
-
-complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcommand_from restore" -xa "(__dot_available_backups)"
-complete -c dot -n "__fish_seen_subcommand_from backup; and __fish_seen_subcommand_from delete" -xa "(__dot_available_backups)"
