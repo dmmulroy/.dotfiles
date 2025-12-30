@@ -10,3 +10,5 @@ alias oc 'opencode'
 complete -c oc -e
 alias vimdiff 'nvim -d'
 alias wr 'wrangler'
+alias localcode 'bun --cwd /Users/$USER/Code/personal/opencode/packages/opencode dev -- (pwd)'
+alias lc 'localcode'

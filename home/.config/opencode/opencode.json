@@ -1,5 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
-  "theme": "catppuccin",
+  "plugin": ["opencode-supermemory"],
+  "theme": "catppuccin-macchiato",
+  "keybinds": {
+    "leader": "ctrl+o",
+    "messages_half_page_up": "ctrl+u",
+    "messages_half_page_down": "ctrl+d",
+    "input_delete_to_line_start": "none",
+    "input_delete": "delete,shift+delete"
+  }
 }

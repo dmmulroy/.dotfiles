@@ -89,7 +89,7 @@ dot init --skip-ssh --skip-font
 ```bash
 dot update
 ```
-- Pulls latest dotfiles changes
+- Pulls latest dotfiles changes (auto-detects jj vs git)
 - Updates Homebrew packages
 - Re-stows configuration files
 
@@ -293,6 +293,7 @@ dot package remove docker base  # Remove docker from base bundle only
 - **Conditional Loading**: Work-specific Git config for `~/Code/work/`
 - **Plugin Managers**: Each tool uses its own (lazy.nvim, TPM, Fisher)
 - **Error Resilience**: Package installation continues despite individual failures
+- **jj Support**: Auto-detects jj-managed repos and uses appropriate update commands
 
 ## Environment Setup
 
