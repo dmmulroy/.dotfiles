@@ -87,6 +87,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - The `dot init` command orchestrates the entire setup process in a specific order (Homebrew → packages → stow → Bun → Claude Code → shell setup)
 
 ### Non-obvious Implementation Details
+- The `dot update` command auto-detects jj-managed repos (colocated mode) and uses `jj git fetch` + `jj rebase` instead of `git pull`
 - Homebrew path differs between ARM64 (`/opt/homebrew`) and x86 (`/usr/local`) - the init script handles this
 - Fish shell must be added to `/etc/shells` before it can be set as default
 - Tmux plugins are installed automatically on first launch via TPM

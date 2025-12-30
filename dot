@@ -770,7 +770,17 @@ cmd_update() {
     
     # Pull latest changes
     print_info "Pulling latest changes..."
-    if git -C "$DOTFILES_DIR" pull; then
+    
+    # Check if jj is managing this repo (colocated mode)
+    if [[ -d "${DOTFILES_DIR}/.jj" ]] && command_exists jj; then
+        print_info "Detected jj-managed repository"
+        if jj git fetch -R "$DOTFILES_DIR" && jj -R "$DOTFILES_DIR" rebase -d 'trunk()'; then
+            print_success "Repository updated via jj"
+        else
+            print_error "Failed to update repository via jj"
+            return 1
+        fi
+    elif git -C "$DOTFILES_DIR" pull; then
         print_success "Repository updated"
     else
         print_error "Failed to update repository"
