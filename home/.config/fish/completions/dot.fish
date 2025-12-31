@@ -11,7 +11,7 @@ complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and c
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
-complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
+complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using OpenCode"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
