@@ -30,7 +30,7 @@ disabled = true
 
 [custom.scm]
 command = "jj-starship --strip-bookmark-prefix 'dmmulroy/' --truncate-name 20 --bookmarks-display-limit 1"
-detect_folders = [".jj", ".git"]
+when = "jj-starship detect"
 shell = ["sh"]
 format = "$output "
 
