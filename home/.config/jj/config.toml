@@ -35,6 +35,9 @@ colocate = true
 # Sign commits when pushing to remote
 sign-on-push = true
 
+[aliases]
+bm = ["bookmark"]
+
 [revset-aliases]
 # Find commits authored by you
 'mine()' = 'author(dmmulroy)'
