@@ -323,42 +323,52 @@ install_bun() {
     fi
 }
 
-# Helper to determine Claude Code installation method
-get_claude_install_method() {
-    local claude_path
-    claude_path=$(command -v claude 2>/dev/null) || { echo "not_installed"; return; }
+# Helper to determine OpenCode installation method
+get_opencode_install_method() {
+    local opencode_path
+    opencode_path=$(command -v opencode 2>/dev/null) || { echo "not_installed"; return; }
     
-    case "$claude_path" in
-        "${HOME}/.claude"*) echo "native" ;;
+    case "$opencode_path" in
+        "${HOME}/.opencode"*) echo "native" ;;
+        "/opt/homebrew"*|"/usr/local/Cellar"*) echo "brew" ;;
         *".bun"*) echo "bun" ;;
         *"node_modules"*|*"/npm/"*) echo "npm" ;;
         *) echo "unknown" ;;
     esac
 }
 
-# Helper to check for multiple Claude installations
-check_claude_conflicts() {
+# Helper to check for multiple OpenCode installations
+check_opencode_conflicts() {
     local found_paths=()
     
     # Check native installation
-    if [[ -x "${HOME}/.claude/bin/claude" ]]; then
-        found_paths+=("${HOME}/.claude/bin/claude (native)")
+    if [[ -x "${HOME}/.opencode/bin/opencode" ]]; then
+        found_paths+=("${HOME}/.opencode/bin/opencode (native)")
+    fi
+    
+    # Check homebrew installation
+    if command -v brew >/dev/null 2>&1; then
+        local brew_path
+        brew_path=$(brew --prefix 2>/dev/null)/bin/opencode
+        if [[ -x "$brew_path" ]]; then
+            found_paths+=("$brew_path (brew)")
+        fi
     fi
     
     # Check bun global installation
-    local bun_path="${HOME}/.bun/bin/claude"
+    local bun_path="${HOME}/.bun/bin/opencode"
     if [[ -x "$bun_path" ]]; then
         found_paths+=("$bun_path (bun)")
     fi
     
     # Check npm global installation (common locations)
     local npm_paths=(
-        "/usr/local/bin/claude"
-        "${HOME}/.npm-global/bin/claude"
-        "${HOME}/.local/bin/claude"
+        "/usr/local/bin/opencode"
+        "${HOME}/.npm-global/bin/opencode"
+        "${HOME}/.local/bin/opencode"
     )
     for npm_path in "${npm_paths[@]}"; do
-        if [[ -x "$npm_path" && "$npm_path" != "${HOME}/.claude"* ]]; then
+        if [[ -x "$npm_path" && "$npm_path" != "${HOME}/.opencode"* ]]; then
             found_paths+=("$npm_path (npm)")
         fi
     done
@@ -370,27 +380,27 @@ check_claude_conflicts() {
     return 1
 }
 
-install_claude_code() {
-    print_step "Installing Claude Code CLI"
+install_opencode() {
+    print_step "Installing OpenCode CLI"
     
     # Save current shell options for restoration
     local _saved_opts="$-"
     
     # Check current installation status
     local install_method
-    install_method=$(get_claude_install_method)
+    install_method=$(get_opencode_install_method)
     
     case "$install_method" in
-        native)
-            print_success "Claude Code is already installed via native installer (recommended)"
+        native|brew)
+            print_success "OpenCode is already installed via $install_method (recommended)"
             return 0
             ;;
         bun|npm)
-            print_warning "Claude Code is installed via $install_method package manager"
-            print_info "The native installer is now recommended for better updates and integration"
+            print_warning "OpenCode is installed via $install_method package manager"
+            print_info "Homebrew or native installer is recommended for better updates"
             
-            if confirm "Migrate to native installer?" "y"; then
-                print_info "Migrating Claude Code to native installer..."
+            if confirm "Migrate to Homebrew?" "y"; then
+                print_info "Migrating OpenCode to Homebrew..."
                 
                 # Temporarily disable exit on error
                 set +e
@@ -398,26 +408,36 @@ install_claude_code() {
                 # Remove old installation
                 if [[ "$install_method" == "bun" ]] && command_exists bun; then
                     print_info "Removing bun installation..."
-                    bun remove -g @anthropic-ai/claude-code 2>/dev/null
+                    bun remove -g opencode-ai 2>/dev/null
                 elif command_exists npm; then
                     print_info "Removing npm installation..."
-                    npm uninstall -g @anthropic-ai/claude-code 2>/dev/null
+                    npm uninstall -g opencode-ai 2>/dev/null
                 fi
                 
-                # Install via native installer
+                # Install via Homebrew (preferred on macOS)
+                if command_exists brew; then
+                    print_info "Installing via Homebrew..."
+                    if brew install opencode; then
+                        print_success "OpenCode migrated to Homebrew successfully"
+                        set -"$_saved_opts" 2>/dev/null || true
+                        return 0
+                    fi
+                fi
+                
+                # Fallback to native installer
                 print_info "Installing via native installer..."
-                if curl -fsSL https://claude.ai/install.sh | bash; then
-                    print_success "Claude Code migrated to native installer successfully"
-                    print_info "You may need to restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
+                if curl -fsSL https://opencode.ai/install | bash; then
+                    print_success "OpenCode migrated to native installer successfully"
+                    print_info "You may need to restart your shell"
                     set -"$_saved_opts" 2>/dev/null || true
                     return 0
                 else
-                    print_error "Native installer failed, reinstalling via $install_method..."
+                    print_error "Installation failed, reinstalling via $install_method..."
                     # Reinstall via original method
                     if [[ "$install_method" == "bun" ]]; then
-                        bun install -g @anthropic-ai/claude-code
+                        bun install -g opencode-ai
                     else
-                        npm install -g @anthropic-ai/claude-code
+                        npm install -g opencode-ai
                     fi
                     set -"$_saved_opts" 2>/dev/null || true
                     return 1
@@ -428,22 +448,34 @@ install_claude_code() {
             fi
             ;;
         unknown)
-            print_success "Claude Code is already installed"
+            print_success "OpenCode is already installed"
             return 0
             ;;
     esac
     
-    # Fresh installation - try native installer first
-    print_info "Installing Claude Code CLI via native installer..."
+    # Fresh installation - try Homebrew first (best for macOS)
+    print_info "Installing OpenCode CLI..."
     
     # Temporarily disable exit on error for installation attempts
     set +e
     
-    # Try native installer first (recommended)
+    # Try Homebrew first (recommended for macOS)
+    if command_exists brew; then
+        print_info "Installing via Homebrew..."
+        if brew install opencode; then
+            print_success "OpenCode installed successfully via Homebrew"
+            set -"$_saved_opts" 2>/dev/null || true
+            return 0
+        else
+            print_warning "Homebrew installation failed, trying native installer..."
+        fi
+    fi
+    
+    # Try native installer
     print_info "Running native installer..."
-    if curl -fsSL https://claude.ai/install.sh | bash; then
-        print_success "Claude Code installed successfully via native installer"
-        print_info "You may need to restart your shell or add ~/.claude/bin to your PATH"
+    if curl -fsSL https://opencode.ai/install | bash; then
+        print_success "OpenCode installed successfully via native installer"
+        print_info "You may need to restart your shell or add ~/.opencode/bin to your PATH"
         set -"$_saved_opts" 2>/dev/null || true
         return 0
     else
@@ -453,8 +485,8 @@ install_claude_code() {
     # Fallback to bun (faster than npm)
     if command_exists bun; then
         print_info "Installing via Bun..."
-        if bun install -g @anthropic-ai/claude-code; then
-            print_success "Claude Code installed successfully via Bun"
+        if bun install -g opencode-ai; then
+            print_success "OpenCode installed successfully via Bun"
             set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
@@ -465,18 +497,19 @@ install_claude_code() {
     # Fallback to npm
     if command_exists npm; then
         print_info "Installing via npm..."
-        if npm install -g @anthropic-ai/claude-code; then
-            print_success "Claude Code installed successfully via npm"
+        if npm install -g opencode-ai; then
+            print_success "OpenCode installed successfully via npm"
             set -"$_saved_opts" 2>/dev/null || true
             return 0
         else
-            print_error "Failed to install Claude Code via npm"
+            print_error "Failed to install OpenCode via npm"
             set -"$_saved_opts" 2>/dev/null || true
             return 1
         fi
     else
         print_error "All installation methods failed"
-        print_info "Try manually: curl -fsSL https://claude.ai/install.sh | bash"
+        print_info "Try manually: brew install opencode"
+        print_info "Or: curl -fsSL https://opencode.ai/install | bash"
         set -"$_saved_opts" 2>/dev/null || true
         return 1
     fi
@@ -750,7 +783,7 @@ cmd_init() {
     install_packages || return 1
     stow_dotfiles || return 1
     install_bun || return 1
-    install_claude_code || print_warning "Claude Code installation failed (continuing)"
+    install_opencode || print_warning "OpenCode installation failed (continuing)"
     
     if [[ "${SKIP_SSH:-}" != "true" ]]; then
         generate_ssh_key || print_warning "SSH key generation failed (continuing)"
@@ -844,38 +877,63 @@ cmd_doctor() {
         ((++issues))
     fi
     
-    # Check Claude Code
-    if command_exists claude; then
-        print_success "Claude Code installed"
+    # Check jj (Jujutsu)
+    if command_exists jj; then
+        print_success "jj (Jujutsu) installed"
+        
+        # Check if jj config exists
+        local jj_config="${HOME}/.config/jj/config.toml"
+        if [[ -f "$jj_config" ]]; then
+            print_success "jj config found"
+            
+            # Check if user is configured
+            if grep -q "^\[user\]" "$jj_config" && grep -q "email" "$jj_config"; then
+                print_success "jj user configured"
+            else
+                print_warning "jj user not configured in config.toml"
+                print_info "Add [user] section with name and email"
+            fi
+        else
+            print_warning "jj config not found at $jj_config"
+            print_info "Run 'jj config edit --user' to configure"
+        fi
+    else
+        print_warning "jj (Jujutsu) not installed"
+        print_info "Install with: brew install jj"
+    fi
+    
+    # Check OpenCode
+    if command_exists opencode; then
+        print_success "OpenCode installed"
         
         # Check installation method using helper function
         local install_method
-        install_method=$(get_claude_install_method)
+        install_method=$(get_opencode_install_method)
         
         case "$install_method" in
-            native)
-                print_success "Claude Code installed via native installer (recommended)"
+            native|brew)
+                print_success "OpenCode installed via $install_method (recommended)"
                 ;;
             bun)
-                print_warning "Claude Code installed via Bun"
-                print_info "Consider migrating to native installer: curl -fsSL https://claude.ai/install.sh | bash"
+                print_warning "OpenCode installed via Bun"
+                print_info "Consider migrating to Homebrew: brew install opencode"
                 print_info "Or run 'dot init' to migrate automatically"
                 ;;
             npm)
-                print_warning "Claude Code installed via npm"
-                print_info "Consider migrating to native installer: curl -fsSL https://claude.ai/install.sh | bash"
+                print_warning "OpenCode installed via npm"
+                print_info "Consider migrating to Homebrew: brew install opencode"
                 print_info "Or run 'dot init' to migrate automatically"
                 ;;
             *)
-                print_warning "Claude Code installed via unknown method"
-                print_info "Consider reinstalling via: curl -fsSL https://claude.ai/install.sh | bash"
+                print_warning "OpenCode installed via unknown method"
+                print_info "Consider reinstalling via: brew install opencode"
                 ;;
         esac
         
         # Check for multiple installations (potential conflicts)
         local conflicts
-        if conflicts=$(check_claude_conflicts); then
-            print_warning "Multiple Claude Code installations detected:"
+        if conflicts=$(check_opencode_conflicts); then
+            print_warning "Multiple OpenCode installations detected:"
             for path in $conflicts; do
                 print_info "  - $path"
             done
@@ -883,15 +941,15 @@ cmd_doctor() {
         fi
         
         # Check if we can get version (indicates it's working)
-        if claude --version >/dev/null 2>&1; then
-            print_success "Claude Code is functional"
+        if opencode --version >/dev/null 2>&1; then
+            print_success "OpenCode is functional"
         else
-            print_warning "Claude Code may need authentication"
-            print_info "Run 'claude auth login' to authenticate"
+            print_warning "OpenCode may need configuration"
+            print_info "Run 'opencode' and use /connect to configure a provider"
         fi
     else
-        print_warning "Claude Code not installed"
-        print_info "Install with: curl -fsSL https://claude.ai/install.sh | bash"
+        print_warning "OpenCode not installed"
+        print_info "Install with: brew install opencode"
         print_info "Or run 'dot init' to install automatically"
     fi
     
@@ -933,7 +991,7 @@ cmd_doctor() {
     fi
     
     # Check if Fish plugins are installed (Fisher)
-    if command_exists fish && command_exists fisher; then
+    if command_exists fish && fish -c "type fisher" >/dev/null 2>&1; then
         print_success "Fisher (Fish plugin manager) is available"
     elif command_exists fish; then
         print_warning "Fisher not installed - Fish plugins may not work"
@@ -1089,7 +1147,7 @@ complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and c
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
-complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using Claude Code"
+complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using OpenCode"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
@@ -1406,10 +1464,10 @@ cmd_summary() {
     # Save current shell options for restoration
     local _saved_opts="$-"
     
-    # Check if Claude Code is available
-    if ! command_exists claude; then
-        print_error "Claude Code is not installed"
-        print_info "Install it with: curl -fsSL https://claude.ai/install.sh | bash"
+    # Check if OpenCode is available
+    if ! command_exists opencode; then
+        print_error "OpenCode is not installed"
+        print_info "Install it with: brew install opencode"
         print_info "Or run 'dot init' to install automatically"
         return 1
     fi
@@ -1495,8 +1553,8 @@ EOF
         echo ""
     fi
     
-    # Build prompt for Claude
-    local claude_prompt="You are a technical writer. Provide ONLY a concise 2-3 paragraph summary of these Git commits. Do NOT ask questions or provide additional commentary. Focus on:
+    # Build prompt for OpenCode
+    local ai_prompt="You are a technical writer. Provide ONLY a concise 2-3 paragraph summary of these Git commits. Do NOT ask questions or provide additional commentary. Focus on:
 1. What changes were made (features, fixes, improvements)
 2. Overall patterns or themes in the development
 3. Any notable technical decisions or architectural changes
@@ -1516,7 +1574,7 @@ Here are the commits (most recent first):
     while IFS='|' read -r hash author _ date subject; do
         ((++commit_count))
         local short_hash="${hash:0:8}"
-        claude_prompt+="Commit $commit_count ($short_hash, $date):
+        ai_prompt+="Commit $commit_count ($short_hash, $date):
 Subject: $subject
 Author: $author
 "
@@ -1526,14 +1584,14 @@ Author: $author
             local diff_output
             diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null || true)
             if [[ -n "$diff_output" ]]; then
-                claude_prompt+="Files changed:
+                ai_prompt+="Files changed:
 $diff_output
 
 "
             fi
         fi
         
-        claude_prompt+="
+        ai_prompt+="
 "
     done < "$temp_commits_file"
     
@@ -1541,7 +1599,8 @@ $diff_output
     rm -f "$temp_commits_file"
     
     # Add instructions
-    claude_prompt+="
+    ai_prompt+="
+
 
 INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do not ask questions or provide additional commentary."
     
@@ -1549,47 +1608,47 @@ INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do no
     local temp_file
     temp_file=$(mktemp -t DOT_prompt_XXXXXX)
     trap 'rm -f "$temp_file"' RETURN
-    echo "$claude_prompt" > "$temp_file"
+    echo "$ai_prompt" > "$temp_file"
 
-    print_info "Generating summary with Claude Code..."
+    print_info "Generating summary with OpenCode..."
     
-    # Call Claude Code with explicit error handling
-    local claude_output=""
-    local claude_error=""
+    # Call OpenCode with explicit error handling
+    local opencode_output=""
+    local opencode_error=""
     local exit_code=0
     
     # Temporarily disable set -e to capture the exit code properly
     set +e
-    claude_output=$(claude --model sonnet --print < "$temp_file" 2>&1)
+    opencode_output=$(opencode run < "$temp_file" 2>&1)
     exit_code=$?
     # Restore original shell options
     set -"$_saved_opts"
     
-    if [[ $exit_code -eq 0 && -n "$claude_output" ]]; then
+    if [[ $exit_code -eq 0 && -n "$opencode_output" ]]; then
         print_header "Summary of Recent Changes"
         echo ""
-        echo "$claude_output"
+        echo "$opencode_output"
         echo ""
     else
-        print_error "Failed to generate summary with Claude Code (exit code: $exit_code)"
-        if [[ -n "$claude_output" ]]; then
-            claude_error="$claude_output"
+        print_error "Failed to generate summary with OpenCode (exit code: $exit_code)"
+        if [[ -n "$opencode_output" ]]; then
+            opencode_error="$opencode_output"
         else
-            claude_error="No output received from Claude Code"
+            opencode_error="No output received from OpenCode"
         fi
     fi
     
     # Handle errors if any occurred
-    if [[ -n "${claude_error:-}" ]]; then
+    if [[ -n "${opencode_error:-}" ]]; then
         
         # Check if it's an authentication issue
-        if echo "$claude_output" | grep -q -i "auth\|login\|api"; then
-            print_info "Claude Code needs authentication. Run: claude auth login"
-        elif echo "$claude_output" | grep -q -i "network\|connection"; then
+        if echo "$opencode_output" | grep -q -i "auth\|login\|api\|connect"; then
+            print_info "OpenCode needs configuration. Run: opencode and use /connect"
+        elif echo "$opencode_output" | grep -q -i "network\|connection"; then
             print_info "Network connection issue. Check your internet connection"
         else
-            print_info "Claude Code error: $claude_output"
-            print_info "Try running: claude --version to verify installation"
+            print_info "OpenCode error: $opencode_output"
+            print_info "Try running: opencode --version to verify installation"
         fi
         
         return 1
@@ -2276,7 +2335,7 @@ cmd_help() {
     echo "    package             Package management commands (add, remove, list)"
     echo "    check-packages      Check which packages are installed/missing"
     echo "    retry-failed        Retry failed package installations"
-    echo "    summary             Summarize recent git commits using Claude Code"
+    echo "    summary             Summarize recent git commits using OpenCode"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
@@ -2326,7 +2385,7 @@ cmd_help() {
     echo "    - Package installation is resilient to failures"
     echo "    - Failed packages are logged and can be retried later"
     echo "    - SHA verification is disabled for better reliability"
-    echo "    - Claude Code CLI installed via native installer (with bun/npm fallback)"
+    echo "    - OpenCode CLI installed via Homebrew (with native installer/bun/npm fallback)"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
     echo ""

@@ -84,7 +84,7 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Fish shell configurations load custom functions from `home/.config/fish/functions/`
 - Neovim uses Lua-based configuration with modular plugin definitions in `home/.config/nvim/lua/plugins/`
 - Git configuration conditionally includes work-specific settings based on directory path
-- The `dot init` command orchestrates the entire setup process in a specific order (Homebrew → packages → stow → Bun → Claude Code → shell setup)
+- The `dot init` command orchestrates the entire setup process in a specific order (Homebrew → packages → stow → Bun → OpenCode → shell setup)
 
 ### Non-obvious Implementation Details
 - The `dot update` command auto-detects jj-managed repos (colocated mode) and uses `jj git fetch` + `jj rebase` instead of `git pull`
@@ -94,8 +94,8 @@ This dotfiles repository uses GNU Stow for symlink management. All configuration
 - Work packages prompt is interactive - the script asks before installing work-specific tools
 - The `dot` CLI tool is in PATH via Fish config (`fish_add_path ~/.dotfiles`)
 - Package installation has fallback logic - continues even if individual packages fail
-- Claude Code CLI is installed via native installer (`curl -fsSL https://claude.ai/install.sh | bash`) with bun/npm fallback
-- The `dot doctor` command performs comprehensive health checks of the development environment, including Claude Code installation method verification and conflict detection
+- OpenCode CLI is installed via Homebrew (`brew install opencode`) with native installer/bun/npm fallback
+- The `dot doctor` command performs comprehensive health checks of the development environment, including OpenCode installation method verification and conflict detection
 - Package management commands (`dot package add/remove/update/list`) automatically detect package type (brew vs cask) and maintain sorted bundle files
 - Adding packages installs them immediately and updates the appropriate bundle file
 - Updating packages can target all packages, specific packages, or packages from specific bundles
