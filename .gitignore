@@ -21,3 +21,6 @@ home/.claude/*
 !home/.claude/sounds/*
 !home/.claude/commands
 !home/.claude/commands/*
+
+# jj
+.jj
