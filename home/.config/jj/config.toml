@@ -18,9 +18,6 @@ default-command = ["log"]
 # Use curved lines for commit graph visualization
 graph.style = "curved"
 
-[template-aliases]
-# Display commit IDs as shortest unique 8-char prefix
-'format_short_id(id)' = 'id.shortest(8)'
 
 [signing]
 # Only sign commits authored by you
@@ -37,10 +34,16 @@ sign-on-push = true
 
 [aliases]
 bm = ["bookmark"]
+gf = ["git", "fetch"]
+gp = ["git", "push"]
 
 [revset-aliases]
 # Find commits authored by you
 'mine()' = 'author(dmmulroy)'
+
+[template-aliases]
+# Display commit IDs as shortest unique 8-char prefix
+'format_short_id(id)' = 'id.shortest(8)'
 
 # Work-specific overrides for repos in ~/Code/work
 [[--scope]]
