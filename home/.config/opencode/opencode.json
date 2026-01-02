@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
-  "plugin": ["opencode-supermemory"],
   "theme": "catppuccin-macchiato",
   "keybinds": {
     "leader": "ctrl+o",
