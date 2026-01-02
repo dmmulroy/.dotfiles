@@ -6,6 +6,8 @@ email = "dillon.mulroy@gmail.com"
 
 [ui]
 editor = "nvim"
+diff-editor = ":builtin"
+diff-formatter = ":git"
 
 [ui.movement]
 # Make prev/next default to --edit mode (edit commit in place)
@@ -42,7 +44,13 @@ backend = "watchman"
 [aliases]
 bm = ["bookmark"]
 gf = ["git", "fetch"]
-gp = ["git", "push"]
+# Run intent-check hook before push (jj doesn't support git hooks)
+gp = ["util", "exec", "--", "sh", "-c", """
+  if [ -f .git/hooks/pre-push ] && [ -x .git/hooks/pre-push ]; then
+    .git/hooks/pre-push || exit 1
+  fi
+  jj git push "$@"
+""", "sh"]
 
 # Advance a bookmark to your latest pushable change
 # Usage: jj tug [bookmark_name]
