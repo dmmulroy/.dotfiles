@@ -44,10 +44,17 @@ bm = ["bookmark"]
 gf = ["git", "fetch"]
 gp = ["git", "push"]
 
-# Advance the closest bookmark to your latest pushable change
-# Works with describe workflow: jj new my-feature, work, jj desc -m "feat", jj tug
-# closest_pushable(@) finds @ if it has a description, otherwise @-
-tug = ["bookmark", "move", "--from", "closest_bookmark(@)", "--to", "closest_pushable(@)"]
+# Advance a bookmark to your latest pushable change
+# Usage: jj tug [bookmark_name]
+# - jj tug        → moves closest_bookmark(@) to closest_pushable(@)
+# - jj tug main   → moves 'main' to closest_pushable(@)
+tug = ["util", "exec", "--", "sh", "-c", """
+  if [ -n "$1" ]; then
+    jj bookmark move "$1" --to 'closest_pushable(@)'
+  else
+    jj bookmark move --from 'closest_bookmark(@)' --to 'closest_pushable(@)'
+  fi
+""", "sh"]
 
 # Show your entire connected stack
 stack = ["log", "-r", "stack()"]
