@@ -1,32 +1,50 @@
-# AGENTS.md
+# Dotfiles
 
-See [docs/cli.md](docs/cli.md) for full CLI reference and [docs/architecture.md](docs/architecture.md) for system design.
+## Purpose & Scope
+macOS development environment managed via GNU Stow. Owns: system setup orchestration, package management, symlink management. Does NOT own: individual tool configs (delegated to child nodes).
 
-## Quick Reference
+## Entry Points & Contracts
+- `dot` — Main CLI tool for setup, maintenance, and utilities
+- `packages/bundle` — Base Brewfile (all machines)
+- `packages/bundle.work` — Work-specific packages (optional)
 
+## Dependencies
+- GNU Stow (symlink management)
+- Homebrew (package management)
+- Fish shell (default shell)
+
+## Usage Patterns
 ```bash
-./dot init          # Full system setup
-./dot stow          # Update symlinks
-./dot doctor        # Health check
-./dot package ...   # Package management
+./dot init              # Full system setup
+./dot stow              # Update symlinks after editing configs
+./dot doctor            # Health check
+./dot package add/remove/update/list  # Package management
+./dot summary           # AI-powered commit summary
+./dot benchmark-shell   # Fish startup performance
 ```
 
-## Development Workflow
+## Anti-Patterns
+- Don't edit configs in `~/` directly — edit in `./home/`, then `dot stow`
+- Don't skip shellcheck when modifying `dot` script
 
-When modifying configurations:
-1. Edit files in the `./home/` directory (NOT in your actual home directory)
-2. Run `./dot stow` to update symlinks (or `./dot init` for full setup)
-3. Test changes in the relevant application
+## Downlinks
+- [home/.config/fish/AGENTS.md](home/.config/fish/AGENTS.md) — Shell config
+- [home/.config/nvim/AGENTS.md](home/.config/nvim/AGENTS.md) — Editor config
+- [home/.config/tmux/AGENTS.md](home/.config/tmux/AGENTS.md) — Terminal multiplexer
+- [home/.config/git/AGENTS.md](home/.config/git/AGENTS.md) — Git identity & settings
+- [home/.config/jj/AGENTS.md](home/.config/jj/AGENTS.md) — Jujutsu VCS config
+- [home/.config/ghostty/AGENTS.md](home/.config/ghostty/AGENTS.md) — Terminal emulator
 
-## Development Guidelines
+## Outlinks
+- [docs/cli.md](docs/cli.md) — Full CLI reference
+- [docs/architecture.md](docs/architecture.md) — System design
 
-### Shell Script Best Practices
-- **ALWAYS run shellcheck when modifying the `dot` script**: `shellcheck dot` 
-- Fix all shellcheck warnings and errors before committing changes
-- Use proper quoting for variables and paths to prevent word splitting
-- Use `command -v` instead of deprecated `which` command
-- Implement proper trap cleanup for temporary files and directories
-
-## Memories
-- Anytime dot cli is updated always update the cli help flags/commands/text, AGENTS.md, README.md, and the fish completions for dot
-- Always run `shellcheck dot` when making changes to the dot script to ensure code quality and safety
+## Patterns & Pitfalls
+- **Stow-based workflow**: All configs live in `./home/`, symlinked to `~/` via GNU Stow
+- **Conditional git identity**: Work repos in `~/Code/work/` auto-switch to Cloudflare email
+- **jj-aware updates**: `dot update` detects jj-managed repos and uses `jj git fetch` + `jj rebase`
+- **Catppuccin Macchiato everywhere**: Consistent theme across nvim, tmux, fish, ghostty
+- **ALWAYS run `shellcheck dot`** when modifying the dot script
+- **When dot CLI changes**: Update help text, AGENTS.md, README.md, and fish completions (`dot completions`)
+- **Package fallback**: Installation continues even if individual packages fail
+- **OpenCode install priority**: Homebrew → native installer → bun → npm
