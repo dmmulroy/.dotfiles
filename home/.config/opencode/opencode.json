@@ -8,5 +8,14 @@
     "messages_half_page_down": "ctrl+d",
     "input_delete_to_line_start": "none",
     "input_delete": "delete,shift+delete"
+  },
+  "mcp": {
+    "backstage": { "enabled": false },
+    "cloudflare-docs": { "enabled": false },
+    "elasticsearch": { "enabled": false },
+    "gitlab": { "enabled": false },
+    "jira": { "enabled": false },
+    "townlake": { "enabled": false },
+    "wiki": { "enabled": false }
   }
 }
