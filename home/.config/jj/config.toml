@@ -8,6 +8,7 @@ email = "dillon.mulroy@gmail.com"
 editor = "nvim"
 diff-editor = ":builtin"
 diff-formatter = ":git"
+default-command = "log"
 
 [ui.movement]
 # Make prev/next default to --edit mode (edit commit in place)
