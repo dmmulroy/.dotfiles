@@ -1,43 +1,63 @@
-# Neovim Configuration
+# NEOVIM CONFIG
 
-## Purpose & Scope
-Neovim editor configuration. Owns: keybindings, plugins, LSP setup, appearance. Does NOT own: shell integration (see fish/), terminal (see ghostty/).
+Lua-based, lazy.nvim managed. TypeScript-focused w/ LSP.
 
-## Entry Points & Contracts
-- `init.lua` — Entry point, loads `lua/dmmulroy/`
-- `lua/dmmulroy/` — Core config: options, keymaps, utilities
-- `lua/plugins/` — Lazy.nvim plugin specs
-- `after/` — Filetype detection, ftplugins, syntax overrides
+## STRUCTURE
 
-## Dependencies
-- Lazy.nvim (auto-bootstraps on first launch)
-- Mason (auto-installs LSP servers and formatters)
-- Ripgrep, fd (for telescope)
-
-## Usage Patterns
-```vim
-" Leader is Space
-<leader>e      " Oil file explorer (float)
-<leader>sf     " Find files
-<leader>sg     " Live grep
-<leader>1-5    " Harpoon file slots
-<leader>w/q    " Save/quit
-<leader>f      " Format buffer
-<leader>d      " Diagnostic float
-S              " Find/replace word under cursor
-gd/gr/gi       " LSP: definition/references/implementations
+```
+nvim/
+├── init.lua              # Entry: require("dmmulroy")
+├── lua/
+│   ├── dmmulroy/         # Personal config module
+│   │   ├── init.lua      # Orchestrates all requires
+│   │   ├── keymaps.lua   # All keybindings (exported for LSP)
+│   │   ├── options.lua   # vim.opt settings
+│   │   ├── lazy.lua      # lazy.nvim bootstrap
+│   │   └── prelude.lua   # Utility functions
+│   └── plugins/          # 1 file per plugin
+└── after/                # Filetype overrides
 ```
 
-## Anti-Patterns
-- Don't start eslint LSP manually unless needed — it's disabled by default for performance
-- Don't use semantic highlights — disabled due to upstream catppuccin issues
+## WHERE TO LOOK
 
-## Patterns & Pitfalls
-- **Catppuccin Macchiato** — consistent with fish/tmux/ghostty theme
-- **All navigation centers cursor** — movements append `zz` (C-d, C-u, n, N, gd, etc.)
-- **vim-tmux-navigator** — C-h/j/k/l seamlessly crosses nvim splits and tmux panes
-- **eslint LSP disabled by default** — memory hog, causes perf issues; use biome/oxlint instead
-- **ocamllsp manual install** — runs via `dune exec ocamllsp`, not Mason
-- **jj/JJ exits insert mode** — alternative to Escape
-- **blink.cmp for completion** — falls back to cmp_nvim_lsp if unavailable
-- **Semantic highlights disabled** — cleared due to catppuccin issue #480
+| Task | Location |
+|------|----------|
+| Add plugin | `lua/plugins/<name>.lua` returning spec table |
+| Add keymap | `lua/dmmulroy/keymaps.lua` |
+| Change option | `lua/dmmulroy/options.lua` |
+| LSP server | `lua/plugins/lsp.lua` → `vim.lsp.config()` |
+| Formatter | `lua/plugins/conform.lua` |
+| TypeScript | `lua/plugins/typescript-tools.lua` (not lspconfig) |
+
+## CONVENTIONS
+
+- Plugin files return `{ ... }` table (lazy.nvim spec)
+- Lazy load via `event`, `ft`, `cmd`, `keys`
+- LSP uses nvim 0.11+ API: `vim.lsp.config()` + `vim.lsp.enable()`
+- Keymaps applied via `LspAttach` autocmd from exported `keymaps.on_attach`
+- Auto-center: all nav commands (`C-u`, `C-d`, `n`, `N`, `gd`) + `zz`
+
+## ANTI-PATTERNS
+
+- tsserver via lspconfig (use typescript-tools.nvim)
+- Hardcode colorscheme (catppuccin-macchiato via plugin)
+- Skip lazy loading for heavy plugins
+
+## KEY BINDINGS
+
+| Key | Mode | Action |
+|-----|------|--------|
+| `jj`/`JJ` | i | Exit insert |
+| `H`/`L` | n | Line start/end |
+| `S` | n | Quick substitute |
+| `<leader>e` | n | Oil file explorer |
+| `<leader>m` | n | Maximize window |
+| `<C-h/j/k/l>` | n | Pane navigation (tmux-aware) |
+
+## LSP SERVERS
+
+typescript-tools (TS/JS), lua_ls, rust_analyzer, ocamllsp (manual), tailwindcss, svelte, biome, eslint (autostart=false)
+
+## FORMATTER CHAIN
+
+JS/TS/TSX: oxfmt → biome → prettierd (first available, respects project config)

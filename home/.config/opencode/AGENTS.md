@@ -4,6 +4,7 @@
 
 - Make minimal, surgical changes
 - **Never compromise type safety**: No `any`, no non-null assertion operator (`!`), no type assertions (`as Type`)
+- **Abstractions**: Consciously constrained, pragmatically parameterised, doggedly documented
 
 ## Testing
 

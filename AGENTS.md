@@ -1,50 +1,79 @@
-# Dotfiles
+# DOTFILES
 
-## Purpose & Scope
-macOS development environment managed via GNU Stow. Owns: system setup orchestration, package management, symlink management. Does NOT own: individual tool configs (delegated to child nodes).
+macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 
-## Entry Points & Contracts
-- `dot` — Main CLI tool for setup, maintenance, and utilities
-- `packages/bundle` — Base Brewfile (all machines)
-- `packages/bundle.work` — Work-specific packages (optional)
+## STRUCTURE
 
-## Dependencies
-- GNU Stow (symlink management)
-- Homebrew (package management)
-- Fish shell (default shell)
-
-## Usage Patterns
-```bash
-./dot init              # Full system setup
-./dot stow              # Update symlinks after editing configs
-./dot doctor            # Health check
-./dot package add/remove/update/list  # Package management
-./dot summary           # AI-powered commit summary
-./dot benchmark-shell   # Fish startup performance
+```
+.dotfiles/
+├── dot                 # CLI: init/update/doctor/stow/package
+├── home/.config/       # Stowed to ~/.config/
+│   ├── fish/           # Shell (AGENTS.md)
+│   ├── nvim/           # Editor (AGENTS.md)
+│   ├── tmux/           # Multiplexer + TPM plugins
+│   ├── git/            # Conditional work config
+│   ├── jj/             # Jujutsu VCS + hooks
+│   ├── opencode/       # AI agent config
+│   └── ghostty/        # Terminal
+├── packages/
+│   ├── bundle          # Base Brewfile
+│   └── bundle.work     # Work additions
+└── docs/
 ```
 
-## Anti-Patterns
-- Don't edit configs in `~/` directly — edit in `./home/`, then `dot stow`
-- Don't skip shellcheck when modifying `dot` script
+## WHERE TO LOOK
 
-## Downlinks
-- [home/.config/fish/AGENTS.md](home/.config/fish/AGENTS.md) — Shell config
-- [home/.config/nvim/AGENTS.md](home/.config/nvim/AGENTS.md) — Editor config
-- [home/.config/tmux/AGENTS.md](home/.config/tmux/AGENTS.md) — Terminal multiplexer
-- [home/.config/git/AGENTS.md](home/.config/git/AGENTS.md) — Git identity & settings
-- [home/.config/jj/AGENTS.md](home/.config/jj/AGENTS.md) — Jujutsu VCS config
-- [home/.config/ghostty/AGENTS.md](home/.config/ghostty/AGENTS.md) — Terminal emulator
+| Task | Location |
+|------|----------|
+| Add package | `dot package add <name>` or edit `packages/bundle` |
+| Shell alias/abbr | `home/.config/fish/conf.d/aliases.fish` |
+| Shell function | `home/.config/fish/functions/` |
+| Git alias | `home/.config/git/config` [alias] section |
+| Neovim plugin | `home/.config/nvim/lua/plugins/<name>.lua` |
+| Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
+| Tmux binding | `home/.config/tmux/tmux.conf` |
+| jj alias | `home/.config/jj/config.toml` [aliases] |
+| Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
 
-## Outlinks
-- [docs/cli.md](docs/cli.md) — Full CLI reference
-- [docs/architecture.md](docs/architecture.md) — System design
+## CONVENTIONS
 
-## Patterns & Pitfalls
-- **Stow-based workflow**: All configs live in `./home/`, symlinked to `~/` via GNU Stow
-- **Conditional git identity**: Work repos in `~/Code/work/` auto-switch to Cloudflare email
-- **jj-aware updates**: `dot update` detects jj-managed repos and uses `jj git fetch` + `jj rebase`
-- **Catppuccin Macchiato everywhere**: Consistent theme across nvim, tmux, fish, ghostty
-- **ALWAYS run `shellcheck dot`** when modifying the dot script
-- **When dot CLI changes**: Update help text, AGENTS.md, README.md, and fish completions (`dot completions`)
-- **Package fallback**: Installation continues even if individual packages fail
-- **OpenCode install priority**: Homebrew → native installer → bun → npm
+- Stow layout: `home/` mirrors `~`, stow creates symlinks
+- Fish: `conf.d/` auto-sourced, `functions/` lazy-loaded
+- Neovim: 1 plugin per file in `lua/plugins/`, returns lazy.nvim spec
+- Git abbrs: ~180 oh-my-zsh style via `__git.init.fish`
+- Private helpers: prefix `__` (e.g., `__git.default_branch`)
+
+## ANTI-PATTERNS
+
+- Edit `~/.config/*` directly (changes lost on stow)
+- Casks in `bundle.work` (use base bundle)
+- Hardcode paths (use `$DOTFILES_DIR`, `$HOME`)
+
+## COMMANDS
+
+```bash
+dot init              # Full setup
+dot update            # Pull + brew upgrade + restow
+dot doctor            # Health check
+dot stow              # Resymlink only
+dot package add X     # Add + install package
+dot summary           # AI commit summary (opencode)
+dot benchmark-shell   # Fish startup perf
+```
+
+## KEY CONFIGS
+
+| Tool | Entry | Notes |
+|------|-------|-------|
+| Fish | `config.fish` | Sources `conf.d/`, sets EDITOR/MANPAGER |
+| Neovim | `init.lua` | 1 line: `require("dmmulroy")` |
+| Tmux | `tmux.conf` | Prefix `C-;`, auto-installs TPM |
+| Git | `config` | SSH signing, `pull.rebase`, conditional include |
+| jj | `config.toml` | SSH signing, private commits blocked |
+
+## UNIQUE STYLES
+
+- tmux prefix: `C-;` (not `C-b`)
+- tmux splits: `\` horizontal, `Enter` vertical
+- nvim: `jj`/`JJ` exit insert, `H`/`L` line start/end
+- git: `fomo` = fetch origin main + rebase
