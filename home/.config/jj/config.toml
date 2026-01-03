@@ -44,13 +44,7 @@ backend = "watchman"
 [aliases]
 bm = ["bookmark"]
 gf = ["git", "fetch"]
-# Run intent-check hook before push (jj doesn't support git hooks)
-gp = ["util", "exec", "--", "sh", "-c", """
-  if [ -f .git/hooks/pre-push ] && [ -x .git/hooks/pre-push ]; then
-    .git/hooks/pre-push || exit 1
-  fi
-  jj git push "$@"
-""", "sh"]
+gp = ["git", "push"]
 
 # Advance a bookmark to your latest pushable change
 # Usage: jj tug [bookmark_name]

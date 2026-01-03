@@ -16,6 +16,8 @@
     "gitlab": { "type": "remote", "url": "https://gitlab.mcp.cfdata.org/mcp", "enabled": false },
     "jira": { "type": "remote", "url": "https://jira.mcp.cfdata.org/mcp", "enabled": false },
     "townlake": { "type": "remote", "url": "https://mcp.townlake.cfdata.org/mcp", "enabled": false },
-    "wiki": { "type": "remote", "url": "https://wiki.mcp.cfdata.org/mcp", "enabled": false }
+    "wiki": { "type": "remote", "url": "https://wiki.mcp.cfdata.org/mcp", "enabled": false },
+    "context7": { "type": "remote", "url": "https://mcp.context7.com/mcp" },
+    "grep_app": { "type": "remote", "url": "https://mcp.grep.app" }
   }
 }
