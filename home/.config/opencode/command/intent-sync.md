@@ -1,1 +1,0 @@
-/Users/dillon/.config/opencode/oc-intent-layer/.opencode/command/intent-sync.md
