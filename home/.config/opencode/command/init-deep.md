@@ -28,6 +28,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 <critical>
 **TodoWrite ALL phases. Mark in_progress → completed in real-time.**
+   
 ```
 TodoWrite([
   { id: "discovery", content: "Fire explore agents + LSP codemap + read existing", status: "pending", priority: "high" },
@@ -36,6 +37,7 @@ TodoWrite([
   { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
 ])
 ```
+
 </critical>
 
 ---
