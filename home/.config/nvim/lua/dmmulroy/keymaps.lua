@@ -321,14 +321,6 @@ vim.keymap.set("v", "H", "^", { desc = "Move to beginning of line in visual mode
 vim.keymap.set("v", "<A-j>", ":m '>+1<CR>gv=gv", { desc = "Move selected block down" })
 vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selected block up" })
 
--- Code Companion
-vim.keymap.set(
-	"x",
-	"<leader>ai",
-	"<cmd>'<,'>CodeCompanion<cr>",
-	{ desc = "Prompt Code Companion on the current selection", noremap = true, silent = true }
-)
-
 vim.keymap.set("x", "<leader>p", '"_dP', { desc = "Paste without overwriting register" })
 
 -- This keymap indents the selected visual block to the left and reselects it
