@@ -29,9 +29,8 @@ disabled = true
 disabled = true
 
 [custom.scm]
-command = "jj-starship --strip-bookmark-prefix 'dmmulroy/' --truncate-name 20 --bookmarks-display-limit 1"
 when = "jj-starship detect"
-shell = ["sh"]
+shell = ["jj-starship", "--strip-bookmark-prefix", "dmmulroy/", "--truncate-name", "20", "--bookmarks-display-limit", "1"]
 format = "$output "
 
 [golang]
