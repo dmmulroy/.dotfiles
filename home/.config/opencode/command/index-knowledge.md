@@ -23,18 +23,17 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 background_task(description, prompt, agent?)
   - description: string (required) - short label for status
   - prompt: string (required) - full instructions
-  - agent: string (optional) - "general" (default), "explore", "build", "plan"
-  - Returns: XML with <task_id> to track
+  - agent: string (optional) - agent type to use
+  - Returns: task_id; system notifies on completion
 
 background_output(task_id, block?, timeout?)
   - task_id: string (required)
-  - block: boolean (default: false) - wait for completion
-  - timeout: number (default: 60000ms)
-  - Returns: XML with <status> and <output>
+  - block: boolean (optional) - wait for completion
+  - timeout: number (optional) - max wait in ms
 
 background_cancel(task_id?, all?)
-  - task_id: string - cancel specific task
-  - all: boolean - cancel all running tasks
+  - task_id: string (optional) - cancel specific task
+  - all: boolean (optional) - cancel all running tasks
 ```
 
 ---
