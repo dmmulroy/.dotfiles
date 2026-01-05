@@ -78,18 +78,44 @@ return {
 				return string.format("󱡅 %s/%d", current_mark, total_marks)
 			end
 
+			-- vcsigns diff stats component
+			local function vcsigns_diff()
+				local bufnr = vim.api.nvim_get_current_buf()
+				local ok, stats = pcall(function()
+					return vim.b[bufnr].vcsigns_status
+				end)
+				if not ok or not stats then
+					return ""
+				end
+				return stats
+			end
+
 			require("lualine").setup({
 				options = {
 					theme = "catppuccin",
 					globalstatus = true,
-					component_separators = { left = "", right = "" },
+					component_separators = { left = "", right = "" },
 					section_separators = { left = "█", right = "█" },
 				},
 				sections = {
 					lualine_b = {
-						{ get_vcs_info, icon = "" },
+						{ get_vcs_info, icon = "" },
 						harpoon_component,
-						"diff",
+						{
+							"diff",
+							source = function()
+								local bufnr = vim.api.nvim_get_current_buf()
+								local summary = vim.b[bufnr].vcsigns_summary
+								if summary then
+									return {
+										added = summary.added or 0,
+										modified = summary.modified or 0,
+										removed = summary.removed or 0,
+									}
+								end
+								return nil
+							end,
+						},
 						"diagnostics",
 					},
 					lualine_c = {

@@ -1,18 +1,18 @@
 ---
-description: Generate hierarchical AGENTS.md knowledge base
+description: Initialize hierarchical AGENTS.md knowledge base
 ---
 
 <command-instruction>
-# /index-knowledge
+# /init-deep
 
 Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Usage
 
 ```
-/index-knowledge                # Update mode: modify existing + create new where warranted
-/index-knowledge --create-new   # Read existing → remove all → regenerate from scratch
-/index-knowledge --max-depth=2  # Limit directory depth (default: 5)
+/init-deep                      # Update mode: modify existing + create new where warranted
+/init-deep --create-new         # Read existing → remove all → regenerate from scratch
+/init-deep --max-depth=5        # Limit directory depth (default: 5)
 ```
 
 ---
