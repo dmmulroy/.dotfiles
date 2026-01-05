@@ -79,7 +79,7 @@ background_task(
   agent="explore",
   prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only"
 )
-// Response: <background_task_launched><task_id>bg_xxx</task_id>...</background_task_launched>
+// Response: [bg:bg_xxx] launched "project structure" → background_output({ task_id: "bg_xxx" })
 // Extract task_id, append to TASK_IDS
 
 background_task(
@@ -207,33 +207,18 @@ lsp_find_references(filePath="...", line=X, character=Y)
 
 ### Collect Background Results
 
-System auto-notifies when tasks complete via injected XML:
-```xml
-<background_task_completed>
-  <task_id>bg_xxx</task_id>
-  <description>project structure</description>
-  <duration>12s</duration>
-</background_task_completed>
-
-<action_required>
-  <tool>background_output</tool>
-  <args><task_id>bg_xxx</task_id></args>
-</action_required>
+System auto-notifies when tasks complete:
+```
+[bg:bg_xxx] "project structure" completed (12s) → background_output({ task_id: "bg_xxx" })
 ```
 
 Collect results for each completed task:
-```
-// For each task_id in TASK_IDS:
-background_output(task_id="bg_xxx")
+```typescript
+background_output({ task_id: "bg_xxx" })
 
 // Response:
-// <background_task_result>
-//   <task_id>bg_xxx</task_id>
-//   <status>completed</status>
-//   <output>
-//     [explore agent findings here]
-//   </output>
-// </background_task_result>
+// [bg:bg_xxx] result (12s):
+// [explore agent findings here]
 ```
 
 **Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**
