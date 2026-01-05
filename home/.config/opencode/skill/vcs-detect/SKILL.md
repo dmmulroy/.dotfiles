@@ -1,11 +1,22 @@
 ---
 name: vcs-detect
-description: Detect whether current project uses jj (Jujutsu) or git VCS. This skill should be used when performing version control operations, before running git/jj commands, or when uncertain which VCS the project uses. Covers detection logic, command equivalents, and jj-specific patterns.
+description: Detect whether current project uses jj (Jujutsu) or git VCS. Use before ANY version control operation - commit, push, pull, fetch, status, diff, log, branch, rebase, merge, stash, reset, blame. Covers detection logic, command equivalents, and jj-specific patterns.
 ---
 
 # VCS Detect
 
 Determine if project uses jj or git, then use appropriate commands.
+
+## When to Use
+
+Load this skill before running ANY of these commands or operations:
+- `git status`, `git commit`, `git push`, `git pull`, `git fetch`
+- `git diff`, `git log`, `git branch`, `git rebase`, `git merge`
+- `git stash`, `git reset`, `git blame`, `git add`
+- Any user request containing: "commit", "push", "pull", "branch", "rebase"
+- When user says "check in changes", "save my work", "update from remote"
+
+**Do NOT assume git** - always check for `.jj/` first.
 
 ## Detection
 

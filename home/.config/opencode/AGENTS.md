@@ -35,8 +35,8 @@
 
 ## SCM, Git, Pull Requests, Commits
 
+- **ALWAYS check for `.jj/` dir before ANY VCS command** - if present, use jj not git
 - **Never** add Claude to attribution or as a contributor PRs, commits, messages, or PR descriptions
-- **Prefer jj** over git in jj-enabled repos (check for `.jj/` dir)
 - **gh CLI available** for GitHub operations (PRs, issues, etc.)
 
 ## Plans

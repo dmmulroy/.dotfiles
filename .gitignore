@@ -22,5 +22,12 @@ home/.claude/*
 !home/.claude/commands
 !home/.claude/commands/*
 
+# Python
+__pycache__/
+*.pyc
+
+# Packaged skills
+*.zip
+
 # jj
 .jj
