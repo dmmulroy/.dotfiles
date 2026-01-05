@@ -9,11 +9,15 @@ return {
 				build = "cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release && cmake --install build --prefix build",
 				cond = vim.fn.executable("cmake") == 1,
 			},
+			{
+				"zschreur/telescope-jj.nvim",
+			},
 		},
 		config = function()
 			local actions = require("telescope.actions")
+			local telescope = require("telescope")
 
-			require("telescope").setup({
+			telescope.setup({
 				defaults = {
 					mappings = {
 						i = {
@@ -39,7 +43,32 @@ return {
 			})
 
 			-- Enable telescope fzf native, if installed
-			pcall(require("telescope").load_extension, "fzf")
+			pcall(telescope.load_extension, "fzf")
+			-- Enable telescope-jj
+			pcall(telescope.load_extension, "jj")
 		end,
+		keys = {
+			-- jj-aware file picker with git fallback
+			{
+				"<leader>sf",
+				function()
+					-- Try jj first
+					local jj_ok = pcall(require("telescope").extensions.jj.files)
+					if jj_ok then
+						return
+					end
+					-- Fallback to find_files (works everywhere)
+					require("telescope.builtin").find_files({ hidden = true })
+				end,
+				desc = "Find files (jj/git aware)",
+			},
+			{
+				"<leader>sj",
+				function()
+					require("telescope").extensions.jj.diff()
+				end,
+				desc = "jj diff (changed files)",
+			},
+		},
 	},
 }

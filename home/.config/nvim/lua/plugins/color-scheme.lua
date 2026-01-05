@@ -10,8 +10,8 @@ return {
 				-- 	-- solid = false,
 				-- },
 				integrations = {
+					diffview = true,
 					fidget = true,
-					gitsigns = true,
 					harpoon = true,
 					mason = true,
 					native_lsp = { enabled = true },

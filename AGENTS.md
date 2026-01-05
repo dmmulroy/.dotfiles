@@ -1,5 +1,8 @@
 # DOTFILES
 
+**Generated:** 2026-01-05T05:28:49Z
+**Commit:** 6c8a501
+
 macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 
 ## STRUCTURE

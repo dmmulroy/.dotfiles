@@ -1,5 +1,8 @@
 # FISH SHELL CONFIG
 
+**Generated:** 2026-01-05T05:28:49Z
+**Commit:** 6c8a501
+
 Layered: `config.fish` → `conf.d/*.fish` (auto) → `functions/*.fish` (lazy)
 
 ## STRUCTURE

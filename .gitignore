@@ -2,7 +2,6 @@
 lazy-lock.json
 home/.config/fish/fish_variables
 home/.config/fish/conf.d/secrets.fish
-.aider*
 .envrc
 */**/tmux/plugins/*
 backups/
@@ -10,24 +9,13 @@ packages/failed_packages_*.txt
 tmp/
 .DS_STORE
 
-# Ignore everything in home/.claude/
-home/.claude/*
-
-# But whitelist these specific files
-!home/.claude/CLAUDE.md
-!home/.claude/agents
-!home/.claude/agents/*
-!home/.claude/sounds
-!home/.claude/sounds/*
-!home/.claude/commands
-!home/.claude/commands/*
 
 # Python
 __pycache__/
 *.pyc
 
-# Packaged skills
-*.zip
-
 # jj
 .jj
+
+# opencode
+home/.config/opencode/node_modules/
