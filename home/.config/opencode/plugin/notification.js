@@ -24,7 +24,7 @@ export const NotificationPlugin = async ({ $, client }) => {
       }
 
       // Permission requests bubble up to main agent UI, so always notify
-      if (event.type === "permission.updated") {
+      if (event.type === "permission.requested") {
         await $`afplay ${soundPath}`;
       }
     },
