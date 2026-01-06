@@ -6,7 +6,7 @@ email = "dillon.mulroy@gmail.com"
 
 [ui]
 editor = "nvim"
-diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
+diff-editor = ":builtin"
 diff-formatter = ":git"
 default-command = "log"
 

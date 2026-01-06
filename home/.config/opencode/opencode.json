@@ -2,6 +2,10 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
   "theme": "catppuccin-macchiato",
+  "enabled_providers": [
+    "anthropic",
+    "cloudflare-ai-gateway"
+  ],
   "keybinds": {
     "leader": "ctrl+o",
     "messages_half_page_up": "ctrl+u",

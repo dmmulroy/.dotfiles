@@ -8,7 +8,6 @@ Unified diff review for both **jj** and **git** repos.
 |--------|---------|
 | **diffview.nvim** | Full diff review UI, file history |
 | **vcsigns.nvim** | Gutter signs, hunk ops (jj/git/hg native) |
-| **hunk.nvim** | jj diff-editor for `split -i`, `squash -i` |
 | **telescope-jj.nvim** | jj-aware file picker |
 
 ## Diffview
@@ -110,46 +109,6 @@ By default, vcsigns diffs against parent~1 (good for jj new+squash flow).
 ]r             Diff against newer commit
 ```
 
-## hunk.nvim
-
-Diff editor for jj interactive commands. Automatically opens when running:
-- `jj split -i`
-- `jj squash -i`
-- Any command using `--tool` flag
-
-### Keybindings
-
-| Key | Action |
-|-----|--------|
-| `a` | Toggle line (in diff) / Toggle file (in tree) |
-| `A` | Toggle entire hunk |
-| `s` | Toggle line pair (both sides) |
-| `]c` / `[c` | Next/prev hunk |
-| `<Tab>` | Switch between left/right diff panes |
-| `<leader>e` | Focus file tree |
-| `<leader><CR>` | Accept selection |
-| `q` | Abort (no changes saved) |
-
-### Workflow: Split a Commit
-
-```bash
-jj split -i
-```
-
-1. File tree on left shows changed files
-2. Select files/hunks to include in first commit with `a`/`A`
-3. `<leader><CR>` to accept
-4. Selected changes go to first commit
-5. Remaining changes stay in second commit
-
-### Icons
-
-| Icon | Meaning |
-|------|---------|
-| `󰡖` | Selected (will be included) |
-| `` | Deselected (will stay behind) |
-| `󰛲` | Partially selected |
-
 ## Telescope
 
 ### Keybindings
@@ -176,5 +135,3 @@ All tools work in jj colocated repos (where `.git` and `.jj` coexist). This is j
 
 - diffview config: `~/.config/nvim/lua/plugins/diffview.lua`
 - vcsigns config: `~/.config/nvim/lua/plugins/vcsigns.lua`
-- hunk config: `~/.config/nvim/lua/plugins/hunk.lua`
-- jj diff-editor: `~/.config/jj/config.toml` → `ui.diff-editor`

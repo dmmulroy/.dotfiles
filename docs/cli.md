@@ -11,7 +11,6 @@
 # Update symlinks for dotfiles
 ./dot stow
 # OR manually: stow -R -v -d . -t "$HOME" home
-
 # Install dot command globally (add to PATH)
 ./dot link
 
