@@ -2,17 +2,19 @@
 description: Start Ralph coding loop
 ---
 
-Start Ralph to complete user stories from a PRD file.
+Start Ralph to complete features from a PRD file.
 
-Ralph runs in the current session, continuing until all stories pass or max iterations.
+Ralph runs in the current session, continuing until all features pass or max iterations.
+
+ONLY WORK ON A SINGLE FEATURE PER ITERATION.
 
 Workflow per iteration:
-1. Pick highest-priority incomplete story
+1. Find highest-priority incomplete feature (YOU decide priority, not necessarily first in list)
 2. Implement it
-3. Run typecheck + tests
-4. Commit (git/jj auto-detected)
-5. Mark story done in prd.json
-6. Log to progress.txt
+3. Run format, lint, typecheck + tests
+4. Update PRD with work done
+5. APPEND progress to progress.txt (leave note for next person working in codebase - do NOT overwrite)
+6. Make a commit (git/jj auto-detected)
 7. Continue or output `<promise>COMPLETE</promise>`
 
 Usage: /ralph @path/to/prd.json [max-iterations]
