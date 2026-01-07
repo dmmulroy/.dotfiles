@@ -173,11 +173,12 @@ ${branchSetup}
 Find the highest-priority feature to work on and work only on that feature.
 This should be the one YOU decide has the highest priority - not necessarily first.
 
-1. Check types pass (typecheck/tsc)
-2. Check tests pass
-3. Update the PRD marking the feature done
-4. Append your progress to ${state.progressPath} - leave a note for the next person
-5. Commit: ${commitCmd}
+1. Run format + lint
+2. Check types pass (typecheck/tsc)
+3. Check tests pass
+4. Update the PRD marking the feature done
+5. APPEND progress to ${state.progressPath} - leave a note for the next person (do NOT overwrite)
+6. Commit: ${commitCmd}
 
 ONLY WORK ON A SINGLE FEATURE.
 
@@ -208,11 +209,12 @@ Read ${state.prdPath} for current status.
 Read ${state.progressPath} for learnings.
 
 Continue from where you left off. Complete one feature, then:
-1. Check types pass
-2. Check tests pass  
-3. Update PRD marking feature done
-4. Append progress to ${state.progressPath}
-5. Commit: ${commitCmd}
+1. Run format + lint
+2. Check types pass
+3. Check tests pass  
+4. Update PRD marking feature done
+5. APPEND progress to ${state.progressPath} (do NOT overwrite)
+6. Commit: ${commitCmd}
 
 When ALL stories have passes: true, output: ${COMPLETE_SIGNAL}
 `;
