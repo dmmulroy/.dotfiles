@@ -82,6 +82,7 @@ Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
   "branchName": "<feature-name>",
   "features": [
     {
+      "id": "functional-1",
       "category": "functional",
       "description": "User can register with email and password",
       "steps": [
@@ -107,6 +108,7 @@ Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string | Unique identifier, e.g. "db-1", "api-auth", "setup-deps" |
 | `category` | string | Grouping: "functional", "ui", "api", "security", "testing", etc. |
 | `description` | string | What the feature does when complete |
 | `steps` | string[] | **Verification steps** - how to test it works |
@@ -116,7 +118,7 @@ Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
 
 - **Steps are verification, not implementation** - They describe HOW TO TEST, not how to build
 - **Category is flexible** - Use what fits your codebase
-- **No IDs or ordering** - Agent decides what to work on
+- **ID format**: `<category>-<number>` or descriptive like `"api-auth"`, `"db-schema"`
 - **Context helps agent explore** - Patterns and key files guide initial exploration
 
 ## Conversion Rules
@@ -134,6 +136,7 @@ Quality over speed. Small steps compound into big progress.
 
 ### Features from Markdown
 - Each `### Title [category]` becomes a feature
+- Generate `id` as `<category>-<number>` (e.g., "db-1", "api-2") or descriptive slug
 - Text after title is the `description`
 - Items under `**Verification:**` become `steps`
 - `passes` always starts as `false`
@@ -257,6 +260,7 @@ User can retrieve their favorites.
   "branchName": "user-favorites",
   "features": [
     {
+      "id": "db-1",
       "category": "db",
       "description": "Database table for storing favorites",
       "steps": [
@@ -267,6 +271,7 @@ User can retrieve their favorites.
       "passes": false
     },
     {
+      "id": "api-1",
       "category": "api",
       "description": "User can add an item to favorites",
       "steps": [
@@ -279,6 +284,7 @@ User can retrieve their favorites.
       "passes": false
     },
     {
+      "id": "api-2",
       "category": "api",
       "description": "User can retrieve their favorites",
       "steps": [

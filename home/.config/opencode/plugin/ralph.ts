@@ -14,6 +14,7 @@ import * as path from "path";
 type VCSType = "git" | "jj";
 
 interface Feature {
+  id: string; // unique identifier, e.g. "setup-1", "core-auth"
   category: string;
   description: string;
   steps: string[]; // verification steps - how to test it works
@@ -43,7 +44,8 @@ interface RalphFileState {
   maxErrors: number;
   vcsType: VCSType;
   startedAt: string;
-  sessionHistory: string[]; // track all session IDs for debugging
+  compacting: boolean; // true when waiting for compaction to complete
+  model?: { providerID: string; modelID: string }; // model for compaction
 }
 
 interface RalphStartArgs {
@@ -201,59 +203,58 @@ function buildInitialPrompt(state: RalphFileState): string {
       ? `jj describe -m "feat(<scope>): <description>" && jj new`
       : `git add -A && git commit -m "feat(<scope>): <description>"`;
 
-  return `You are Ralph, an autonomous coding agent. Your goal: implement all features until passes: true.
+  return `You are Ralph, an autonomous coding agent. Iteration ${state.iteration}/${state.maxIterations}.
 
 ## Phase 1: Get Your Bearings
 
-1. **Read the feature list**: ${prdPath}
-   - Each feature has \`steps\` (verification steps - how to test it works)
+1. **Read progress log**: ${progressPath}
+   - **READ "Codebase Patterns" SECTION FIRST** - critical learnings
+   - Check what's been done previously
+
+2. **Read the feature list**: ${prdPath}
+   - Each feature has \`id\`, \`category\`, \`description\`, \`steps\`
    - Features with \`passes: false\` need work
    - Check \`context\` for patterns, key files, non-goals
 
-2. **Read progress log**: ${progressPath}
-   - What's been done previously
-   - Learnings and discoveries
-   - Patterns found in the codebase
+3. **Check history**: ${gitLogCmd}
 
-3. **Check git history**: ${gitLogCmd}
-   - See recent commits and changes
-   - Understand what state the code is in
+4. **Verify environment**: run tests to ensure codebase works
 
-4. **Verify environment works**
-   - Run any existing tests to ensure codebase is in working state
-   - If something is broken, fix it first
+## Phase 2: Choose ONE Feature
 
-## Phase 2: Choose a Feature
-
-**YOU decide** which feature to implement. Consider:
-- Dependencies (what must exist first?)
-- Foundational work (database before API, API before UI)
-- What you learned from exploring
+Pick the next incomplete feature (\`passes: false\`). Consider dependencies.
 
 ## Phase 3: Implement
 
 1. Implement the feature
-2. **Verify using the \`steps\` from the feature** - these are your test cases
+2. **Verify using the \`steps\`** - these are your test cases
 3. Run feedback loops: format, lint, typecheck, tests
 4. All verification steps must pass
 
-## Phase 4: Update State
+## Phase 4: Update State & STOP
 
-1. Update ${prdPath}: set \`passes: true\` for the completed feature
-2. APPEND to ${progressPath}: what you did, what you learned (do NOT overwrite)
-3. ${branchSetup}
+1. ${branchSetup}
+2. Update ${prdPath}: set \`passes: true\` for completed feature
+3. APPEND to ${progressPath} using this format:
+
+\`\`\`
+## Iteration ${state.iteration} - [feature.id]
+- What was implemented
+- Files changed
+- **Learnings:** patterns discovered, gotchas encountered
+
+If you discover a REUSABLE pattern, also add it to "## Codebase Patterns" at TOP.
+---
+\`\`\`
+
 4. Commit: ${commitCmd}
+5. **STOP HERE** - end your response. Next iteration handles next feature.
 
 ---
 
-**IMPORTANT**: 
-- Work on ONE feature per iteration
-- Never edit or remove features from the PRD (only change \`passes\`)
-- Steps are verification criteria, not implementation instructions
+**CRITICAL**: Work on ONE feature, then STOP. Never edit/remove features (only change \`passes\`).
 
-Iteration ${state.iteration}/${state.maxIterations}.
-
-When ALL features have passes: true, output: ${COMPLETE_SIGNAL}
+When ALL features have \`passes: true\`, output: ${COMPLETE_SIGNAL}
 `;
 }
 
@@ -261,11 +262,6 @@ function buildContinuationPrompt(state: RalphFileState): string {
   const prdPath = getPrdPath(state.projectDir, state.branchName);
   const progressPath = getProgressPath(state.projectDir, state.branchName);
   
-  const gitLogCmd = state.vcsType === "jj" ? "jj log --limit 10" : "git log --oneline -10";
-  const branchCheck =
-    state.vcsType === "jj"
-      ? `Verify you're on the ralph change for "${state.branchName}".`
-      : `Verify you're on branch "${state.branchName}".`;
   const commitCmd =
     state.vcsType === "jj"
       ? `jj describe -m "feat(<scope>): <description>" && jj new`
@@ -273,30 +269,26 @@ function buildContinuationPrompt(state: RalphFileState): string {
 
   return `[RALPH - ITERATION ${state.iteration}/${state.maxIterations}]
 
-You are Ralph. This is a FRESH SESSION - get your bearings from files.
+Context was compacted. Summary above contains your progress.
 
-## Get Your Bearings
+## Continue
 
-1. Read ${prdPath} - features with passes: false need work
-2. Read ${progressPath} - what's been done, learnings
-3. Run: ${gitLogCmd} - see recent changes
-4. Verify environment: run tests to ensure code works
-
-${branchCheck}
-
-## Your Task
-
-1. **Choose** an incomplete feature (YOU decide based on dependencies)
-2. **Implement** until all verification \`steps\` pass
-3. **Verify** using the steps (these are your test cases)
+1. Read ${progressPath} - **"Codebase Patterns" section FIRST**
+2. Read ${prdPath} - find next feature with \`passes: false\`
+3. **Implement** ONE feature until \`steps\` pass
 4. **Feedback loops**: format, lint, typecheck, tests
-5. **Update PRD**: set passes: true
-6. **Append to progress**: what you did, what you learned
+5. **Update PRD**: set \`passes: true\`
+6. **Append to progress**:
+   \`\`\`
+   ## Iteration ${state.iteration} - [feature.id]
+   - What was implemented
+   - **Learnings:** patterns, gotchas
+   ---
+   \`\`\`
 7. **Commit**: ${commitCmd}
+8. **STOP** - end your response. Next iteration handles next feature.
 
-Work on ONE feature. Never edit/remove features (only change passes).
-
-When ALL features pass: ${COMPLETE_SIGNAL}
+When ALL features have \`passes: true\`: ${COMPLETE_SIGNAL}
 `;
 }
 
@@ -339,16 +331,14 @@ async function ensureProgressFile(
     await client.file.read({ query: { path: progressPath } });
   } catch {
     const content = `# Ralph Progress Log
-Started: ${getDate()}
 Branch: ${branchName}
+Started: ${getDate()}
 
 ## Codebase Patterns
-<!-- Ralph will add discovered patterns here -->
-
-## Key Files
-<!-- Ralph will add important files here -->
+<!-- READ THIS FIRST - Consolidate reusable patterns here -->
 
 ---
+<!-- Iteration logs below - APPEND ONLY -->
 `;
     await $`echo ${content} > ${progressPath}`.quiet();
   }
@@ -409,7 +399,7 @@ function createRalphStart(
 ): ToolDefinition {
   return tool({
     description: `Start Ralph coding loop for a branch. PRD must exist at .opencode/state/ralph/<branch>/prd.json.
-PRD schema: { branchName: string, features: [{ id, category, description, steps: string[], passes: boolean }] }`,
+PRD schema: { branchName: string, features: [{ id: string, category: string, description: string, steps: string[], passes: boolean }], context?: { patterns, keyFiles, nonGoals } }`,
     args: {
       branch: tool.schema.string().describe("Branch name (matches folder in .opencode/state/ralph/<branch>/)"),
       iterations: tool.schema
@@ -460,7 +450,7 @@ PRD schema: { branchName: string, features: [{ id, category, description, steps:
           maxErrors: DEFAULT_MAX_ERRORS,
           vcsType,
           startedAt: new Date().toISOString(),
-          sessionHistory: [ctx.sessionID],
+          compacting: false,
         };
 
         writeState(projectDir, branchName, state);
@@ -546,7 +536,8 @@ async function formatBranchStatus(
       const nextFeature = prd.features.find((f) => !f.passes);
       results.push(`  PRD: ${done}/${total} features complete`);
       if (nextFeature) {
-        results.push(`  Next: [${nextFeature.category}] ${nextFeature.description.slice(0, 50)}`);
+        const featureId = nextFeature.id ?? nextFeature.category;
+        results.push(`  Next: [${featureId}] ${nextFeature.description.slice(0, 50)}`);
       }
     }
   } catch {
@@ -580,6 +571,32 @@ function createRalphStop(projectDir: string): ToolDefinition {
 // Event Handler
 // =============================================================================
 
+/** Get model info from session's last user message */
+async function getSessionModel(
+  client: OpencodeClient,
+  sessionID: string,
+): Promise<{ providerID: string; modelID: string } | null> {
+  try {
+    const result = await client.session.messages({ path: { id: sessionID } });
+    const messages = ((result as { data?: unknown }).data ?? result) as Array<{
+      info?: { role?: string; model?: { providerID?: string; modelID?: string } };
+    }>;
+    
+    // Find last user message with model info
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (!msg) continue;
+      const model = msg.info?.model;
+      if (msg.info?.role === "user" && model?.providerID && model?.modelID) {
+        return { providerID: model.providerID, modelID: model.modelID };
+      }
+    }
+  } catch {
+    // Fall through
+  }
+  return null;
+}
+
 async function handleSessionIdle(
   event: { type: string; properties?: Record<string, unknown> },
   client: OpencodeClient,
@@ -610,53 +627,65 @@ async function handleSessionIdle(
     return;
   }
 
-  // Increment iteration
-  state.iteration++;
-  state.errorCount = 0;
-
-  const oldSessionID = sessionID;
-
-  // Create fresh session for next iteration (progress.txt carries learnings forward)
-  const sessionTitle = `ralph: ${state.branchName} (iteration ${state.iteration})`;
-  const newSessionResult = await client.session.create({
-    body: { title: sessionTitle },
-  });
-
-  const newSession = (newSessionResult as { data?: { id?: string } }).data ?? newSessionResult;
-  const newSessionID = (newSession as { id?: string }).id;
-
-  if (!newSessionID) {
-    await showToast(client, "Failed to create new session", "error");
-    state.active = false;
+  // If we just finished compacting, send continuation prompt
+  if (state.compacting) {
+    state.compacting = false;
+    state.errorCount = 0;
     writeState(projectDir, state.branchName, state);
+
+    await showToast(
+      client,
+      `Ralph ${state.branchName}: iteration ${state.iteration}/${state.maxIterations}`,
+      "info",
+    );
+
+    const prompt = buildContinuationPrompt(state);
+    await client.session.prompt({
+      path: { id: sessionID },
+      body: { parts: [{ type: "text", text: prompt }] },
+      query: { directory: state.projectDir },
+    });
     return;
   }
 
-  // Update state with new session
-  state.sessionID = newSessionID;
-  state.sessionHistory.push(newSessionID);
+  // Iteration complete - trigger compaction before next iteration
+  state.iteration++;
+  state.compacting = true;
+  
+  // Get model from session if not cached
+  if (!state.model) {
+    state.model = await getSessionModel(client, sessionID) ?? undefined;
+  }
+  
   writeState(projectDir, state.branchName, state);
 
   await showToast(
     client,
-    `Ralph ${state.branchName}: iteration ${state.iteration}/${state.maxIterations}`,
+    `Ralph ${state.branchName}: compacting before iteration ${state.iteration}`,
     "info",
   );
 
-  // Send prompt to new session
-  const prompt = buildContinuationPrompt(state);
-
-  await client.session.prompt({
-    path: { id: newSessionID },
-    body: { parts: [{ type: "text", text: prompt }] },
-    query: { directory: state.projectDir },
-  });
-
-  // Cleanup old session (optional - keeps history cleaner)
-  try {
-    await client.session.delete({ path: { id: oldSessionID } });
-  } catch {
-    // Deletion failed, not critical
+  // Trigger compaction - session will go idle again when done
+  if (state.model) {
+    await client.session.summarize({
+      path: { id: sessionID },
+      body: {
+        providerID: state.model.providerID,
+        modelID: state.model.modelID,
+      },
+      query: { directory: state.projectDir },
+    });
+  } else {
+    // Fallback: skip compaction if no model info, just continue
+    state.compacting = false;
+    writeState(projectDir, state.branchName, state);
+    
+    const prompt = buildContinuationPrompt(state);
+    await client.session.prompt({
+      path: { id: sessionID },
+      body: { parts: [{ type: "text", text: prompt }] },
+      query: { directory: state.projectDir },
+    });
   }
 }
 
