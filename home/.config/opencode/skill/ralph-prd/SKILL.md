@@ -19,12 +19,14 @@ Based on [Anthropic's research on long-running agents](https://www.anthropic.com
 4. Create `.opencode/state/ralph/<branch-name>/` directory
 5. Move markdown PRD to `.opencode/state/ralph/<branch-name>/prd.md`
 6. Output JSON to `.opencode/state/ralph/<branch-name>/prd.json`
+7. Create empty `.opencode/state/ralph/<branch-name>/progress.txt`
 
 State folder structure:
 ```
 .opencode/state/ralph/<branch-name>/
-├── prd.md      # Original markdown PRD (moved from project root)
-└── prd.json    # Converted JSON for Ralph
+├── prd.md       # Original markdown PRD (moved from project root)
+├── prd.json     # Converted JSON for Ralph
+└── progress.txt # Empty file for Ralph to track progress
 ```
 
 ## Input Format
@@ -175,6 +177,7 @@ Tell the user:
 PRD converted and moved to .opencode/state/ralph/<branch-name>/
   - prd.md (moved from <original-path>)
   - prd.json (generated)
+  - progress.txt (empty)
 
 Branch: <feature-name>
 Features: X total
@@ -252,6 +255,8 @@ User can retrieve their favorites.
 ### Output: .opencode/state/ralph/user-favorites/
 
 **prd.md** - Moved from `prd-favorites.md`
+
+**progress.txt** - Empty file for Ralph to track progress
 
 **prd.json**:
 
