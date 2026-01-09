@@ -1,32 +1,32 @@
 ---
-name: ralph-prd
-description: Convert markdown PRDs to Ralph-executable JSON format. Use after creating a PRD with the prd skill to generate the prd.json that Ralph uses for autonomous implementation.
+name: prd-task
+description: Convert markdown PRDs to executable JSON format. Use after creating a PRD with the prd skill to generate the prd.json for autonomous task completion.
 ---
 
-# Ralph Skill
+# PRD Task Skill
 
-Convert markdown PRDs to Ralph-executable JSON format.
+Convert markdown PRDs to executable JSON format for autonomous task completion.
 
-Ralph is an autonomous coding agent. The PRD defines the **end state** via features with verification steps. Ralph decides HOW to get there.
+The PRD defines the **end state** via tasks with verification steps. The agent decides HOW to get there.
 
 Based on [Anthropic's research on long-running agents](https://www.anthropic.com/engineering/effective-harnesses-long-running-agents).
 
 ## Workflow
 
-1. User requests: "Load the ralph skill and convert prd-<name>.md"
+1. User requests: "Load the prd-task skill and convert prd-<name>.md"
 2. Read the markdown PRD
-3. Extract features with verification steps
-4. Create `.opencode/state/ralph/<branch-name>/` directory
-5. Move markdown PRD to `.opencode/state/ralph/<branch-name>/prd.md`
-6. Output JSON to `.opencode/state/ralph/<branch-name>/prd.json`
-7. Create empty `.opencode/state/ralph/<branch-name>/progress.txt`
+3. Extract tasks with verification steps
+4. Create `.opencode/state/<prd-name>/` directory
+5. Move markdown PRD to `.opencode/state/<prd-name>/prd.md`
+6. Output JSON to `.opencode/state/<prd-name>/prd.json`
+7. Create empty `.opencode/state/<prd-name>/progress.txt`
 
 State folder structure:
 ```
-.opencode/state/ralph/<branch-name>/
+.opencode/state/<prd-name>/
 ├── prd.md       # Original markdown PRD (moved from project root)
-├── prd.json     # Converted JSON for Ralph
-└── progress.txt # Empty file for Ralph to track progress
+├── prd.json     # Converted JSON for task execution
+└── progress.txt # Empty file to track progress
 ```
 
 ## Input Format
@@ -41,7 +41,7 @@ Expects markdown PRD with end-state focus:
 - [ ] Users can log in
 - [ ] Auth is secure
 
-## Features
+## Tasks
 
 ### User Registration [functional]
 User can register with email and password.
@@ -75,14 +75,14 @@ User can log in and receive JWT token.
 
 ## Output Format
 
-Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
+Move PRD and generate JSON in `.opencode/state/<prd-name>/`:
 - `prd.md` - Original markdown (moved from source location)
 - `prd.json` - Converted JSON:
 
 ```json
 {
-  "branchName": "<feature-name>",
-  "features": [
+  "prdName": "<prd-name>",
+  "tasks": [
     {
       "id": "functional-1",
       "category": "functional",
@@ -106,15 +106,15 @@ Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
 
 ## Schema Details
 
-### Feature Object
+### Task Object
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Unique identifier, e.g. "db-1", "api-auth", "setup-deps" |
 | `category` | string | Grouping: "functional", "ui", "api", "security", "testing", etc. |
-| `description` | string | What the feature does when complete |
+| `description` | string | What the task does when complete |
 | `steps` | string[] | **Verification steps** - how to test it works |
-| `passes` | boolean | Ralph sets to `true` when ALL steps verified |
+| `passes` | boolean | Set to `true` when ALL steps verified |
 
 ### Key Points
 
@@ -125,24 +125,24 @@ Move PRD and generate JSON in `.opencode/state/ralph/<branch-name>/`:
 
 ## Conversion Rules
 
-### Feature Sizing
+### Task Sizing
 
-Keep features small and focused:
+Keep tasks small and focused:
 
-- One logical change per feature
-- If a PRD section feels too large, break it into multiple features
-- Prefer many small features over few large ones
-- Each feature should be completable in one commit
+- One logical change per task
+- If a PRD section feels too large, break it into multiple tasks
+- Prefer many small tasks over few large ones
+- Each task should be completable in one commit
 
 Quality over speed. Small steps compound into big progress.
 
-### Features from Markdown
-- Each `### Title [category]` becomes a feature
+### Tasks from Markdown
+- Each `### Title [category]` becomes a task
 - Generate `id` as `<category>-<number>` (e.g., "db-1", "api-2") or descriptive slug
 - Text after title is the `description`
 - Items under `**Verification:**` become `steps`
 - `passes` always starts as `false`
-- **Split large sections** into multiple focused features
+- **Split large sections** into multiple focused tasks
 
 ### Context Preserved
 - `context.patterns` - existing code patterns to follow
@@ -160,41 +160,40 @@ Fight entropy. Leave the codebase better than you found it.
 ## Field Rules
 
 **READ-ONLY except:**
-- `passes`: Ralph sets to `true` when ALL verification steps pass
+- `passes`: Set to `true` when ALL verification steps pass
 
-**NEVER edit or remove features** - This could lead to missing functionality.
+**NEVER edit or remove tasks** - This could lead to missing functionality.
 
-## Branch Name
+## PRD Name
 
 Derive from PRD title:
-- `# PRD: User Authentication` → `"branchName": "user-authentication"`
+- `# PRD: User Authentication` -> `"prdName": "user-authentication"`
 
 ## After Conversion
 
 Tell the user:
 
 ```
-PRD converted and moved to .opencode/state/ralph/<branch-name>/
+PRD converted and moved to .opencode/state/<prd-name>/
   - prd.md (moved from <original-path>)
   - prd.json (generated)
   - progress.txt (empty)
 
-Branch: <feature-name>
-Features: X total
+PRD: <prd-name>
+Tasks: X total
   - functional: N
   - testing: N
 
 Non-goals (excluded): <list>
 
-To run Ralph:
-  /ralph <branch-name> [max_iterations]
+To complete tasks:
+  /complete-next-task <prd-name>
 
-Ralph will:
-1. Get bearings (read progress, git log, verify environment)
-2. Choose a feature to implement
+This will:
+1. Get bearings (read progress, check history, verify environment)
+2. Choose a task to implement
 3. Implement until all verification steps pass
 4. Commit and update progress
-5. Repeat until all features pass
 ```
 
 ## Example
@@ -209,7 +208,7 @@ Ralph will:
 - [ ] Favorites persist
 - [ ] Users can list favorites
 
-## Features
+## Tasks
 
 ### Favorites Storage [db]
 Database table for storing favorites.
@@ -252,18 +251,18 @@ User can retrieve their favorites.
 - Sharing favorites
 ```
 
-### Output: .opencode/state/ralph/user-favorites/
+### Output: .opencode/state/user-favorites/
 
 **prd.md** - Moved from `prd-favorites.md`
 
-**progress.txt** - Empty file for Ralph to track progress
+**progress.txt** - Empty file for tracking progress
 
 **prd.json**:
 
 ```json
 {
-  "branchName": "user-favorites",
-  "features": [
+  "prdName": "user-favorites",
+  "tasks": [
     {
       "id": "db-1",
       "category": "db",
