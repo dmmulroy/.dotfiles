@@ -1,6 +1,6 @@
 {
-  "branchName": "user-authentication",
-  "features": [
+  "prdName": "user-authentication",
+  "tasks": [
     {
       "category": "functional",
       "description": "User can register with email and password",
