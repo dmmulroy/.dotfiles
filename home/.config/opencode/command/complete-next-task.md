@@ -100,8 +100,10 @@ If you discover a **reusable pattern**, also add to `## Codebase Patterns` at th
 
 ### 8. Commit
 
-- jj: `jj describe -m 'feat(<scope>): <description>' && jj new`
+- jj: `jj describe -m 'feat(<scope>): <description>' && jj bookmark create <prdName>/<task-id> && jj new`
 - git: `git add -A && git commit -m 'feat(<scope>): <description>'`
+
+Bookmark format: `<prdName>/<task-id>` (e.g., `lib-relay-implementation/types-2`)
 
 ## Completion
 

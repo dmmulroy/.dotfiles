@@ -15,24 +15,21 @@ Detect the version control system in use before running any VCS commands.
 
 ## Detection Logic
 
-**Priority order (check in sequence):**
+Both `jj root` and `git rev-parse --show-toplevel` walk up the filesystem to find repo root.
 
-1. **Check for `.jj/` directory** - If exists, use `jj`
-2. **Check for `.git/` directory** - If exists, use `git`
-3. **Neither found** - Not a VCS-managed directory
+**Priority order:**
 
-```
-if .jj/ exists -> use jj
-else if .git/ exists -> use git
-else -> no VCS detected
-```
+1. `jj root` succeeds → jj (handles colocated too)
+2. `git rev-parse` succeeds → git
+3. Both fail → no VCS
 
 ## Detection Command
 
-Run this single command to detect VCS:
-
 ```bash
-if [ -d ".jj" ]; then echo "jj"; elif [ -d ".git" ]; then echo "git"; else echo "none"; fi
+if jj root &>/dev/null; then echo "jj"
+elif git rev-parse --show-toplevel &>/dev/null; then echo "git"
+else echo "none"
+fi
 ```
 
 ## Command Mappings

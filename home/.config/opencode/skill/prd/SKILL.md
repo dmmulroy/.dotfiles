@@ -12,13 +12,13 @@ The PRD describes WHAT to build and WHY, not HOW or in WHAT ORDER.
 ## Workflow
 
 1. User requests: "Load the prd skill and create a PRD for [feature]"
-2. **Ask clarifying questions** across multiple rounds to build full understanding
+2. **Ask clarifying questions** to build full understanding
 3. **Explore codebase** to understand patterns, constraints, and dependencies
 4. Generate markdown PRD to `prd-<feature-name>.md` in project root
 
 ## Clarifying Questions
 
-Ask questions across these domains. Multiple rounds expected.
+Ask questions across these domains.
 
 ### Problem & Motivation
 - What problem does this solve? Who experiences it?
@@ -27,13 +27,9 @@ Ask questions across these domains. Multiple rounds expected.
 
 ### Users & Stakeholders
 - Who are the primary users? Secondary users?
-- Who are the stakeholders that need to approve?
-- Are there personas or user segments with different needs?
 
 ### End State & Success
 - What does "done" look like? How will users interact with it?
-- What quantitative metrics define success? (latency, adoption %, error rate)
-- What qualitative outcomes matter? (user feedback, team velocity)
 
 ### Scope & Boundaries
 - What's explicitly OUT of scope?
@@ -51,7 +47,7 @@ Ask questions across these domains. Multiple rounds expected.
 - External service dependencies?
 - What decisions are still open/contentious?
 
-Keep questions concise. 3-5 per round. Multiple rounds expected for complex features.
+Keep questions concise. 5-7 at most.
 
 ## Output Format
 
@@ -362,21 +358,9 @@ When complete:
 ---
 ## After PRD Creation
 
-Tell the user:
+### RFC Review Checklist
 
-```
-PRD saved to prd-<name>.md
-
-PRD is RFC-ready when:
-- [ ] Problem statement clearly articulates user/business impact
-- [ ] Success metrics are quantifiable and measurable
-- [ ] Risks identified with mitigations
-- [ ] Alternatives considered and documented
-```
-
-## RFC Review Checklist
-
-Before marking PRD ready for review, verify:
+Before marking PRD ready for review and sharing with the user, verify:
 
 - [ ] Technical risks identified and mitigated
 - [ ] User flows documented (if applicable)
@@ -385,3 +369,8 @@ Before marking PRD ready for review, verify:
 - [ ] Design considerations captured (if applicable)
 - [ ] Problem statement is clear and compelling
 - [ ] Scope boundaries explicit
+
+Tell the user:
+
+PRD saved to prd-<name>.md
+```
