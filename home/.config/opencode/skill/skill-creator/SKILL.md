@@ -60,10 +60,34 @@ Better **context engineering**: inspired from **progressive disclosure** techniq
 
 #### SKILL.md (required)
 
-**File name:** `SKILL.md` (uppercase)
-**File size:** Under 200 lines, if you need more, plit it to multiple files in `references` folder.
+**File name:** `SKILL.md` (uppercase)  
+**File size:** Under 200 lines; split to `references/` if needed.
 
-**Metadata Quality:** The `name` and `description` in YAML frontmatter determine when the agent will use the skill. Be specific about what the skill does and when to use it. Use the third-person (e.g. "This skill should be used when..." instead of "Use this skill when...").
+**YAML Frontmatter (REQUIRED):** Every SKILL.md MUST begin with YAML frontmatter:
+
+```yaml
+---
+name: skill-name
+description: What this skill does and when to use it. Use third-person.
+---
+```
+
+Optional fields (`references`, `license`, `metadata`):
+
+```yaml
+---
+name: skill-name
+description: What this skill does and when to use it.
+references:
+  - references/guide.md
+  - references/api.md
+license: Apache-2.0
+---
+```
+
+**CRITICAL:** Do NOT use XML-style tags (`<purpose>`, `<references>`, `<description>`). Only YAML frontmatter is valid.
+
+**Metadata Quality:** `name` and `description` determine skill activation. Be specific; use third-person ("This skill should be used when...").
 
 #### Bundled Resources (optional)
 
