@@ -58,7 +58,7 @@ From exported data and conversation context, create summary:
   - Use past tense ("added", "fixed", "created")
   - Start with "user requested..." or "user asked..."
   - Chronological order
-  - 3-10 items typical
+  - Attempt to keep the summary to a max of 25 turns ("user requested", "agent did")
   - **NEVER include sensitive data**: API keys, credentials, secrets, tokens, passwords, env vars
 
 ### 3. Update PR/MR Description
