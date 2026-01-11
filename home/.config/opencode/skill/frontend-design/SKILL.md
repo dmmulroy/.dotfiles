@@ -1,6 +1,6 @@
 ---
 name: frontend-design
-description: Create distinctive, production-grade frontend interfaces. Use when building web components, pages, or applications with React-based frameworks. Includes Tailwind CSS v4, shadcn/ui components, anime.js animations, and visual design philosophy for avoiding generic AI aesthetics.
+description: Create distinctive, production-grade frontend interfaces. Use when building web components, pages, or applications with React-based frameworks. Includes Tailwind CSS v4, shadcn/ui components, Motion animations, and visual design philosophy for avoiding generic AI aesthetics.
 ---
 
 # Frontend Design
@@ -38,12 +38,18 @@ Search: `@theme`, `@container`, `OKLCH`, `mask-`, `text-shadow`
 
 Search: `Field`, `InputGroup`, `Spinner`, `ButtonGroup`, `next-themes`
 
-### Animation
+### Animation (Motion + Tailwind)
 
-- `./references/animation/animejs-core.md` - v4 syntax, basic API, timelines, stagger
-- `./references/animation/animejs-advanced.md` - SVG, scroll, utilities, TypeScript
+- `./references/animation/motion-core.md` - Core API, variants, gestures, layout animations
+- `./references/animation/motion-advanced.md` - AnimatePresence, scroll, orchestration, TypeScript
 
-**CRITICAL**: Always use anime.js v4 syntax. Never v3.
+**Stack**:
+| Animation Type | Tool |
+|----------------|------|
+| Hover/transitions | Tailwind CSS (`transition-*`) |
+| shadcn states | `tailwindcss-animate` (built-in) |
+| Gestures/layout/exit | Motion (`motion/react`) |
+| Complex SVG morphing | anime.js v4 (niche only) |
 
 ### Visual Design
 
@@ -86,7 +92,7 @@ Bold maximalism and refined minimalism both work. Key is intentionality.
 
 **shadcn/ui v3.6**: Copy-paste Radix components. Visual styles: Vega/Nova/Maia/Lyra/Mira. New: Field, InputGroup, Spinner, ButtonGroup.
 
-**Anime.js v4**: `import { animate } from 'animejs'`. Never v3 syntax.
+**Motion**: `import { motion, AnimatePresence } from 'motion/react'`. Declarative React animations. Use `tailwindcss-animate` for shadcn states.
 
 ## Typography
 
@@ -112,8 +118,27 @@ Use OKLCH for vivid colors. Dominant colors with sharp accents:
 
 ## Motion
 
-CSS `@starting-style` for enter/exit (no JS). Anime.js v4 for complex.
+**Primary**: Motion for React animations. **Fallback**: CSS `@starting-style` for simple enter/exit.
 
+```tsx
+import { motion, AnimatePresence } from 'motion/react';
+
+// Basic animation
+<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+
+// Exit animations
+<AnimatePresence>
+  {show && <motion.div exit={{ opacity: 0 }} />}
+</AnimatePresence>
+
+// Layout animations
+<motion.div layout />
+
+// Gestures
+<motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} />
+```
+
+CSS fallback (no JS):
 ```css
 dialog[open] {
   opacity: 1;

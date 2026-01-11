@@ -27,7 +27,7 @@ export const NotificationPlugin = async ({ $, client }) => {
       }
 
       // Permission prompt created
-      if (event.type === "permission.updated") {
+      if (event.type === "permission.asked") {
         await $`afplay ${soundPath}`;
       }
     },
