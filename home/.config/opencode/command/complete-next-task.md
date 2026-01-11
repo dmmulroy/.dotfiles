@@ -110,7 +110,7 @@ Bookmark format: `<prdName>/<task-id>` (e.g., `lib-relay-implementation/types-2`
 If all tasks have `passes: true`, output:
 
 ```
-<task>COMPLETE</task>
+<tasks>COMPLETE</tasks>
 ```
 
 ## Philosophy
