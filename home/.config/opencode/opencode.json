@@ -2,8 +2,17 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
   "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.envrc": "deny",
+      "secrets/*": "deny"
+    },
     "external_directory": {
-      "~/Code/personal/opencode": "allow"
+      "/Users/dillon/Code/personal/opencode/*": "allow",
+      "/Users/dillon/.dotfiles/home/.config/opencode/*": "allow",
+      "/Users/dillon/.config/opencode/*": "allow"
     }
   },
   "theme": "catppuccin-macchiato",
