@@ -7,6 +7,10 @@ set -gx EDITOR 'nvim'
 # Set neovim as the program to open manpages
 set -gx MANPAGER 'nvim +Man!'
 
+# OpenCode experimental features
+set -gx OPENCODE_EXPERIMENTAL_LSP_TOOL 1
+set -gx OPENCODE_EXPERIMENTAL_PLAN_MODE 1
+
 # Add dotfiles directory to PATH for 'dot' command
 fish_add_path ~/.dotfiles
 

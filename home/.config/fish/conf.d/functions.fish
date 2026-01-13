@@ -22,3 +22,11 @@ function vi
         nvim $argv
     end
 end
+
+function localcode
+    if test (count $argv) -eq 0
+        bun --cwd /Users/$USER/Code/personal/opencode/packages/opencode dev -- (pwd)
+    else
+        bun --cwd /Users/$USER/Code/personal/opencode/packages/opencode dev -- $argv
+    end
+end
