@@ -1,0 +1,3 @@
+# OpenCode experimental features
+set -gx OPENCODE_EXPERIMENTAL_LSP_TOOL 1
+set -gx OPENCODE_EXPERIMENTAL_PLAN_MODE 1
