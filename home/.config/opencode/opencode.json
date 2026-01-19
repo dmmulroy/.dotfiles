@@ -73,6 +73,11 @@
       "url": "https://mcp.grep.app",
       "enabled": true
     },
+    "opensrc": {
+      "type": "local",
+      "command": ["npx", "-y", "opensrc-mcp"],
+      "enabled": true
+    },
     "cloudflare": {
       "type": "local",
       "command": ["npx", "-y", "@cloudflare/mcp-server-cloudflare"],
