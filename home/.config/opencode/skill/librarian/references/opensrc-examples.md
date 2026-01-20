@@ -2,7 +2,18 @@
 
 ## Workflow: Fetch → Explore
 
-### Basic Fetch and Read
+### Basic Fetch and Explore with tree()
+
+```javascript
+async () => {
+  const [{ source }] = await opensrc.fetch("vercel/ai");
+  // Get directory structure first
+  const tree = await opensrc.tree(source.name, { depth: 2 });
+  return tree;
+}
+```
+
+### Fetch and Read Key Files
 
 ```javascript
 async () => {
@@ -16,6 +27,19 @@ async () => {
   ]);
   
   return { sourceName, files };
+}
+```
+
+### readMany with Globs
+
+```javascript
+async () => {
+  const [{ source }] = await opensrc.fetch("zod");
+  // Read all package.json files in monorepo
+  const files = await opensrc.readMany(source.name, [
+    "packages/*/package.json"  // globs supported!
+  ]);
+  return Object.keys(files);
 }
 ```
 

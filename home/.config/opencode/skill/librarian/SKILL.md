@@ -64,9 +64,10 @@ Specific repo?
 
 ```
 1. opensrc.fetch(target)
-2. opensrc.files("github.com/owner/repo", "**/*")
-3. Read: README, package.json, src/index.*
-4. Create architecture diagram (see diagrams.md)
+2. opensrc.tree(source.name) → quick overview
+3. opensrc.files(source.name, "**/*.ts") → detailed listing
+4. Read: README, package.json, src/index.*
+5. Create architecture diagram (see diagrams.md)
 ```
 
 ### "Compare X vs Y"

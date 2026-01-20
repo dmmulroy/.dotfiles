@@ -27,6 +27,9 @@ opensrc.get(name: string): Source | undefined
 // List files with optional glob
 opensrc.files(sourceName: string, glob?: string): Promise<FileEntry[]>
 
+// Get directory tree structure (default depth: 3)
+opensrc.tree(sourceName: string, options?: { depth?: number }): Promise<TreeNode>
+
 // Regex search file contents
 opensrc.grep(pattern: string, options?: GrepOptions): Promise<GrepResult[]>
 
@@ -36,7 +39,7 @@ opensrc.astGrep(sourceName: string, pattern: string, options?: AstGrepOptions): 
 // Read single file
 opensrc.read(sourceName: string, filePath: string): Promise<string>
 
-// Batch read multiple files
+// Batch read multiple files (supports globs!)
 opensrc.readMany(sourceName: string, paths: string[]): Promise<Record<string, string>>
 
 // Parse fetch spec
@@ -142,6 +145,16 @@ interface FileEntry {
   path: string;
   size: number;
   isDirectory: boolean;
+}
+```
+
+### TreeNode
+
+```typescript
+interface TreeNode {
+  name: string;
+  type: "file" | "dir";
+  children?: TreeNode[];  // only for dirs
 }
 ```
 
