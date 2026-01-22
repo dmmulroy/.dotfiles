@@ -87,7 +87,7 @@ Example: pattern="console.log($MSG)" rewrite="logger.info($MSG)"`,
       args.pattern,
       "--rewrite",
       args.rewrite,
-      "--interactive",
+      "--update-all",
     ];
     if (args.lang) cmd.push("--lang", args.lang);
     cmd.push(args.path ?? ".");
