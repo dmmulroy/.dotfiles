@@ -7,7 +7,8 @@
       "*.env": "deny",
       "*.env.*": "deny",
       "*.envrc": "deny",
-      "secrets/*": "deny"
+      "secrets/*": "deny",
+      ".dev.vars": "ask",
     },
     "external_directory": {
       "/Users/dillon/Code/personal/opencode/*": "allow",
@@ -75,17 +76,12 @@
     },
     "opensrc": {
       "type": "local",
-      "command": ["npx", "-y", "opensrc-mcp"],
+      "command": [
+        "npx",
+        "-y",
+        "opensrc-mcp"
+      ],
       "enabled": true
     },
-    "cloudflare": {
-      "type": "local",
-      "command": ["npx", "-y", "@cloudflare/mcp-server-cloudflare"],
-      "environment": {
-        "CLOUDFLARE_API_TOKEN": "{env:CLOUDFLARE_API_TOKEN}",
-        "CLOUDFLARE_ACCOUNT_ID": "{env:CLOUDFLARE_ACCOUNT_ID}"
-      },
-      "enabled": false
-    }
   }
 }
