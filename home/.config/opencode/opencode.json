@@ -2,25 +2,22 @@
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
   "permission": {
+    "external_directory": {
+      "*": "ask",
+      "~/.config/opencode/*": "allow",
+      "~/.dotfiles/home/.config/opencode/*": "allow",
+      "~/Code/personal/opencode/*": "allow"
+    },
     "read": {
       "*": "allow",
       "*.env": "deny",
       "*.env.*": "deny",
       "*.envrc": "deny",
       "secrets/*": "deny",
-      ".dev.vars": "ask",
-    },
-    "external_directory": {
-      "/Users/dillon/Code/personal/opencode/*": "allow",
-      "/Users/dillon/.dotfiles/home/.config/opencode/*": "allow",
-      "/Users/dillon/.config/opencode/*": "allow"
+      ".dev.vars": "ask"
     }
   },
   "theme": "catppuccin-macchiato",
-  "enabled_providers": [
-    "anthropic",
-    "cloudflare-ai-gateway"
-  ],
   "keybinds": {
     "leader": "ctrl+o",
     "messages_half_page_up": "ctrl+u",
@@ -28,6 +25,9 @@
     "input_delete_to_line_start": "none",
     "input_delete": "delete,shift+delete"
   },
+  "plugin": [
+    "opencode-anthropic-auth"
+  ],
   "mcp": {
     "backstage": {
       "type": "remote",
@@ -82,6 +82,6 @@
         "opensrc-mcp"
       ],
       "enabled": true
-    },
+    }
   }
 }
