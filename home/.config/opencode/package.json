@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "@opencode-ai/plugin": "1.1.36"
+    "@openauthjs/openauth": "^0.4.3",
+    "@opencode-ai/plugin": "1.1.39"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",

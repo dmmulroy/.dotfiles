@@ -42,3 +42,6 @@ Invoke for: code review, architecture decisions, debugging analysis, refactor pl
 
 ### Librarian
 Invoke for: understanding 3rd party libraries/packages, exploring remote repositories, discovering open source patterns.
+
+### Overseer
+Invoke for: task orchestration, milestone/task/subtask management, finding next ready work, recording learnings, tracking multi-session work.

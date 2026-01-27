@@ -18,6 +18,10 @@ interface Task {
   blocks: string[];
   result: string | null;    // Completion result from tasks.complete()
   commitSha: string | null; // Commit ID when task completed
+  createdAt: string;        // ISO 8601 timestamp
+  updatedAt: string;        // ISO 8601 timestamp
+  startedAt: string | null; // Set when tasks.start() called
+  completedAt: string | null; // Set when tasks.complete() called
 }
 ```
 

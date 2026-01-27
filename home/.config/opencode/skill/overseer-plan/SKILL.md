@@ -1,6 +1,10 @@
 ---
 name: overseer-plan
 description: Convert markdown planning documents to Overseer tasks via MCP codemode. Use when converting plans, specs, or design docs to trackable task hierarchies.
+license: MIT
+metadata:
+  author: dmmulroy
+  version: "1.0.0"
 ---
 
 # Converting Markdown Documents to Overseer Tasks
