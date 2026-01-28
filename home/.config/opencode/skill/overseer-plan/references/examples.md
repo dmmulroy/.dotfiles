@@ -25,15 +25,19 @@ const milestone = await tasks.create({
 });
 
 const subtasks = [
-  "Create database schema for users/tokens",
-  "Implement auth controller with endpoints",
-  "Add JWT middleware for route protection",
-  "Build frontend login/register forms",
-  "Add integration tests"
+  { desc: "Create database schema for users/tokens", done: "Migration runs, tables exist with FK constraints" },
+  { desc: "Implement auth controller with endpoints", done: "POST /register, /login return expected responses" },
+  { desc: "Add JWT middleware for route protection", done: "Unauthorized requests return 401, valid tokens pass" },
+  { desc: "Build frontend login/register forms", done: "Forms render, submit without errors" },
+  { desc: "Add integration tests", done: "`npm test` passes with auth coverage" }
 ];
 
-for (const desc of subtasks) {
-  await tasks.create({ description: desc, parentId: milestone.id });
+for (const sub of subtasks) {
+  await tasks.create({ 
+    description: sub.desc, 
+    context: `Part of 'Add Authentication System'.\n\nDone when: ${sub.done}`,
+    parentId: milestone.id 
+  });
 }
 
 return { milestone: milestone.id, subtaskCount: subtasks.length };
@@ -124,9 +128,21 @@ const milestone = await tasks.create({
 });
 
 const phases = [
-  { name: "Backend Infrastructure", items: ["Database schema", "Password hashing", "JWT tokens"] },
-  { name: "API Endpoints", items: ["POST /auth/register", "POST /auth/login", "POST /auth/logout"] },
-  { name: "Frontend", items: ["Login/register forms", "Protected routes", "Session persistence"] }
+  { name: "Backend Infrastructure", items: [
+    { desc: "Database schema", done: "Migration runs, tables exist" },
+    { desc: "Password hashing", done: "bcrypt hashes verified in tests" },
+    { desc: "JWT tokens", done: "Token generation/validation works" }
+  ]},
+  { name: "API Endpoints", items: [
+    { desc: "POST /auth/register", done: "Creates user, returns 201" },
+    { desc: "POST /auth/login", done: "Returns JWT on valid credentials" },
+    { desc: "POST /auth/logout", done: "Invalidates session, returns 200" }
+  ]},
+  { name: "Frontend", items: [
+    { desc: "Login/register forms", done: "Forms render, submit successfully" },
+    { desc: "Protected routes", done: "Redirect to login when unauthenticated" },
+    { desc: "Session persistence", done: "Refresh maintains logged-in state" }
+  ]}
 ];
 
 for (const phase of phases) {
@@ -135,7 +151,11 @@ for (const phase of phases) {
     parentId: milestone.id
   });
   for (const item of phase.items) {
-    await tasks.create({ description: item, parentId: phaseTask.id });
+    await tasks.create({ 
+      description: item.desc, 
+      context: `Part of '${phase.name}'.\n\nDone when: ${item.done}`,
+      parentId: phaseTask.id 
+    });
   }
 }
 
