@@ -54,6 +54,24 @@ Use `/overseer-plan` to convert any markdown planning document into trackable Ov
 - Work items tightly coupled
 - Plan is exploratory/investigative
 
+## Task Quality Criteria
+
+Every task must be:
+- **Atomic**: Single committable unit of work
+- **Validated**: Has tests OR explicit acceptance criteria in context ("Done when: ...")
+- **Clear**: Technical, specific, imperative verb
+
+Every milestone must:
+- **Demoable**: Produces runnable/testable increment
+- **Builds on prior**: Can depend on previous milestone's output
+
+## Review Workflow
+
+1. Analyze document → propose breakdown
+2. **Invoke Oracle** to review breakdown and suggest improvements
+3. Incorporate feedback
+4. Create in Overseer (persists to SQLite via MCP)
+
 ## After Creating
 
 ```javascript

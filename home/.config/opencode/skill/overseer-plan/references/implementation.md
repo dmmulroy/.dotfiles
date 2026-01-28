@@ -80,19 +80,61 @@ Capture returned task ID for subsequent steps.
 - Work items inseparable
 - Plan very short (<10 lines)
 
-## Step 5: Create Subtasks (If Breaking Down)
+## Step 5: Validate Atomicity & Acceptance Criteria
+
+For each proposed task, verify:
+- **Atomic**: Can be completed in single commit
+- **Validated**: Has clear acceptance criteria
+
+If task too large → split further.
+If no validation → add to context:
+
+```
+Done when: <specific observable criteria>
+```
+
+Examples of good acceptance criteria:
+- "Done when: `npm test` passes, new migration applied"
+- "Done when: API returns 200 with expected payload"
+- "Done when: Component renders without console errors"
+- "Done when: Type check passes (`tsc --noEmit`)"
+
+## Step 6: Oracle Review
+
+Before creating tasks, invoke Oracle to review the proposed breakdown.
+
+**Prompt Oracle with:**
+
+```
+Review this task breakdown for "<milestone>":
+
+1. <task> - Done when: <criteria>
+2. <task> - Done when: <criteria>
+...
+
+Check:
+- Are tasks truly atomic (single commit)?
+- Is validation criteria clear and observable?
+- Does milestone deliver demoable increment?
+- Missing dependencies/blockers?
+- Any tasks that should be split or merged?
+```
+
+Incorporate Oracle's feedback, then proceed to create tasks.
+
+## Step 7: Create Subtasks (If Breaking Down)
 
 ### Extract for Each Subtask
 
 1. **Description**: Strip numbering, keep concise (1-10 words), imperative form
-2. **Context**: Section content + "Part of [milestone description]"
+2. **Context**: Section content + "Part of [milestone description]" + acceptance criteria
 
 ### Flat Breakdown
 
 ```javascript
 const subtasks = [
-  { description: "Create database schema", context: "Schema for users/tokens. Part of 'Add Auth'." },
-  { description: "Build API endpoints", context: "POST /auth/register, /auth/login. Part of 'Add Auth'." }
+  { description: "Create database schema", context: "Schema for users/tokens. Part of 'Add Auth'.\n\nDone when: Migration runs, tables exist with FK constraints." },
+  { description: "Build API endpoints", context: "POST /auth/register, /auth/login. Part of 'Add Auth'.\n\nDone when: Endpoints return expected responses, tests pass." }
 ];
 
 const created = [];
@@ -127,7 +169,7 @@ for (const item of phaseItems) {
 }
 ```
 
-## Step 6: Report Results
+## Step 8: Report Results
 
 ### Subtasks Created
 
