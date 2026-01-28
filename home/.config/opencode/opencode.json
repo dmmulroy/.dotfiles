@@ -82,6 +82,11 @@
         "opensrc-mcp"
       ],
       "enabled": true
+    },
+    "overseer": {
+      "type": "local",
+      "command": ["os", "mcp"],
+      "enabled": true
     }
   }
 }
