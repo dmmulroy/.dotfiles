@@ -1,12 +1,10 @@
 ---
 description: Principal engineering advisor for code reviews, architecture decisions, complex debugging, and planning. Invoke when you need deeper analysis before acting — reviews, trade-offs, debugging race conditions, planning refactors. Prompt with precise problem + files. Ask for concrete outcomes.
 mode: subagent
-model: anthropic/claude-opus-4-5
-# Extended thinking - maxed out for deepest reasoning
+model: openai/gpt-5.2
+# GPT-5.2: 400k context, 128k output, native reasoning (matches amp oracle)
 options:
-  thinking:
-    type: enabled
-    budgetTokens: 31999
+  reasoningEffort: high
 # Strict read-only permissions (mirrors Amp's allowMcp:false, allowToolbox:false)
 permission:
   "*": deny
@@ -75,7 +73,7 @@ Brief outline only if relevant and trade-offs are significant.
 ## Tool Usage
 
 You have read-only access: read, grep, glob, LSP, webfetch.
-Use them freely to verify assumptions and gather context. Your extended thinking enables deep analysis - leverage it fully.
+Use them freely to verify assumptions and gather context. Your native reasoning enables deep analysis - leverage it fully.
 
 ## Guidelines
 
