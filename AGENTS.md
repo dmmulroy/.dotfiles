@@ -1,7 +1,7 @@
 # DOTFILES
 
-**Generated:** 2026-01-12T00:00:00Z
-**Commit:** 3536bff
+**Generated:** 2026-01-29T00:00:00Z
+**Commit:** f2997bb
 
 macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 
@@ -53,6 +53,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 - Casks in `bundle.work` (use base bundle)
 - Hardcode paths (use `$DOTFILES_DIR`, `$HOME`)
 - Nested git repos in stowed dirs (creates symlink issues)
+- node_modules in stowed dirs (opencode exception)
 
 ## COMMANDS
 
@@ -83,9 +84,11 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 - tmux splits: `\` horizontal, `Enter` vertical
 - nvim: `jj`/`JJ` exit insert, `H`/`L` line start/end
 - git: `fomo` = fetch origin main + rebase
+- Theme: Catppuccin Macchiato across tools
 
 ## NOTES
 
 - jj hook warns on push if AGENTS.md stale
 - `dot update` handles WARP VPN brew API issues automatically
 - Tmux theme must load BEFORE continuum (status-right conflict)
+- opencode/ has node_modules (exception to stow anti-pattern)
