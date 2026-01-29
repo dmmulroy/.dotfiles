@@ -216,6 +216,18 @@ Open Questions:
 - [ ] <if any remain> → Owner: [who]
 ```
 
+### Step 12: Write spec to file (MANDATORY)
+
+**This step is NOT optional.** Every completed spec MUST be persisted.
+
+1. Derive filename from feature/decision name (kebab-case, e.g., `user-auth-flow.md`)
+2. Write spec to `specs/<filename>.md`
+3. Confirm file written with path
+
+```
+Spec written to: specs/<filename>.md
+```
+
 <user-request>
 $ARGUMENTS
 </user-request>
