@@ -133,6 +133,34 @@ Your result must include explicit verification evidence. See @file references/ve
 4. **Action-oriented descriptions**: Start with verbs ("Add", "Fix", "Update")
 5. **Verify before completing**: Tests passing, manual testing done
 
+## Work Request Handling
+
+**CRITICAL**: Overseer tracks work, does not execute it.
+
+When user says "do", "complete", "work on", or "implement":
+
+1. `tasks.nextReady(milestoneId?)` → get task with full context
+2. `tasks.start(id)` → mark in_progress
+3. Return with explicit handoff using this template:
+
+### Handoff Template (use exactly)
+
+```
+## Next Task: [description]
+
+**ID**: [id] (for reporting back)
+**Context**: [inherited context]
+**Learnings**: [relevant learnings]
+
+---
+
+**ACTION REQUIRED**: Implement this task, then report back:
+- "@overseer mark [id] done: [what you did, tests, verification]"
+- "@overseer learned [id]: [insights for future tasks]"
+```
+
+**Never** mark complete without evidence of work done. If asked to "complete" without prior implementation context, treat as work request (return task info + handoff).
+
 ---
 
 ## Reading Order

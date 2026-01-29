@@ -6,7 +6,7 @@ Task orchestration via Overseer MCP codemode.
 
 ## Workflow
 
-### Step 1: Load overseer skill
+### Step 1: **ALWAYS** Load overseer skill
 
 ```
 skill({ name: 'overseer' })
