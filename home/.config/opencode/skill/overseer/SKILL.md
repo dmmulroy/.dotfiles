@@ -77,12 +77,12 @@ console.log(task.context.parent);    // Parent's context (if depth > 0)
 console.log(task.context.milestone); // Root milestone context (if depth > 1)
 console.log(task.learnings.own);     // Learnings attached to this task (bubbled from children)
 
-// 3. Start work (auto-creates VCS bookmark)
+// 3. Start work (VCS required - creates bookmark, records start commit)
 await tasks.start(task.id);
 
 // 4. Implement...
 
-// 5. Complete with learnings (auto-squashes commits, bubbles learnings to parent)
+// 5. Complete with learnings (VCS required - commits changes, bubbles learnings to parent)
 await tasks.complete(task.id, {
   result: "Implemented login endpoint with JWT tokens",
   learnings: ["bcrypt rounds should be 12 for production"]

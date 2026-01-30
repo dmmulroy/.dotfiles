@@ -77,11 +77,11 @@ Every milestone must:
 ```javascript
 await tasks.get("<id>");                    // TaskWithContext (full context + learnings)
 await tasks.list({ parentId: "<id>" });     // Task[] (children without context chain)
-await tasks.start("<id>");                  // Task (creates VCS bookmark)
-await tasks.complete("<id>", { result: "...", learnings: [...] });  // Task (squashes commits, bubbles learnings)
+await tasks.start("<id>");                  // Task (VCS required - creates bookmark, records start commit)
+await tasks.complete("<id>", { result: "...", learnings: [...] });  // Task (VCS required - commits, bubbles learnings)
 ```
 
-**VCS Integration**: `start` and `complete` automatically manage VCS bookmarks and commits. No manual VCS operations needed.
+**VCS Required**: `start` and `complete` require jj or git (fail with `NotARepository` if none found). CRUD operations work without VCS.
 
 **Note**: Priority must be 1-5. Blockers cannot be ancestors or descendants.
 
