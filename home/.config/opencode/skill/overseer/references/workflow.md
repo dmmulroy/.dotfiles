@@ -16,7 +16,7 @@ if (!task) {
 }
 ```
 
-`nextReady()` returns a `Task` with inherited context and learnings populated.
+`nextReady()` returns a `TaskWithContext` (task with inherited context and learnings) or `null`.
 
 ## 2. Review Context
 
@@ -61,7 +61,7 @@ console.log("Task learnings:", task.learnings.own);
 await tasks.start(taskId);
 ```
 
-**VCS Effect:** Creates bookmark `task/<id>`, records start commit, creates WIP commit.
+**VCS Required:** Creates bookmark `task/<id>`, records start commit. Fails with `NotARepository` if no jj/git found.
 
 After starting, the task status changes to `in_progress`.
 
@@ -101,23 +101,24 @@ Verification:
 });
 ```
 
-**VCS Effect:** Squashes all commits since start, rebases onto parent's bookmark (if child task).
+**VCS Required:** Commits changes (NothingToCommit treated as success), then deletes the task's bookmark (best-effort) and clears the DB bookmark field on success. Fails with `NotARepository` if no jj/git found.
 
 **Learnings Effect:** Learnings bubble to immediate parent only. `sourceTaskId` is preserved through bubbling, so if this task's learnings later bubble further, the origin is tracked.
 
 The `result` becomes part of the task's permanent record.
 
-## VCS Integration (Automatic)
+## VCS Integration (Required for Workflow)
 
 VCS operations are **automatically handled** by the tasks API:
 
 | Task Operation | VCS Effect |
 |----------------|------------|
-| `tasks.start(id)` | Creates bookmark `task/<id>`, records start commit, creates WIP commit |
-| `tasks.complete(id)` | Squashes all commits since start, rebases onto parent's bookmark |
-| `tasks.delete(id)` | Deletes bookmark `task/<id>` |
+| `tasks.start(id)` | **VCS required** - creates bookmark `task/<id>`, records start commit |
+| `tasks.complete(id)` | **VCS required** - commits changes, deletes bookmark (best-effort), clears DB bookmark on success |
+| `tasks.complete(milestoneId)` | Same + deletes ALL descendant bookmarks recursively (depth-1 and depth-2) |
+| `tasks.delete(id)` | Best-effort bookmark cleanup (logs warning on failure) |
 
-**Key insight:** Agents never need to call `vcs.commit()` during normal task flow.
+**Note:** VCS (jj or git) is required for start/complete. CRUD operations work without VCS.
 
 ## Error Handling
 

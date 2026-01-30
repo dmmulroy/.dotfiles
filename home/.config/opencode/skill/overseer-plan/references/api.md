@@ -11,13 +11,20 @@ interface Task {
   id: string;
   parentId: string | null;
   description: string;
-  priority: 1 | 2 | 3 | 4 | 5;  // Must be 1-5
+  priority: 1 | 2 | 3 | 4 | 5;
   completed: boolean;
-  depth: 0 | 1 | 2;         // 0=milestone, 1=task, 2=subtask
-  blockedBy: string[];
-  blocks: string[];
-  result: string | null;    // Completion result from tasks.complete()
-  commitSha: string | null; // Commit ID when task completed
+  completedAt: string | null;
+  startedAt: string | null;
+  createdAt: string;            // ISO 8601
+  updatedAt: string;
+  result: string | null;        // Completion notes
+  commitSha: string | null;     // Auto-populated on complete
+  depth: 0 | 1 | 2;             // 0=milestone, 1=task, 2=subtask
+  blockedBy?: string[];         // Blocking task IDs (omitted if empty)
+  blocks?: string[];            // Tasks this blocks (omitted if empty)
+  bookmark?: string;            // VCS bookmark name (if started)
+  startCommit?: string;         // Commit SHA at start
+  effectivelyBlocked: boolean;  // True if task OR ancestor has incomplete blockers
 }
 
 // Task with full context - returned by get(), nextReady()
@@ -29,8 +36,27 @@ interface TaskWithContext extends Task {
   };
   learnings: {
     own: Learning[];          // This task's learnings (bubbled from completed children)
+    parent: Learning[];       // Parent's learnings (depth > 0)
+    milestone: Learning[];    // Milestone's learnings (depth > 1)
   };
 }
+
+// Task tree structure - returned by tree()
+interface TaskTree {
+  task: Task;
+  children: TaskTree[];
+}
+
+// Progress summary - returned by progress()
+interface TaskProgress {
+  total: number;
+  completed: number;
+  ready: number;     // !completed && !effectivelyBlocked
+  blocked: number;   // !completed && effectivelyBlocked
+}
+
+// Task type alias for depth filter
+type TaskType = "milestone" | "task" | "subtask";
 ```
 
 ## Learning Interface
@@ -49,7 +75,13 @@ interface Learning {
 
 ```typescript
 declare const tasks: {
-  list(filter?: { parentId?: string; ready?: boolean; completed?: boolean }): Promise<Task[]>;
+  list(filter?: { 
+    parentId?: string; 
+    ready?: boolean; 
+    completed?: boolean;
+    depth?: 0 | 1 | 2;    // 0=milestones, 1=tasks, 2=subtasks
+    type?: TaskType;      // Alias: "milestone"|"task"|"subtask" (mutually exclusive with depth)
+  }): Promise<Task[]>;
   get(id: string): Promise<TaskWithContext>;
   create(input: {
     description: string;
@@ -71,22 +103,28 @@ declare const tasks: {
   block(taskId: string, blockerId: string): Promise<void>;
   unblock(taskId: string, blockerId: string): Promise<void>;
   nextReady(milestoneId?: string): Promise<TaskWithContext | null>;
+  tree(rootId?: string): Promise<TaskTree | TaskTree[]>;
+  search(query: string): Promise<Task[]>;
+  progress(rootId?: string): Promise<TaskProgress>;
 };
 ```
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `list` | `Task[]` | Filter by `parentId`, `ready`, `completed` |
+| `list` | `Task[]` | Filter by `parentId`, `ready`, `completed`, `depth`, `type` |
 | `get` | `TaskWithContext` | Get task with full context chain + inherited learnings |
 | `create` | `Task` | Create task (priority must be 1-5) |
 | `update` | `Task` | Update description, context, priority, parentId |
-| `start` | `Task` | Mark started + **creates VCS bookmark** |
-| `complete` | `Task` | Mark complete + **squashes commits** + bubbles learnings to parent |
+| `start` | `Task` | **VCS required** - creates bookmark, records start commit |
+| `complete` | `Task` | **VCS required** - commits changes + bubbles learnings to parent |
 | `reopen` | `Task` | Reopen completed task |
-| `delete` | `void` | Delete task + **cleans up VCS bookmark** |
+| `delete` | `void` | Delete task + best-effort VCS bookmark cleanup |
 | `block` | `void` | Add blocker (cannot be self, ancestor, or descendant) |
 | `unblock` | `void` | Remove blocker relationship |
 | `nextReady` | `TaskWithContext \| null` | Get deepest ready leaf with full context |
+| `tree` | `TaskTree \| TaskTree[]` | Get task tree (all milestones if no ID) |
+| `search` | `Task[]` | Search by description/context/result (case-insensitive) |
+| `progress` | `TaskProgress` | Aggregate counts for milestone or all tasks |
 
 ## Learnings API
 
@@ -102,17 +140,17 @@ declare const learnings: {
 |--------|-------------|
 | `list` | List learnings for task |
 
-## VCS Integration
+## VCS Integration (Required for Workflow)
 
 VCS operations are **automatically handled** by the tasks API:
 
 | Task Operation | VCS Effect |
 |----------------|------------|
-| `tasks.start(id)` | Creates bookmark `task/<id>`, records start commit, creates WIP commit |
-| `tasks.complete(id)` | Squashes commits since start, rebases onto parent's bookmark (if child task) |
-| `tasks.delete(id)` | Deletes bookmark `task/<id>` |
+| `tasks.start(id)` | **VCS required** - creates bookmark `task/<id>`, records start commit |
+| `tasks.complete(id)` | **VCS required** - commits changes (NothingToCommit = success) |
+| `tasks.delete(id)` | Best-effort bookmark cleanup (logs warning on failure) |
 
-**No direct VCS API** - agents work with tasks, VCS is managed behind the scenes.
+**VCS (jj or git) is required** for start/complete. Fails with `NotARepository` if none found. CRUD operations work without VCS.
 
 ## Quick Examples
 
@@ -130,14 +168,25 @@ const subtask = await tasks.create({
   context: "Handle 7-day expiry"
 });
 
-// Start work (auto-creates VCS bookmark)
+// Start work (VCS required - creates bookmark)
 await tasks.start(subtask.id);
 
 // ... do implementation work ...
 
-// Complete task with learnings (auto-squashes commits, bubbles learnings to parent)
+// Complete task with learnings (VCS required - commits changes, bubbles learnings to parent)
 await tasks.complete(subtask.id, {
   result: "Implemented using jose library",
   learnings: ["Use jose instead of jsonwebtoken"]
 });
+
+// Get progress summary
+const progress = await tasks.progress(milestone.id);
+// -> { total: 2, completed: 1, ready: 1, blocked: 0 }
+
+// Search tasks
+const authTasks = await tasks.search("authentication");
+
+// Get task tree
+const tree = await tasks.tree(milestone.id);
+// -> { task: Task, children: TaskTree[] }
 ```
