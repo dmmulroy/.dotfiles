@@ -35,7 +35,7 @@ Phase: CLARIFY | Waiting for: answers to questions 1-4
 
 1. **STOP.** Do not proceed to planning.
 2. Identify gaps in: scope, motivation, constraints, edge cases, success criteria
-3. Ask 3-5 pointed questions that would change the approach
+3. Ask 3-5 pointed questions that would change the approach. USE YOUR QUESTION TOOL. 
 4. **Wait for responses**
 
 | Category | Example |

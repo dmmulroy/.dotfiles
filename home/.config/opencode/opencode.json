@@ -151,7 +151,9 @@
     "overseer": {
       "type": "local",
       "command": [
-        "os",
+        "npx",
+        "-y",
+        "@dmmulroy/overseer",
         "mcp"
       ],
       "enabled": true
