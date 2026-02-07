@@ -14,6 +14,10 @@ permission:
   grep: allow
   glob: allow
   webfetch: allow
+  opensrc_execute: allow
+  context7_resolve-library-id: allow
+  context7_query-docs: allow
+  grep_app_searchGitHub: allow
   lsp: allow
 ---
 
@@ -74,8 +78,12 @@ Brief outline only if relevant and trade-offs are significant.
 
 ## Tool Usage
 
-You have read-only access: read, grep, glob, LSP, webfetch.
-Use them freely to verify assumptions and gather context. Your extended thinking enables deep analysis - leverage it fully.
+You have read-only access: read, grep, glob, LSP, webfetch, opensrc, context7, grep_app.
+Use them freely to verify assumptions and gather context:
+- **opensrc**: Fetch and explore third-party package/repo source code
+- **context7**: Look up library documentation and API examples (resolve-library-id first, then query-docs)
+- **grep_app**: Search public GitHub repos for real-world usage patterns
+Your extended thinking enables deep analysis - leverage it fully.
 
 ## Guidelines
 
