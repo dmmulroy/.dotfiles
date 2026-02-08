@@ -136,6 +136,29 @@
   "plugin": [
     "opencode-anthropic-auth"
   ],
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-5.3-codex": {
+          "name": "GPT-5.3 Codex",
+          "tool_call": true,
+          "reasoning": true,
+          "temperature": true,
+          "attachment": false,
+          "interleaved": {
+            "field": "reasoning_content"
+          },
+          "limit": {
+            "context": 1047576,
+            "output": 65536
+          },
+          "options": {
+            "store": false
+          }
+        }
+      }
+    }
+  },
   "mcp": {
     "backstage": {
       "type": "remote",
