@@ -1,0 +1,27 @@
+{
+  "generatedAt": 1771514176333,
+  "ts": {
+    "warmP50Ms": 0.3326250000000073,
+    "warmP95Ms": 0.5368330000000014,
+    "coldFirstRequestMs": 28.610083000000003,
+    "editToDiagnosticsP95Ms": 173.834667,
+    "leakedProcesses": 0,
+    "diagnosticsSummaryChars": 360
+  },
+  "python": {
+    "warmP50Ms": 0.2201669999999467,
+    "warmP95Ms": 0.4427920000002814,
+    "coldFirstRequestMs": 24.68858399999999,
+    "editToDiagnosticsP95Ms": 174.55600000000004,
+    "leakedProcesses": 0,
+    "diagnosticsSummaryChars": 356
+  },
+  "aggregate": {
+    "warmP50Ms": 0.276395999999977,
+    "warmP95Ms": 0.4898125000001414,
+    "coldFirstRequestMs": 26.649333499999997,
+    "editToDiagnosticsP95Ms": 174.1953335,
+    "leakedProcesses": 0,
+    "diagnosticsSummaryChars": 360
+  }
+}

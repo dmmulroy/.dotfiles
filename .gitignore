@@ -25,3 +25,19 @@ home/.config/opencode/node_modules/
 
 # jj per-repo configs
 home/.config/jj/repos/
+
+# pi agent runtime/state (keep settings + customization resources tracked)
+home/.pi/agent/*
+
+!home/.pi/agent/settings.json
+!home/.pi/agent/tsconfig.json
+!home/.pi/agent/package.json
+!home/.pi/agent/themes/
+!home/.pi/agent/themes/*.json
+!home/.pi/agent/extensions/
+!home/.pi/agent/extensions/**
+!home/.pi/agent/prelude/
+!home/.pi/agent/prelude/**
+!home/.pi/agent/skills/
+!home/.pi/agent/skills/**
+

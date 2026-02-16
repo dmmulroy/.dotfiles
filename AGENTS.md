@@ -37,6 +37,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 | Tmux binding | `home/.config/tmux/tmux.conf` |
 | jj alias | `home/.config/jj/config.toml` [aliases] |
 | Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
+| Pi extension shared helper | `home/.pi/agent/prelude/` |
 
 ## CONVENTIONS
 
@@ -46,6 +47,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + jj.
 - Git abbrs: ~180 oh-my-zsh style via `__git.init.fish`
 - Private helpers: prefix `__` (e.g., `__git.default_branch`)
 - VCS: jj colocated (`.jj/` + `.git/`), `dot update` is jj-aware
+- Pi extensions: check `home/.pi/agent/prelude/` before writing new helpers; extract reusable logic there
 
 ## ANTI-PATTERNS
 

@@ -1,0 +1,27 @@
+{
+  "generatedAt": 1771514176386,
+  "pi": {
+    "warmP50Ms": 0.276395999999977,
+    "warmP95Ms": 0.4898125000001414,
+    "coldFirstRequestMs": 26.649333499999997,
+    "editToDiagnosticsP95Ms": 174.1953335,
+    "leakedProcesses": 0,
+    "diagnosticsSummaryChars": 360
+  },
+  "baseline": {
+    "warmP50Ms": 55,
+    "warmP95Ms": 95,
+    "coldFirstRequestMs": 280,
+    "editToDiagnosticsP95Ms": 3200,
+    "diagnosticsSummaryChars": 1800
+  },
+  "checks": {
+    "warmP50": true,
+    "warmP95": true,
+    "cold": true,
+    "editP95": true,
+    "noLeaks": true,
+    "summaryBudget": true
+  },
+  "passed": true
+}
