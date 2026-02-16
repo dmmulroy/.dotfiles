@@ -1,0 +1,10 @@
+{
+  "source": "default",
+  "baseline": {
+    "warmP50Ms": 55,
+    "warmP95Ms": 95,
+    "coldFirstRequestMs": 280,
+    "editToDiagnosticsP95Ms": 3200,
+    "diagnosticsSummaryChars": 1800
+  }
+}

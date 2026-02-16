@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "test:lsp:unit": "bun test ./extensions/lsp/tests/unit",
+    "test:lsp:integration": "bun test ./extensions/lsp/tests/integration",
+    "test:lsp:perf": "bun test ./extensions/lsp/tests/perf",
+    "test:lsp": "bun test ./extensions/lsp/tests",
+    "bench:lsp": "bun run ./extensions/lsp/bench/run-parity.ts"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.53.0",
+    "@mariozechner/pi-coding-agent": "^0.53.0",
+    "@mariozechner/pi-tui": "^0.53.0",
+    "picomatch": "^4.0.3"
+  }
+}

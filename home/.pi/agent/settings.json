@@ -1,0 +1,12 @@
+{
+  "lastChangelogVersion": "0.53.0",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.3-codex",
+  "defaultThinkingLevel": "xhigh",
+  "theme": "catppuccin-macchiato",
+  "packages": [
+    "npm:pi-mcp-adapter",
+    "npm:pi-subagents"
+  ],
+  "hideThinkingBlock": true
+}
