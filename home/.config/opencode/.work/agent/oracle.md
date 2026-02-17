@@ -1,8 +1,8 @@
 ---
 description: Principal engineering advisor for code reviews, architecture decisions, complex debugging, and planning. Invoke when you need deeper analysis before acting — reviews, trade-offs, debugging race conditions, planning refactors. Prompt with precise problem + files. Ask for concrete outcomes.
 mode: subagent
-model: openai/gpt-5.2-codex
-reasoningEffort: high
+model: openai/gpt-5.3-codex
+reasoningEffort: xhigh
 # Strict read-only permissions (mirrors Amp's allowMcp:false, allowToolbox:false)
 permission:
   "*": deny
