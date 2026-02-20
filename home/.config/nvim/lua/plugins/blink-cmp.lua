@@ -78,6 +78,7 @@ return {
 			},
 			completion = {
 				trigger = {
+					show_in_snippet = false,
 					show_on_trigger_character = true,
 				},
 				menu = {
