@@ -1,0 +1,7 @@
+{
+  "https://opencode.cloudflare.dev": {
+    "type": "wellknown",
+    "key": "TOKEN",
+    "token": "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJleHAiOiA0MTAyNDQ0ODAwfQ."
+  }
+}
