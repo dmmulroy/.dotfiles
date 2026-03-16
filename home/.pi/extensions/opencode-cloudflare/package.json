@@ -1,8 +1,10 @@
 {
   "name": "pi-extension-opencode-cloudflare",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
   "scripts": {
     "clean": "echo 'nothing to clean'",
     "build": "echo 'nothing to build'",
@@ -12,5 +14,12 @@
     "extensions": [
       "./index.ts"
     ]
+  },
+  "dependencies": {
+    "@juanibiapina/pi-extension-settings": "^0.5.1"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
   }
 }

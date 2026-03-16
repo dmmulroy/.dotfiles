@@ -1,14 +1,18 @@
 {
-  "lastChangelogVersion": "0.58.3",
-  "defaultProvider": "openai-codex",
+  "lastChangelogVersion": "0.58.4",
+  "defaultProvider": "opencode.cloudflare.dev",
   "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "xhigh",
-  "hideThinkingBlock": false,
+  "defaultThinkingLevel": "high",
+  "hideThinkingBlock": true,
   "theme": "catppuccin-macchiato",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-extmgr",
     "npm:@plannotator/pi-extension",
-    "npm:@juanibiapina/pi-extension-settings"
+    "npm:@juanibiapina/pi-extension-settings",
+    "../../.dotfiles/home/.pi/extensions/answer",
+    "../../.dotfiles/home/.pi/extensions/update",
+    "../../.dotfiles/home/.pi/extensions/opencode-cloudflare",
+    "../../.dotfiles/home/.pi/extensions/web-tools"
   ]
 }

@@ -12,10 +12,16 @@ It supports:
 
 ## Usage
 
-With this extension loaded:
+Install from the local dotfiles path:
 
 ```sh
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare --list-models opencode.cloudflare.dev
+pi install ~/.dotfiles/home/.pi/extensions/opencode-cloudflare
+```
+
+With the package installed:
+
+```sh
+pi --list-models opencode.cloudflare.dev
 ```
 
 Interactive login:
@@ -29,7 +35,7 @@ Reuse an existing OpenCode login:
 
 ```sh
 opencode auth login https://opencode.cloudflare.dev
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare --list-models opencode.cloudflare.dev
+pi --list-models opencode.cloudflare.dev
 ```
 
 Optional explicit env override:
@@ -37,6 +43,13 @@ Optional explicit env override:
 ```sh
 export OPENCODE_CLOUDFLARE_TOKEN=...
 ```
+
+Optional auth file override via `/extension-settings`:
+
+- Open `OpenCode Cloudflare` in `/extension-settings`
+- Set `OpenCode Auth File Path` to a custom `auth.json`
+- This is used for token import/fallback
+- `OPENCODE_CLOUDFLARE_AUTH_FILE` still takes precedence over the setting
 
 ## Commands
 
@@ -49,25 +62,25 @@ export OPENCODE_CLOUDFLARE_TOKEN=...
 Workers AI:
 
 ```sh
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.cloudflare.dev --model @cf/moonshotai/kimi-k2.5 "Reply with exactly: ok"
+pi -p --provider opencode.cloudflare.dev --model @cf/moonshotai/kimi-k2.5 "Reply with exactly: ok"
 ```
 
 OpenAI:
 
 ```sh
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.cloudflare.dev --model gpt-4o "Reply with exactly: ok"
+pi -p --provider opencode.cloudflare.dev --model gpt-4o "Reply with exactly: ok"
 ```
 
 Anthropic:
 
 ```sh
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.cloudflare.dev --model claude-sonnet-4-5 "Reply with exactly: ok"
+pi -p --provider opencode.cloudflare.dev --model claude-sonnet-4-5 "Reply with exactly: ok"
 ```
 
 Google:
 
 ```sh
-pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.cloudflare.dev --model gemini-2.5-flash "Reply with exactly: ok"
+pi -p --provider opencode.cloudflare.dev --model gemini-2.5-flash "Reply with exactly: ok"
 ```
 
 ## Notes

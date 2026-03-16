@@ -1,0 +1,11 @@
+{
+  "name": "pi-local-extensions-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "./answer",
+    "./update",
+    "./opencode-cloudflare",
+    "./web-tools"
+  ]
+}

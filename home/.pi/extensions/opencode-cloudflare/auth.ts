@@ -12,6 +12,7 @@ import {
 	TOKEN_ENV_OVERRIDE,
 	WELL_KNOWN_URL,
 } from "./constants.ts";
+import { getConfiguredAuthFilePath } from "./settings.ts";
 import {
 	getGatewayConfig,
 	getGatewayTokenExpiry,
@@ -38,6 +39,10 @@ export function listOpenCodeAuthCandidates(): string[] {
 	const candidates = new Set<string>();
 	const explicit = process.env[OPENCODE_AUTH_FILE_ENV]?.trim();
 	if (explicit) candidates.add(path.resolve(explicit));
+
+	const configured = getConfiguredAuthFilePath();
+	if (configured) candidates.add(path.resolve(configured));
+
 	const xdgDataHome = process.env.XDG_DATA_HOME?.trim();
 	if (xdgDataHome) {
 		candidates.add(path.join(xdgDataHome, "opencode", "auth.json"));
