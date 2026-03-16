@@ -1,0 +1,28 @@
+{
+  "name": "pi-web-tools-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "@juanibiapina/pi-extension-settings": "^0.5.1",
+    "html-to-text": "^9.0.5",
+    "linkedom": "^0.18.12",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/turndown": "^5.0.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
