@@ -15,23 +15,23 @@ truncate_to_repo = false
 detect_files = ["global.json", "Directory.Build.props", "Directory.Build.targets", "Packages.props"]
 
 [git_branch]
-disabled = true
+# disabled = true
 symbol = " "
 truncation_length = 18
 
 [git_status]
-disabled = true
+# disabled = true
 
 [git_commit]
-disabled = true
+# disabled = true
 
 [git_state]
-disabled = true
+# disabled = true
 
-[custom.scm]
-when = "jj-starship detect"
-shell = ["jj-starship", "--strip-bookmark-prefix", "dmmulroy/", "--truncate-name", "20", "--bookmarks-display-limit", "1"]
-format = "$output "
+# [custom.scm]
+# when = "jj-starship detect"
+# shell = ["jj-starship", "--strip-bookmark-prefix", "dmmulroy/", "--truncate-name", "20", "--bookmarks-display-limit", "1"]
+# format = "$output "
 
 [golang]
 symbol = " "

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "./index.ts",
+    "./settings.ts",
+    "./types.ts",
+    "./vendor.d.ts",
+    "./network.ts",
+    "./html.ts",
+    "./truncation.ts",
+    "./temp.ts",
+    "./render.ts",
+    "./webfetch.ts",
+    "./websearch.ts",
+    "./providers/**/*.ts",
+    "./test/**/*.ts"
+  ]
+}

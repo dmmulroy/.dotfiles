@@ -1,0 +1,14 @@
+{
+  "lastChangelogVersion": "0.58.3",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.4",
+  "defaultThinkingLevel": "xhigh",
+  "hideThinkingBlock": false,
+  "theme": "catppuccin-macchiato",
+  "packages": [
+    "npm:pi-mcp-adapter",
+    "npm:pi-extmgr",
+    "npm:@plannotator/pi-extension",
+    "npm:@juanibiapina/pi-extension-settings"
+  ]
+}
