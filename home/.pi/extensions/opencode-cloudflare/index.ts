@@ -14,6 +14,7 @@ import {
 import { getCatalog, refreshCatalog, summarizeCatalog } from "./catalog.ts";
 import { CUSTOM_API, GATEWAY_ORIGIN, PROVIDER_ID, PROVIDER_NAME, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { streamOpencodeCloudflare } from "./dispatch.ts";
+import { getConfiguredAuthFilePath, registerOpencodeCloudflareSettings } from "./settings.ts";
 import { clearGatewayConfigCache, getGatewayConfig } from "./wellknown.ts";
 
 function shellQuote(value: string): string {
@@ -43,10 +44,12 @@ function isCommandAvailable(command: string): boolean {
 function buildStatusReport(): string {
 	const imported = readImportedGatewayToken();
 	const authPath = findOpenCodeAuthPath();
+	const configuredAuthPath = getConfiguredAuthFilePath();
 	return [
 		`${PROVIDER_NAME}`,
 		`Pi auth: ${describeStoredCredential()}`,
 		`${TOKEN_ENV_OVERRIDE}: ${hasEnvOverride() ? "present" : "missing"}`,
+		`Configured auth file override: ${configuredAuthPath || "none"}`,
 		`OpenCode auth file: ${authPath || "missing"}`,
 		`OpenCode token: ${describeTokenState(imported?.token)}`,
 		`Catalog: ${summarizeCatalog(getCatalog())}`,
@@ -71,6 +74,7 @@ async function handleDoctor(ctx: ExtensionCommandContext): Promise<void> {
 	const report = [
 		`${PROVIDER_NAME} doctor`,
 		`Gateway origin: ${gateway.origin}`,
+		`Configured auth file override: ${getConfiguredAuthFilePath() || "none"}`,
 		`Auth command: ${Array.isArray(gateway.authCommand) ? gateway.authCommand.join(" ") : gateway.authCommand || "missing"}`,
 		`Enabled backends: ${gateway.enabledBackends.join(", ")}`,
 		`cloudflared: ${isCommandAvailable("cloudflared") ? "found" : "missing"}`,
@@ -81,6 +85,7 @@ async function handleDoctor(ctx: ExtensionCommandContext): Promise<void> {
 }
 
 export default async function (pi: ExtensionAPI) {
+	registerOpencodeCloudflareSettings(pi);
 	const catalog = await refreshCatalog(true);
 
 	pi.registerProvider(PROVIDER_ID, {
@@ -116,5 +121,9 @@ export default async function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			await handleDoctor(ctx);
 		},
+	});
+
+	pi.on("session_start", async () => {
+		registerOpencodeCloudflareSettings(pi);
 	});
 }

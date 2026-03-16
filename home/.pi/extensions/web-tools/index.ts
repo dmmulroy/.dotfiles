@@ -7,6 +7,8 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 	pi.registerTool(createWebFetchTool());
 	pi.registerTool(createWebSearchTool());
 
+	registerWebToolsSettings(pi);
+
 	pi.on("session_start", async (_event, _ctx) => {
 		registerWebToolsSettings(pi);
 	});

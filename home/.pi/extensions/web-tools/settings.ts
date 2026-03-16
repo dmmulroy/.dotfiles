@@ -119,11 +119,10 @@ export const WEB_TOOLS_SETTING_DEFINITIONS = [
 	},
 ] satisfies SettingDefinition[];
 
-let hasRegisteredSettings = false;
-
 export function registerWebToolsSettings(pi: ExtensionAPI): void {
-	if (hasRegisteredSettings) return;
-	hasRegisteredSettings = true;
+	// Emit registrations opportunistically. The settings extension keeps an in-memory
+	// registry, so repeated registration is harmless and helps when extension load
+	// order means the initial listener is not attached yet.
 	pi.events.emit("pi-extension-settings:register", {
 		name: WEB_TOOLS_EXTENSION_NAME,
 		settings: WEB_TOOLS_SETTING_DEFINITIONS,
