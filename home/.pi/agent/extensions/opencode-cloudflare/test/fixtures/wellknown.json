@@ -1,0 +1,142 @@
+{
+  "auth": {
+    "command": [
+      "cloudflared",
+      "access",
+      "login",
+      "--no-verbose",
+      "-app=https://opencode.cloudflare.dev"
+    ],
+    "env": "TOKEN"
+  },
+  "config": {
+    "enabled_providers": [
+      "anthropic",
+      "openai",
+      "workers-ai",
+      "google"
+    ],
+    "provider": {
+      "anthropic": {
+        "options": {
+          "baseURL": "https://opencode.cloudflare.dev/anthropic",
+          "headers": {
+            "cf-access-token": "{env:TOKEN}",
+            "X-Requested-With": "xmlhttprequest",
+            "anthropic-beta": "context-1m-2025-08-07"
+          }
+        },
+        "models": {
+          "anthropic/claude-opus-4-6": {
+            "limit": {
+              "context": 1000000,
+              "output": 128000
+            }
+          }
+        }
+      },
+      "openai": {
+        "options": {
+          "baseURL": "https://opencode.cloudflare.dev/openai",
+          "headers": {
+            "cf-access-token": "{env:TOKEN}",
+            "X-Requested-With": "xmlhttprequest"
+          }
+        },
+        "models": {
+          "gpt-4o": {
+            "options": {
+              "store": false
+            }
+          },
+          "gpt-5": {
+            "options": {
+              "store": false
+            }
+          },
+          "codex-mini-latest": {
+            "options": {
+              "store": false
+            }
+          }
+        }
+      },
+      "google": {
+        "options": {
+          "baseURL": "https://opencode.cloudflare.dev/google-ai-studio/v1beta",
+          "headers": {
+            "cf-access-token": "{env:TOKEN}",
+            "X-Requested-With": "xmlhttprequest"
+          }
+        }
+      },
+      "workers-ai": {
+        "options": {
+          "baseURL": "https://opencode.cloudflare.dev/compat",
+          "headers": {
+            "cf-access-token": "{env:TOKEN}",
+            "X-Requested-With": "xmlhttprequest"
+          }
+        },
+        "models": {
+          "workers-ai/@cf/moonshotai/kimi-k2.5": {
+            "name": "Kimi K2.5",
+            "attachment": true,
+            "reasoning": true,
+            "modalities": {
+              "input": [
+                "text",
+                "image"
+              ],
+              "output": [
+                "text"
+              ]
+            },
+            "limit": {
+              "context": 256000,
+              "output": 64000
+            },
+            "options": {
+              "max_tokens": 64000,
+              "store": false
+            }
+          },
+          "workers-ai/@cf/zai-org/glm-4.7-flash": {
+            "name": "GLM-4.7-Flash",
+            "attachment": true,
+            "reasoning": true,
+            "limit": {
+              "context": 131072,
+              "output": 64000
+            },
+            "options": {
+              "max_tokens": 64000,
+              "store": false
+            }
+          },
+          "workers-ai/@cf/nvidia/nemotron-3-120b-a12b": {
+            "name": "Nemotron 3 Super 120B",
+            "attachment": false,
+            "reasoning": true,
+            "modalities": {
+              "input": [
+                "text"
+              ],
+              "output": [
+                "text"
+              ]
+            },
+            "limit": {
+              "context": 256000,
+              "output": 64000
+            },
+            "options": {
+              "max_tokens": 64000,
+              "store": false
+            }
+          }
+        }
+      }
+    }
+  }
+}
