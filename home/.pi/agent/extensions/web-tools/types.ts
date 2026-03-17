@@ -12,7 +12,7 @@ export interface WebToolsSettings {
 		maxResponseBytes: number;
 		blockPrivateHosts: boolean;
 		maxRedirects: number;
-		userAgent: string;
+		fallbackUserAgent: string;
 	};
 	search: {
 		enabled: boolean;

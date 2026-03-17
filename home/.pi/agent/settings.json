@@ -8,11 +8,6 @@
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-extmgr",
-    "npm:@plannotator/pi-extension",
-    "npm:@juanibiapina/pi-extension-settings",
-    "../../.dotfiles/home/.pi/extensions/answer",
-    "../../.dotfiles/home/.pi/extensions/update",
-    "../../.dotfiles/home/.pi/extensions/opencode-cloudflare",
-    "../../.dotfiles/home/.pi/extensions/web-tools"
+    "npm:@plannotator/pi-extension"
   ]
 }

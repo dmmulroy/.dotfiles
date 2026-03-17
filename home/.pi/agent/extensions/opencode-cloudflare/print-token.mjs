@@ -7,37 +7,10 @@ const GATEWAY_ORIGIN = "https://opencode.cloudflare.dev";
 const WELL_KNOWN_URL = `${GATEWAY_ORIGIN}/.well-known/opencode`;
 const TOKEN_ENV_OVERRIDE = "OPENCODE_CLOUDFLARE_TOKEN";
 const AUTH_FILE_ENV = "OPENCODE_CLOUDFLARE_AUTH_FILE";
-const EXTENSION_SETTINGS_FILE = "settings-extensions.json";
-const EXTENSION_SETTINGS_KEY = "opencode-cloudflare";
-const EXTENSION_SETTINGS_AUTH_FILE_KEY = "authFilePath";
-
-function getAgentDir() {
-	const envDir = process.env.PI_CODING_AGENT_DIR;
-	if (envDir) {
-		if (envDir === "~") return os.homedir();
-		if (envDir.startsWith("~/")) return path.join(os.homedir(), envDir.slice(2));
-		return envDir;
-	}
-	return path.join(os.homedir(), ".pi", "agent");
-}
-
-function readConfiguredAuthFilePath() {
-	const settingsPath = path.join(getAgentDir(), EXTENSION_SETTINGS_FILE);
-	if (!fs.existsSync(settingsPath)) return undefined;
-	try {
-		const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-		const value = settings?.[EXTENSION_SETTINGS_KEY]?.[EXTENSION_SETTINGS_AUTH_FILE_KEY];
-		return typeof value === "string" && value.trim() ? value.trim() : undefined;
-	} catch {
-		return undefined;
-	}
-}
 
 function listCandidates() {
 	const candidates = new Set();
 	if (process.env[AUTH_FILE_ENV]) candidates.add(path.resolve(process.env[AUTH_FILE_ENV]));
-	const configured = readConfiguredAuthFilePath();
-	if (configured) candidates.add(path.resolve(configured));
 	if (process.env.XDG_DATA_HOME) candidates.add(path.join(process.env.XDG_DATA_HOME, "opencode", "auth.json"));
 	candidates.add(path.join(os.homedir(), ".local", "share", "opencode", "auth.json"));
 	return [...candidates];

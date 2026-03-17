@@ -34,12 +34,11 @@ home/.pi/agent/*
 !home/.pi/agent/package.json
 !home/.pi/agent/themes/
 !home/.pi/agent/themes/*.json
+!home/.pi/agent/extensions/
+!home/.pi/agent/extensions/**
+home/.pi/agent/extensions/**/node_modules/
 !home/.pi/agent/skills/
 !home/.pi/agent/skills/**
 !home/.pi/agent/prelude/
 !home/.pi/agent/prelude/**
-
-# pi extension packages
-home/.pi/extensions/node_modules/
-home/.pi/extensions/**/node_modules/
 

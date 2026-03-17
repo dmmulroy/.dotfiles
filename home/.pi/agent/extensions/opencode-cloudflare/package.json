@@ -1,0 +1,16 @@
+{
+  "name": "pi-extension-opencode-cloudflare",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "clean": "echo 'nothing to clean'",
+    "build": "echo 'nothing to build'",
+    "check": "node ./test/smoke.mjs && node ./test/anthropic-auth-regression.mjs && node ./test/google-auth-regression.mjs && node ./test/workers-ai-route-regression.mjs"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -2,18 +2,13 @@ import { complete, type Api, type Model, type UserMessage } from "@mariozechner/
 import {
 	BorderedLoader,
 	type ExtensionAPI,
-	type ExtensionCommandContext,
 	type ExtensionContext,
-	type Theme,
 } from "@mariozechner/pi-coding-agent";
-import { getSetting, setSetting, type OrderedListOption, type SettingDefinition } from "@juanibiapina/pi-extension-settings";
 import {
 	type Component,
 	type Focusable,
 	Editor,
 	type EditorTheme,
-	fuzzyFilter,
-	Input,
 	Key,
 	matchesKey,
 	type TUI,
@@ -56,17 +51,14 @@ Rules:
 - Do not add commentary outside the JSON object.
 - If there are no user-answerable questions, return {"questions": []}.`;
 
-const ANSWER_EXTENSION_NAME = "answer";
-const LEGACY_EXTRACTION_MODELS_SETTING_ID = "extractionModels";
-const PRIMARY_EXTRACTION_MODEL_SETTING_ID = "primaryExtractionModel";
-const FALLBACK_EXTRACTION_MODEL_SETTING_ID = "fallbackExtractionModel";
-
 interface ExtractionModelPreference {
 	provider: string;
 	modelId: string;
 }
 
-interface ExtractionModelOption extends OrderedListOption {
+interface ExtractionModelOption {
+	id: string;
+	label: string;
 	provider: string;
 	modelId: string;
 }
@@ -85,16 +77,6 @@ const STATIC_FALLBACK_EXTRACTION_MODEL_OPTIONS = DEFAULT_EXTRACTION_MODEL_PREFER
 
 function toExtractionModelKey(candidate: ExtractionModelPreference): string {
 	return `${candidate.provider}/${candidate.modelId}`;
-}
-
-function parseExtractionModelKey(value: string): ExtractionModelPreference | undefined {
-	const normalized = value.trim();
-	const slashIndex = normalized.indexOf("/");
-	if (slashIndex <= 0 || slashIndex === normalized.length - 1) return undefined;
-	return {
-		provider: normalized.slice(0, slashIndex),
-		modelId: normalized.slice(slashIndex + 1),
-	};
 }
 
 function getAvailableExtractionModelOptions(
@@ -129,299 +111,14 @@ function getDefaultExtractionModelPreferences(
 	return options.slice(0, 2).map((option) => ({ provider: option.provider, modelId: option.modelId }));
 }
 
-function getSlotSettingIds(): string[] {
-	return [PRIMARY_EXTRACTION_MODEL_SETTING_ID, FALLBACK_EXTRACTION_MODEL_SETTING_ID];
-}
-
-function getStoredSlotSettingValues(): Array<string | undefined> {
-	return getSlotSettingIds().map((settingId) => {
-		const raw = getSetting(ANSWER_EXTENSION_NAME, settingId, undefined);
-		return raw === undefined ? undefined : raw.trim();
-	});
-}
-
-function hasStoredSlotSettings(values: readonly (string | undefined)[]): boolean {
-	return values.some((value) => value !== undefined);
-}
-
-function getStoredSlotModelPreferences(values = getStoredSlotSettingValues()): ExtractionModelPreference[] {
-	const parsed: ExtractionModelPreference[] = [];
-	const seen = new Set<string>();
-
-	for (const raw of values) {
-		if (!raw) continue;
-		const candidate = parseExtractionModelKey(raw);
-		if (!candidate) continue;
-		const key = toExtractionModelKey(candidate);
-		if (seen.has(key)) continue;
-		seen.add(key);
-		parsed.push(candidate);
-	}
-
-	return parsed;
-}
-
-function getLegacyExtractionModelPreferences(): ExtractionModelPreference[] {
-	const raw = getSetting(ANSWER_EXTENSION_NAME, LEGACY_EXTRACTION_MODELS_SETTING_ID, undefined)?.trim();
-	if (!raw) return [];
-
-	return raw
-		.split(",")
-		.map((entry) => parseExtractionModelKey(entry))
-		.filter((candidate): candidate is ExtractionModelPreference => Boolean(candidate));
-}
-
-function mergeExtractionModelPreferences(...groups: readonly ExtractionModelPreference[][]): ExtractionModelPreference[] {
-	const merged: ExtractionModelPreference[] = [];
-	const seen = new Set<string>();
-
-	for (const group of groups) {
-		for (const candidate of group) {
-			const key = toExtractionModelKey(candidate);
-			if (seen.has(key)) continue;
-			seen.add(key);
-			merged.push(candidate);
-		}
-	}
-
-	return merged;
-}
-
-function registerAnswerSettings(
-	pi: ExtensionAPI,
-	modelRegistry?: Pick<ExtensionContext["modelRegistry"], "getAvailable">,
-): void {
-	const defaults = getDefaultExtractionModelPreferences(modelRegistry);
-	const storedSlotValues = getStoredSlotSettingValues();
-	const storedSlots = getStoredSlotModelPreferences(storedSlotValues);
-	const legacy = hasStoredSlotSettings(storedSlotValues) ? [] : getLegacyExtractionModelPreferences();
-	const effective = mergeExtractionModelPreferences(storedSlots, legacy, defaults);
-	const descriptionsSuffix = "use /answer-config to pick from currently available models.";
-	const definitions = [
-		{
-			id: PRIMARY_EXTRACTION_MODEL_SETTING_ID,
-			label: "Primary Model",
-			description: `First model tried for question extraction. Enter provider/modelId manually, or ${descriptionsSuffix}`,
-			defaultValue: storedSlotValues[0] ?? toExtractionModelKey(effective[0] ?? defaults[0] ?? DEFAULT_EXTRACTION_MODEL_PREFERENCES[0]!),
-		},
-		{
-			id: FALLBACK_EXTRACTION_MODEL_SETTING_ID,
-			label: "Fallback Model",
-			description: `Second model tried if the primary model is unavailable. Leave blank to disable, or ${descriptionsSuffix}`,
-			defaultValue: storedSlotValues[1] ?? (effective[1] ? toExtractionModelKey(effective[1]) : ""),
-		},
-	] satisfies SettingDefinition[];
-
-	pi.events.emit("pi-extension-settings:register", {
-		name: ANSWER_EXTENSION_NAME,
-		settings: definitions,
-	});
-}
-
 function getExtractionModelPreferences(
 	modelRegistry?: Pick<ExtensionContext["modelRegistry"], "getAvailable">,
 ): ExtractionModelPreference[] {
-	const storedSlotValues = getStoredSlotSettingValues();
-	const storedSlots = getStoredSlotModelPreferences(storedSlotValues);
-	if (hasStoredSlotSettings(storedSlotValues)) {
-		return storedSlots;
-	}
-
-	const legacy = getLegacyExtractionModelPreferences();
-	const defaults = getDefaultExtractionModelPreferences(modelRegistry);
-	return mergeExtractionModelPreferences(legacy, defaults);
+	return getDefaultExtractionModelPreferences(modelRegistry);
 }
 
 function formatExtractionModelPreferences(preferences: ExtractionModelPreference[]): string {
 	return preferences.map((candidate) => `${candidate.provider}/${candidate.modelId}`).join(", ");
-}
-
-class SearchableModelPicker implements Component, Focusable {
-	private readonly title: string;
-	private readonly options: ExtractionModelOption[];
-	private readonly theme: Theme;
-	private readonly searchInput: Input;
-	private filteredOptions: ExtractionModelOption[];
-	private selectedIndex = 0;
-	private _focused = false;
-
-	constructor(
-		private readonly tui: TUI,
-		title: string,
-		options: ExtractionModelOption[],
-		theme: Theme,
-		private readonly done: (selected?: ExtractionModelPreference) => void,
-		currentSelection?: ExtractionModelPreference,
-	) {
-		this.title = title;
-		this.options = options;
-		this.theme = theme;
-		this.searchInput = new Input();
-		this.filteredOptions = options;
-		this.searchInput.onSubmit = () => {
-			const selected = this.filteredOptions[this.selectedIndex];
-			if (selected) {
-				this.done({ provider: selected.provider, modelId: selected.modelId });
-			}
-		};
-
-		if (currentSelection) {
-			const currentKey = toExtractionModelKey(currentSelection);
-			const currentIndex = this.options.findIndex((option) => option.id === currentKey);
-			if (currentIndex >= 0) {
-				this.selectedIndex = currentIndex;
-			}
-		}
-	}
-
-	get focused(): boolean {
-		return this._focused;
-	}
-
-	set focused(value: boolean) {
-		this._focused = value;
-		this.searchInput.focused = value;
-	}
-
-	invalidate(): void {}
-
-	render(width: number): string[] {
-		const lines: string[] = [];
-		const maxVisible = 10;
-		const contentWidth = Math.max(1, width - 4);
-		const startIndex = Math.max(0, Math.min(this.selectedIndex - Math.floor(maxVisible / 2), this.filteredOptions.length - maxVisible));
-		const endIndex = Math.min(startIndex + maxVisible, this.filteredOptions.length);
-
-		lines.push(this.theme.fg("accent", truncateToWidth(this.title, contentWidth, "…")));
-		lines.push(this.theme.fg("dim", truncateToWidth("Type to filter available models", contentWidth, "…")));
-		lines.push("");
-		for (const line of this.searchInput.render(contentWidth)) {
-			lines.push(line);
-		}
-		lines.push("");
-
-		if (this.filteredOptions.length === 0) {
-			lines.push(this.theme.fg("warning", "  No matching models"));
-		} else {
-			for (let i = startIndex; i < endIndex; i++) {
-				const option = this.filteredOptions[i]!;
-				const isSelected = i === this.selectedIndex;
-				const prefix = isSelected ? this.theme.fg("accent", "→ ") : "  ";
-				const label = isSelected ? this.theme.fg("accent", option.id) : option.id;
-				lines.push(truncateToWidth(`${prefix}${label}`, contentWidth, "…"));
-			}
-
-			if (startIndex > 0 || endIndex < this.filteredOptions.length) {
-				lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${this.filteredOptions.length})`));
-			}
-
-			const selected = this.filteredOptions[this.selectedIndex];
-			if (selected) {
-				lines.push("");
-				lines.push(this.theme.fg("dim", truncateToWidth(`  ${selected.label}`, contentWidth, "…")));
-			}
-		}
-
-		lines.push("");
-		lines.push(this.theme.fg("dim", "  ↑/↓ navigate · Enter select · Esc cancel"));
-		return lines;
-	}
-
-	handleInput(data: string): void {
-		if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
-			this.done(undefined);
-			return;
-		}
-
-		if (matchesKey(data, Key.up)) {
-			if (this.filteredOptions.length === 0) return;
-			this.selectedIndex = this.selectedIndex === 0 ? this.filteredOptions.length - 1 : this.selectedIndex - 1;
-			this.tui.requestRender();
-			return;
-		}
-
-		if (matchesKey(data, Key.down)) {
-			if (this.filteredOptions.length === 0) return;
-			this.selectedIndex = this.selectedIndex === this.filteredOptions.length - 1 ? 0 : this.selectedIndex + 1;
-			this.tui.requestRender();
-			return;
-		}
-
-		if (matchesKey(data, Key.enter)) {
-			const selected = this.filteredOptions[this.selectedIndex];
-			if (selected) {
-				this.done({ provider: selected.provider, modelId: selected.modelId });
-			}
-			return;
-		}
-
-		this.searchInput.handleInput(data);
-		const query = this.searchInput.getValue().trim();
-		this.filteredOptions = query
-			? fuzzyFilter(this.options, query, (option) => `${option.id} ${option.label} ${option.provider} ${option.modelId}`)
-			: this.options;
-		this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.filteredOptions.length - 1));
-		this.tui.requestRender();
-	}
-}
-
-async function configureAnswerExtractionModels(
-	ctx: ExtensionCommandContext,
-	modelRegistry: Pick<ExtensionContext["modelRegistry"], "getAvailable">,
-): Promise<void> {
-	const options = getAvailableExtractionModelOptions(modelRegistry);
-	const slotIds = getSlotSettingIds();
-	const slotLabels = ["Primary Model", "Fallback Model"] as const;
-	const slots = slotIds.map((settingId, index) => ({
-		settingId,
-		label: slotLabels[index]!,
-		value: getSetting(ANSWER_EXTENSION_NAME, settingId, undefined)?.trim() || "",
-	}));
-
-	const formatSlotValue = (value: string): string => (value ? value : "(unset)");
-
-	while (true) {
-		const choice = await ctx.ui.select(
-			"Configure answer extraction models",
-			[
-				...slots.map((slot) => `${slot.label}: ${formatSlotValue(slot.value)}`),
-				"Reset slots to recommended defaults",
-				"Done",
-			],
-		);
-
-		if (!choice || choice === "Done") return;
-
-		if (choice === "Reset slots to recommended defaults") {
-			const defaults = getDefaultExtractionModelPreferences(modelRegistry);
-			for (let i = 0; i < slots.length; i++) {
-				const nextValue = defaults[i] ? toExtractionModelKey(defaults[i]!) : "";
-				slots[i]!.value = nextValue;
-				setSetting(ANSWER_EXTENSION_NAME, slots[i]!.settingId, nextValue);
-			}
-			continue;
-		}
-
-		const slotIndex = slots.findIndex((slot) => `${slot.label}: ${formatSlotValue(slot.value)}` === choice);
-		if (slotIndex < 0) continue;
-		const slot = slots[slotIndex]!;
-
-		const action = await ctx.ui.select(slot.label, ["Choose model", "Clear", "Back"]);
-		if (!action || action === "Back") continue;
-		if (action === "Clear") {
-			slot.value = "";
-			setSetting(ANSWER_EXTENSION_NAME, slot.settingId, "");
-			continue;
-		}
-
-		const selected = await ctx.ui.custom<ExtractionModelPreference | undefined>((tui, theme, _kb, done) => {
-			return new SearchableModelPicker(tui, slot.label, options, theme, done, parseExtractionModelKey(slot.value));
-		});
-		if (!selected) continue;
-
-		slot.value = toExtractionModelKey(selected);
-		setSetting(ANSWER_EXTENSION_NAME, slot.settingId, slot.value);
-	}
 }
 
 function getTextParts(content: Array<{ type: string; text?: string }>): string[] {
@@ -802,8 +499,6 @@ class AnswerComponent implements Component, Focusable {
 }
 
 export default function (pi: ExtensionAPI) {
-	registerAnswerSettings(pi);
-
 	const answerHandler = async (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) {
 			ctx.ui.notify("answer requires interactive mode", "error");
@@ -931,26 +626,12 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => answerHandler(ctx),
 	});
 
-	pi.registerCommand("answer-config", {
-		description: "Configure answer extraction models with a searchable picker",
-		handler: async (_args, ctx) => {
-			if (!ctx.hasUI) {
-				ctx.ui.notify("answer-config requires interactive mode", "error");
-				return;
-			}
-
-			await configureAnswerExtractionModels(ctx, ctx.modelRegistry);
-			registerAnswerSettings(pi, ctx.modelRegistry);
-			ctx.ui.notify("Updated answer extraction model settings", "info");
-		},
-	});
+	
 
 	pi.registerShortcut("ctrl+.", {
 		description: "Extract and answer questions",
 		handler: answerHandler,
 	});
 
-	pi.on("session_start", async (_event, ctx) => {
-		registerAnswerSettings(pi, ctx.modelRegistry);
-	});
+	
 }

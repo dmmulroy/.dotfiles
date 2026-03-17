@@ -1,29 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-	WEB_TOOLS_SETTING_DEFINITIONS,
 	parseEnumSetting,
 	parseIntegerSetting,
 	parseOnOff,
 } from "../settings.ts";
-
-test("settings definitions include the expected ids", () => {
-	const ids = WEB_TOOLS_SETTING_DEFINITIONS.map((setting) => setting.id);
-	assert.deepEqual(ids, [
-		"fetchDefaultFormat",
-		"fetchTimeoutSeconds",
-		"fetchMaxResponseMB",
-		"fetchBlockPrivateHosts",
-		"fetchMaxRedirects",
-		"fetchUserAgent",
-		"searchEnabled",
-		"searchProvider",
-		"searchEndpoint",
-		"searchTimeoutSeconds",
-		"searchDefaultMaxResults",
-		"searchDefaultDepth",
-	]);
-});
 
 test("parseOnOff accepts on/off and falls back safely", () => {
 	assert.equal(parseOnOff("on", false), true);
