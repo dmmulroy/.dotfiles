@@ -25,6 +25,8 @@ type ExecResult = {
 const PACKAGE_NAME = "@mariozechner/pi-coding-agent";
 const BREW_FORMULA_CANDIDATES = ["pi", "pi-coding-agent"] as const;
 const EXEC_TIMEOUT_MS = 60_000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 5_000;
 
 function createReporter(ctx: Pick<ExtensionContext, "hasUI" | "ui">): Reporter {
 	return {
@@ -248,6 +250,25 @@ function summarizeResult(result: ExecResult): string {
 	return pieces.join("\n").trim() || `Command exited with code ${result.code}`;
 }
 
+function isTransientRegistryError(result: ExecResult): boolean {
+	const output = `${result.stdout}\n${result.stderr}`;
+	return /E404|404 Not Found|ETARGET|ERESOLVE|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ERR_SOCKET_TIMEOUT|fetch failed/i.test(output);
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function clearPackageCache(pi: ExtensionAPI, method: InstallMethod, reporter: Reporter): Promise<void> {
+	if (method === "npm") {
+		reporter.notify("Clearing npm cache...", "info");
+		await safeExec(pi, "npm", ["cache", "clean", "--force"], 30_000);
+	} else if (method === "bun") {
+		reporter.notify("Clearing bun cache...", "info");
+		await safeExec(pi, "bun", ["pm", "cache", "rm"], 30_000);
+	}
+}
+
 async function runUpdate(pi: ExtensionAPI, detection: DetectionResult, reporter: Reporter): Promise<ExecResult> {
 	let command = "";
 	let args: string[] = [];
@@ -298,7 +319,23 @@ async function performUpdate(
 			return;
 		}
 
-		const result = await runUpdate(pi, detection, reporter);
+		let result = await runUpdate(pi, detection, reporter);
+
+		if (result.code !== 0 && isTransientRegistryError(result)) {
+			for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+				reporter.notify(
+					`Registry error detected (attempt ${attempt}/${MAX_RETRIES}). ` +
+					`This usually means a dependency hasn't fully propagated yet. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
+					"warning",
+				);
+				await clearPackageCache(pi, detection.method, reporter);
+				await sleep(RETRY_DELAY_MS);
+				result = await runUpdate(pi, detection, reporter);
+				if (result.code === 0) break;
+				if (!isTransientRegistryError(result)) break;
+			}
+		}
+
 		if (result.code !== 0) {
 			throw new Error(summarizeResult(result));
 		}

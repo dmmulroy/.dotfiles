@@ -1,13 +1,14 @@
 {
   "lastChangelogVersion": "0.58.4",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "medium",
+  "defaultProvider": "opencode.cloudflare.dev",
+  "defaultModel": "claude-opus-4-6",
+  "defaultThinkingLevel": "xhigh",
   "hideThinkingBlock": true,
   "theme": "catppuccin-macchiato",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-extmgr",
-    "npm:@plannotator/pi-extension"
+    "npm:@plannotator/pi-extension",
+    "https://github.com/davebcn87/pi-autoresearch"
   ]
 }
