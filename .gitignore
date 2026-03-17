@@ -32,7 +32,6 @@ home/.pi/agent/*
 # pi extensions node_modules
 home/.pi/agent/extensions/**/node_modules/
 
-!home/.pi/agent/settings.json
 !home/.pi/agent/tsconfig.json
 !home/.pi/agent/package.json
 !home/.pi/agent/themes/
