@@ -29,6 +29,9 @@ home/.config/jj/repos/
 # pi agent runtime/state (keep settings + customization resources tracked)
 home/.pi/agent/*
 
+# pi extensions node_modules
+home/.pi/agent/extensions/**/node_modules/
+
 !home/.pi/agent/settings.json
 !home/.pi/agent/tsconfig.json
 !home/.pi/agent/package.json
@@ -36,9 +39,7 @@ home/.pi/agent/*
 !home/.pi/agent/themes/*.json
 !home/.pi/agent/extensions/
 !home/.pi/agent/extensions/**
-home/.pi/agent/extensions/**/node_modules/
+!home/.pi/agent/mcp.json
 !home/.pi/agent/skills/
 !home/.pi/agent/skills/**
-!home/.pi/agent/prelude/
-!home/.pi/agent/prelude/**
 
