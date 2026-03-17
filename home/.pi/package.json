@@ -1,0 +1,16 @@
+{
+  "name": ".pi",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.58.4",
+    "@mariozechner/pi-tui": "^0.58.4"
+  }
+}

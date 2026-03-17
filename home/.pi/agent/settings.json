@@ -1,8 +1,8 @@
 {
   "lastChangelogVersion": "0.58.4",
-  "defaultProvider": "opencode.cloudflare.dev",
+  "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "hideThinkingBlock": true,
   "theme": "catppuccin-macchiato",
   "packages": [

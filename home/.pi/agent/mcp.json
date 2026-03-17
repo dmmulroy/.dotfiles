@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "lifecycle": "eager"
+    },
+    "grep_app": {
+      "url": "https://mcp.grep.app",
+      "lifecycle": "eager"
+    }
+  }
+}

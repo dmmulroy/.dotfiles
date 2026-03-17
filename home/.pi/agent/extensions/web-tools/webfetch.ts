@@ -2,7 +2,7 @@ import { formatSize } from "@mariozechner/pi-coding-agent";
 import { StringEnum, type ImageContent, type TextContent } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { htmlToMarkdown, htmlToText } from "./html.ts";
+import { htmlToMarkdown, htmlToText, isPoorMarkdownConversion } from "./html.ts";
 import {
 	createOperationSignal,
 	decodeTextBuffer,
@@ -133,6 +133,9 @@ export function createWebFetchTool() {
 				let outputText = decodedText;
 				if (parsedContentType.kind === "html" && format === "markdown") {
 					outputText = htmlToMarkdown(decodedText, finalUrl.toString());
+					if (isPoorMarkdownConversion(outputText)) {
+						outputText = htmlToText(decodedText, finalUrl.toString());
+					}
 				} else if (parsedContentType.kind === "html" && format === "text") {
 					outputText = htmlToText(decodedText, finalUrl.toString());
 				}
