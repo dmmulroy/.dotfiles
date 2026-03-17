@@ -18,6 +18,9 @@ import { truncateTextOutput } from "./truncation.ts";
 import type { WebFetchDetails, WebFetchFormat } from "./types.ts";
 
 const WEBFETCH_FORMATS = ["text", "markdown", "html"] as const;
+export const OPENCODE_WEBFETCH_DEFAULT_USER_AGENT =
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
+export const OPENCODE_WEBFETCH_FALLBACK_USER_AGENT = "opencode";
 
 export function createWebFetchTool() {
 	return {
@@ -66,16 +69,24 @@ export function createWebFetchTool() {
 
 			try {
 				const accept = getAcceptHeader(format);
-				const { response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-					headers: {
-						"User-Agent": settings.fetch.userAgent,
-						Accept: accept,
-						"Accept-Language": "en-US,en;q=0.9",
-					},
+				const baseHeaders = createWebFetchHeaders(accept);
+				let { response, finalUrl } = await fetchWithRedirects(requestedUrl, {
+					headers: baseHeaders,
 					signal: composed.signal,
 					maxRedirects: settings.fetch.maxRedirects,
 					blockPrivateHosts: settings.fetch.blockPrivateHosts,
 				});
+
+				if (shouldRetryWithFallbackUserAgent(response)) {
+					await response.body?.cancel().catch(() => undefined);
+					const retryHeaders = createWebFetchHeaders(accept, getFallbackUserAgent(settings.fetch.fallbackUserAgent));
+					({ response, finalUrl } = await fetchWithRedirects(requestedUrl, {
+						headers: retryHeaders,
+						signal: composed.signal,
+						maxRedirects: settings.fetch.maxRedirects,
+						blockPrivateHosts: settings.fetch.blockPrivateHosts,
+					}));
+				}
 
 				if (!response.ok) {
 					throw new Error(`Request failed (${response.status} ${response.statusText || ""})`.trim());
@@ -220,6 +231,23 @@ function getAcceptHeader(format: WebFetchFormat): string {
 		case "html":
 			return "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1";
 	}
+}
+
+export function createWebFetchHeaders(accept: string, userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT): Record<string, string> {
+	return {
+		"User-Agent": userAgent,
+		Accept: accept,
+		"Accept-Language": "en-US,en;q=0.9",
+	};
+}
+
+export function getFallbackUserAgent(configuredUserAgent?: string): string {
+	const trimmed = configuredUserAgent?.trim();
+	return trimmed || OPENCODE_WEBFETCH_FALLBACK_USER_AGENT;
+}
+
+export function shouldRetryWithFallbackUserAgent(response: Pick<Response, "status" | "headers">): boolean {
+	return response.status === 403 && response.headers.get("cf-mitigated") === "challenge";
 }
 
 function clampTimeoutSeconds(timeout: number): number {

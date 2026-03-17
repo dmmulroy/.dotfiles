@@ -1,10 +1,8 @@
 {
-  "name": "pi-extension-web-tools",
+  "name": "pi-web-tools-extension",
+  "private": true,
   "version": "0.1.0",
   "type": "module",
-  "keywords": [
-    "pi-package"
-  ],
   "scripts": {
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit"
@@ -15,17 +13,10 @@
     ]
   },
   "dependencies": {
-    "@juanibiapina/pi-extension-settings": "^0.5.1",
     "html-to-text": "^9.0.5",
     "linkedom": "^0.18.12",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2"
-  },
-  "peerDependencies": {
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*",
-    "@sinclair/typebox": "*"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

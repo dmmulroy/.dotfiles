@@ -28,8 +28,7 @@
     "base": "#24273a",
     "mantle": "#1e2030",
     "crust": "#181926",
-    "diffAddedBg": "#0097d7",
-    "diffRemovedBg": "#d70000"
+    "toolErrorBg": "#3a2a31"
   },
   "colors": {
     "accent": "blue",
@@ -50,8 +49,8 @@
     "customMessageText": "text",
     "customMessageLabel": "pink",
     "toolPendingBg": "base",
-    "toolSuccessBg": "#29342b",
-    "toolErrorBg": "#3a2a31",
+    "toolSuccessBg": "mantle",
+    "toolErrorBg": "toolErrorBg",
     "toolTitle": "blue",
     "toolOutput": "subtext1",
     "mdHeading": "mauve",
@@ -64,8 +63,8 @@
     "mdQuoteBorder": "yellow",
     "mdHr": "subtext0",
     "mdListBullet": "blue",
-    "toolDiffAdded": "diffAddedBg",
-    "toolDiffRemoved": "diffRemovedBg",
+    "toolDiffAdded": "green",
+    "toolDiffRemoved": "red",
     "toolDiffContext": "overlay2",
     "syntaxComment": "overlay2",
     "syntaxKeyword": "mauve",
