@@ -1,3 +1,6 @@
+import { readFileSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { complete, type Api, type Model, type UserMessage } from "@mariozechner/pi-ai";
 import {
   BorderedLoader,
@@ -53,7 +56,7 @@ Rules:
 - If there are no user-answerable questions, return {"questions": []}.`;
 
 interface ExtractionModelPreference {
-  provider: string;
+  provider?: string;
   modelId: string;
 }
 
@@ -64,20 +67,87 @@ interface ExtractionModelOption {
   modelId: string;
 }
 
+const ANSWER_EXTENSION_NAME = "answer";
+const EXTENSION_SETTINGS_PATH = join(homedir(), ".pi", "agent", "settings-extensions.json");
+const PRIMARY_EXTRACTION_MODEL_SETTING_ID = "primaryExtractionModel";
+const SECONDARY_EXTRACTION_MODEL_SETTING_ID = "secondaryExtractionModel";
+
 const DEFAULT_EXTRACTION_MODEL_PREFERENCES: readonly ExtractionModelPreference[] = [
-  { provider: "openai-codex", modelId: "gpt-5.3-codex-spark" },
-  { provider: "openai", modelId: "gpt-5.3-codex-spark" },
+  { modelId: "gpt-5.4-mini" },
+  { modelId: "claude-haiku-4-5" },
 ];
 
 const STATIC_FALLBACK_EXTRACTION_MODEL_OPTIONS = DEFAULT_EXTRACTION_MODEL_PREFERENCES.map((candidate) => ({
-  id: `${candidate.provider}/${candidate.modelId}`,
-  label: `${candidate.provider} / ${candidate.modelId}`,
-  provider: candidate.provider,
+  id: toExtractionModelKey(candidate),
+  label: candidate.provider ? `${candidate.provider} / ${candidate.modelId}` : candidate.modelId,
+  provider: candidate.provider ?? "",
   modelId: candidate.modelId,
 })) satisfies ExtractionModelOption[];
 
 function toExtractionModelKey(candidate: ExtractionModelPreference): string {
-  return `${candidate.provider}/${candidate.modelId}`;
+  return candidate.provider ? `${candidate.provider}/${candidate.modelId}` : candidate.modelId;
+}
+
+function parseExtractionModelKey(value: string): ExtractionModelPreference | undefined {
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  const slashIndex = normalized.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === normalized.length - 1) {
+    return { modelId: normalized };
+  }
+  return {
+    provider: normalized.slice(0, slashIndex),
+    modelId: normalized.slice(slashIndex + 1),
+  };
+}
+
+function getStoredAnswerSettings(): Record<string, unknown> {
+  try {
+    if (!existsSync(EXTENSION_SETTINGS_PATH)) return {};
+    const raw = readFileSync(EXTENSION_SETTINGS_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const answerSettings = parsed[ANSWER_EXTENSION_NAME];
+    if (answerSettings && typeof answerSettings === "object" && !Array.isArray(answerSettings)) {
+      return answerSettings as Record<string, unknown>;
+    }
+  } catch {
+    // Ignore malformed settings and fall back to defaults.
+  }
+  return {};
+}
+
+function getStoredAnswerSetting(key: string): string | undefined {
+  const value = getStoredAnswerSettings()[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function mergeExtractionModelPreferences(...groups: readonly ExtractionModelPreference[][]): ExtractionModelPreference[] {
+  const merged: ExtractionModelPreference[] = [];
+  const seen = new Set<string>();
+
+  for (const group of groups) {
+    for (const candidate of group) {
+      const key = toExtractionModelKey(candidate);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(candidate);
+    }
+  }
+
+  return merged;
+}
+
+function getConfiguredExtractionModelPreferences(): ExtractionModelPreference[] {
+  const settingIds = [
+    PRIMARY_EXTRACTION_MODEL_SETTING_ID,
+    SECONDARY_EXTRACTION_MODEL_SETTING_ID,
+  ];
+
+  return settingIds
+    .map((settingId) => getStoredAnswerSetting(settingId)?.trim())
+    .filter((value): value is string => Boolean(value))
+    .map((value) => parseExtractionModelKey(value))
+    .filter((candidate): candidate is ExtractionModelPreference => Boolean(candidate));
 }
 
 function getAvailableExtractionModelOptions(
@@ -115,7 +185,9 @@ function getDefaultExtractionModelPreferences(
 function getExtractionModelPreferences(
   modelRegistry?: Pick<ExtensionContext["modelRegistry"], "getAvailable">,
 ): ExtractionModelPreference[] {
-  return getDefaultExtractionModelPreferences(modelRegistry);
+  const configured = getConfiguredExtractionModelPreferences();
+  const defaults = getDefaultExtractionModelPreferences(modelRegistry);
+  return mergeExtractionModelPreferences(configured, defaults);
 }
 
 function formatExtractionModelPreferences(preferences: ExtractionModelPreference[]): string {
@@ -195,6 +267,17 @@ function parseExtractionResult(text: string): ExtractionOutcome {
   };
 }
 
+function fallbackExtractQuestions(text: string): ExtractionResult {
+  const normalized = text.replace(/\r\n?/g, "\n").trim();
+  const questionMatches = normalized.match(/[^\n.!?]*\?+(?:["')\]]+)?/g) ?? [];
+  const questions = questionMatches
+    .map((question) => question.replace(/^[\s>*-]+/, "").trim())
+    .filter((question) => question.length > 0)
+    .map((question) => ({ question }));
+
+  return normalizeExtractedQuestions({ questions });
+}
+
 function findLastCompletedAssistantMessage(ctx: ExtensionContext): {
   text?: string;
   skippedIncomplete: boolean;
@@ -226,16 +309,20 @@ async function selectExtractionModel(
   modelRegistry: {
     find: (provider: string, modelId: string) => Model<Api> | undefined;
     getApiKey: (model: Model<Api>) => Promise<string | undefined>;
+    getAvailable: () => Model<Api>[];
   },
   preferences: ExtractionModelPreference[],
 ): Promise<Model<Api> | undefined> {
   for (const candidate of preferences) {
-    const model = modelRegistry.find(candidate.provider, candidate.modelId);
-    if (!model) continue;
+    const models = candidate.provider
+      ? [modelRegistry.find(candidate.provider, candidate.modelId)].filter((model): model is Model<Api> => Boolean(model))
+      : modelRegistry.getAvailable().filter((model) => model.id === candidate.modelId && model.input.includes("text"));
 
-    const apiKey = await modelRegistry.getApiKey(model);
-    if (apiKey) {
-      return model;
+    for (const model of models) {
+      const apiKey = await modelRegistry.getApiKey(model);
+      if (apiKey) {
+        return model;
+      }
     }
   }
 
@@ -569,13 +656,25 @@ export default function (pi: ExtensionAPI) {
 
         const responseText = getTextParts(response.content).join("\n").trim();
         if (!responseText) {
+          const fallback = fallbackExtractQuestions(lastAssistantText);
           return {
-            type: "error",
-            message: "Question extraction returned an empty response.",
+            type: "success",
+            result: fallback,
           } as ExtractionOutcome;
         }
 
-        return parseExtractionResult(responseText);
+        const parsed = parseExtractionResult(responseText);
+        if (parsed.type === "error") {
+          const fallback = fallbackExtractQuestions(lastAssistantText);
+          if (fallback.questions.length > 0) {
+            return {
+              type: "success",
+              result: fallback,
+            } as ExtractionOutcome;
+          }
+        }
+
+        return parsed;
       };
 
       doExtract()
