@@ -456,7 +456,7 @@ const messages = [
   "Glazing the graphics...",
   "Topping with tests...",
   "Cherry-picking the commits...",
-  "Slop forking opensource...",
+  "Slop forking open source...",
 ];
 
 function pickRandom(): string {
