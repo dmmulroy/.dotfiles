@@ -10,7 +10,8 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.58.4",
-    "@mariozechner/pi-tui": "^0.58.4"
+    "@mariozechner/pi-ai": "^0.61.0",
+    "@mariozechner/pi-coding-agent": "^0.61.0",
+    "@mariozechner/pi-tui": "^0.61.0"
   }
 }

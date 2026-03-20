@@ -34,6 +34,7 @@ home/.pi/agent/extensions/**/node_modules/
 
 !home/.pi/agent/tsconfig.json
 !home/.pi/agent/package.json
+!home/.pi/agent/cloak.json
 !home/.pi/agent/themes/
 !home/.pi/agent/themes/*.json
 !home/.pi/agent/extensions/

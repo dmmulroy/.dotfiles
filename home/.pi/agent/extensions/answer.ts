@@ -73,8 +73,9 @@ const PRIMARY_EXTRACTION_MODEL_SETTING_ID = "primaryExtractionModel";
 const SECONDARY_EXTRACTION_MODEL_SETTING_ID = "secondaryExtractionModel";
 
 const DEFAULT_EXTRACTION_MODEL_PREFERENCES: readonly ExtractionModelPreference[] = [
-  { modelId: "gpt-5.4-mini" },
-  { modelId: "claude-haiku-4-5" },
+  { provider: "openai-codex", modelId: "gpt-5.4-mini" },
+  { provider: "openai", modelId: "gpt-5.4-mini" },
+  { provider: "anthropic", modelId: "claude-haiku-4-5" },
 ];
 
 const STATIC_FALLBACK_EXTRACTION_MODEL_OPTIONS = DEFAULT_EXTRACTION_MODEL_PREFERENCES.map((candidate) => ({
@@ -191,7 +192,9 @@ function getExtractionModelPreferences(
 }
 
 function formatExtractionModelPreferences(preferences: ExtractionModelPreference[]): string {
-  return preferences.map((candidate) => `${candidate.provider}/${candidate.modelId}`).join(", ");
+  return preferences
+    .map((candidate) => candidate.provider ? `${candidate.provider}/${candidate.modelId}` : candidate.modelId)
+    .join(", ");
 }
 
 function getTextParts(content: Array<{ type: string; text?: string; }>): string[] {
