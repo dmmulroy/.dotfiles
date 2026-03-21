@@ -1,5 +1,5 @@
 ---
-description: Open interactive code review for current changes
+description: Open interactive code review for current changes or a PR URL
 ---
 
 The Plannotator Code Review has been triggered. Opening the review UI...

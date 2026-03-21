@@ -28,9 +28,12 @@ home/.config/jj/repos/
 
 # pi agent runtime/state (keep settings + customization resources tracked)
 home/.pi/agent/*
+home/.pi/todos/*
+.pi/todos/*
 
 # pi extensions node_modules
 home/.pi/agent/extensions/**/node_modules/
+
 
 !home/.pi/agent/tsconfig.json
 !home/.pi/agent/package.json
