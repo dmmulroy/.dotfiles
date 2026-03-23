@@ -232,3 +232,4 @@ complete -c wrangler -n '__wrangler_clear_perform_completion_once_result'
 complete -c wrangler -n 'not __wrangler_requires_order_preservation && __wrangler_prepare_completions' -f -a '$__wrangler_comp_results'
 # Otherwise we use the -k flag
 complete -k -c wrangler -n '__wrangler_requires_order_preservation && __wrangler_prepare_completions' -f -a '$__wrangler_comp_results'
+

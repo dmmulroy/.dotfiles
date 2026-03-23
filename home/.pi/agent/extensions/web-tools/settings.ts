@@ -18,7 +18,7 @@ const DEFAULTS = {
 	fetchFallbackUserAgent: "opencode",
 	searchEnabled: true,
 	searchProvider: "exa",
-	searchEndpoint: "https://mcp.exa.ai/mcp",
+	searchEndpoint: "https://m.mulroy.dev/m/e",
 	searchTimeoutSeconds: 25,
 	searchDefaultMaxResults: 8,
 	searchDefaultDepth: "auto",

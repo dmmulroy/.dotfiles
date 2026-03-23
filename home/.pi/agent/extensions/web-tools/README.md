@@ -39,7 +39,7 @@ Parameters:
 
 - `query` — required
 - `maxResults` — optional, clamped to `1..20`
-- `depth` — optional: `auto`, `fast`, `deep`
+- `depth` — optional: `auto`, `fast`, `deep` (`deep` is accepted as a compatibility alias and mapped to `fast`)
 
 Current defaults:
 
@@ -53,6 +53,7 @@ Current defaults:
 Behavior notes:
 
 - uses the Exa MCP endpoint
+- Exa currently supports provider depths `auto` and `fast`; tool input `deep` is downgraded to `fast`
 - search responses are limited to `1 MB`
 - provider requests currently send:
   - `livecrawl: "fallback"`

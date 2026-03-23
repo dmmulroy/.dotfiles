@@ -102,10 +102,99 @@ check_dependencies() {
     return 0
 }
 
-# Installation functions
-install_homebrew() {
-    print_step "Installing Homebrew"
-    
+# ─── Tool Registry ────────────────────────────────────────────────────────────
+# Each init step is registered once. Both cmd_init and cmd_doctor read from this.
+#
+# Fields (;; delimited — pipes can't be used since install commands contain them):
+#   name        – display name for step headers and doctor output
+#   check       – command to test existence ("-" = always run, let fn handle idempotency)
+#   install     – shell command OR "fn:<function>" for complex logic
+#   required    – "true" = fatal on failure, "false" = warn and continue
+#   skip_var    – env var that skips this step when "true" ("-" = never skip)
+#   doctor      – "true" = include in doctor dev-tools check, "false" = skip
+#
+# Order matters: steps run top-to-bottom in cmd_init.
+TOOL_REGISTRY=(
+    "Homebrew          ;; brew ;; fn:_install_homebrew                          ;; true  ;; -         ;; true"
+    "Brewfile packages ;; -    ;; fn:_install_packages                          ;; true  ;; -         ;; false"
+    "Stow dotfiles     ;; -    ;; fn:_stow_dotfiles                             ;; true  ;; -         ;; false"
+    "Bun               ;; bun  ;; curl -fsSL https://bun.sh/install | bash      ;; true  ;; -         ;; true"
+    "Vite+             ;; vp   ;; curl -fsSL https://vite.plus | bash           ;; true  ;; -         ;; true"
+    "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; false ;; -         ;; true"
+    "OpenCode          ;; -    ;; fn:_install_opencode                          ;; false ;; -         ;; false"
+    "SSH key           ;; -    ;; fn:_generate_ssh_key                          ;; false ;; SKIP_SSH  ;; false"
+    "MonoLisa font     ;; -    ;; fn:_install_font                              ;; false ;; SKIP_FONT ;; false"
+    "Fish shell        ;; -    ;; fn:_setup_fish_shell                          ;; false ;; -         ;; false"
+)
+
+# Parse a registry entry into variables: r_name, r_check, r_install, r_required, r_skip, r_doctor
+_parse_tool_entry() {
+    local entry="$1"
+    r_name="$(    echo "$entry" | awk -F';;' '{print $1}' | xargs)"
+    r_check="$(   echo "$entry" | awk -F';;' '{print $2}' | xargs)"
+    r_install="$( echo "$entry" | awk -F';;' '{print $3}' | xargs)"
+    r_required="$(echo "$entry" | awk -F';;' '{print $4}' | xargs)"
+    r_skip="$(    echo "$entry" | awk -F';;' '{print $5}' | xargs)"
+    r_doctor="$(  echo "$entry" | awk -F';;' '{print $6}' | xargs)"
+}
+
+# Run all registered init steps
+run_init_steps() {
+    # Count non-skipped steps
+    TOTAL_STEPS=0
+    for entry in "${TOOL_REGISTRY[@]}"; do
+        _parse_tool_entry "$entry"
+        if [[ "$r_skip" != "-" ]] && [[ "${!r_skip:-}" == "true" ]]; then
+            continue
+        fi
+        ((TOTAL_STEPS++))
+    done
+    CURRENT_STEP=0
+
+    for entry in "${TOOL_REGISTRY[@]}"; do
+        _parse_tool_entry "$entry"
+
+        # Check skip variable
+        if [[ "$r_skip" != "-" ]] && [[ "${!r_skip:-}" == "true" ]]; then
+            continue
+        fi
+
+        print_step "$r_name"
+
+        # Dispatch: custom function or generic install
+        if [[ "$r_install" == fn:* ]]; then
+            local fn="${r_install#fn:}"
+            if "$fn"; then
+                true  # function handles its own messaging
+            elif [[ "$r_required" == "true" ]]; then
+                return 1
+            else
+                print_warning "$r_name failed (continuing)"
+            fi
+        else
+            # Generic pattern: check command, skip if exists, else run install
+            if [[ "$r_check" != "-" ]] && command_exists "$r_check"; then
+                print_success "$r_name is already installed"
+            else
+                print_info "Installing $r_name..."
+                if eval "$r_install"; then
+                    print_success "$r_name installed successfully"
+                elif [[ "$r_required" == "true" ]]; then
+                    print_error "Failed to install $r_name"
+                    return 1
+                else
+                    print_warning "Failed to install $r_name (continuing)"
+                fi
+            fi
+        fi
+    done
+}
+
+# ─── Installation Functions ───────────────────────────────────────────────────
+# Custom installers called via "fn:" entries. These handle their own idempotency
+# and messaging (except the step header, which the registry loop prints).
+
+_install_homebrew() {
     if command_exists brew; then
         print_success "Homebrew is already installed"
         return 0
@@ -162,8 +251,7 @@ install_homebrew() {
     rm "$log_file"
 }
 
-install_packages() {
-    print_step "Installing packages from Brewfile"
+_install_packages() {
     
     if [[ ! -f "${PACKAGES_DIR}/bundle" ]]; then
         print_error "Base Brewfile not found at ${PACKAGES_DIR}/bundle"
@@ -253,8 +341,7 @@ install_packages() {
     fi
 }
 
-stow_dotfiles() {
-    print_step "Stowing configuration files"
+_stow_dotfiles() {
     
     if ! command_exists stow; then
         print_error "GNU Stow is not installed"
@@ -302,23 +389,6 @@ stow_dotfiles() {
         print_success "Dotfiles stowed successfully"
     else
         print_error "Failed to stow dotfiles"
-        return 1
-    fi
-}
-
-install_bun() {
-    print_step "Installing Bun"
-    
-    if command_exists bun; then
-        print_success "Bun is already installed"
-        return 0
-    fi
-    
-    print_info "Installing Bun..."
-    if curl -fsSL https://bun.sh/install | bash; then
-        print_success "Bun installed successfully"
-    else
-        print_error "Failed to install Bun"
         return 1
     fi
 }
@@ -380,8 +450,7 @@ check_opencode_conflicts() {
     return 1
 }
 
-install_opencode() {
-    print_step "Installing OpenCode CLI"
+_install_opencode() {
     
     # Save current shell options for restoration
     local _saved_opts="$-"
@@ -511,8 +580,7 @@ install_opencode() {
     fi
 }
 
-generate_ssh_key() {
-    print_step "Generating SSH key for GitHub"
+_generate_ssh_key() {
     
     if [[ -f "$GITHUB_KEY_PATH" ]]; then
         print_success "SSH key already exists at $GITHUB_KEY_PATH"
@@ -534,8 +602,7 @@ generate_ssh_key() {
     fi
 }
 
-install_font() {
-    print_step "Installing MonoLisa font"
+_install_font() {
 
     if [[ ! -f "$GITHUB_KEY_PATH" ]]; then
         print_warning "GitHub SSH key not found. Skipping font installation"
@@ -726,8 +793,7 @@ EOF
     print_success "SSH key generation complete!"
 }
 
-setup_fish_shell() {
-    print_step "Setting up Fish shell"
+_setup_fish_shell() {
     
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
@@ -770,27 +836,7 @@ setup_fish_shell() {
 # Command functions
 cmd_init() {
     print_header "Initializing dotfiles"
-    
-    TOTAL_STEPS=8
-    CURRENT_STEP=0
-    
-    # Run all installation steps
-    install_homebrew || return 1
-    install_packages || return 1
-    stow_dotfiles || return 1
-    install_bun || return 1
-    install_opencode || print_warning "OpenCode installation failed (continuing)"
-    
-    if [[ "${SKIP_SSH:-}" != "true" ]]; then
-        generate_ssh_key || print_warning "SSH key generation failed (continuing)"
-    fi
-    
-    if [[ "${SKIP_FONT:-}" != "true" ]]; then
-        install_font || print_warning "Font installation failed (continuing)"
-    fi
-    
-    setup_fish_shell || print_warning "Fish shell setup failed (continuing)"
-    
+    run_init_steps || return 1
     print_header "Initialization complete! 🎉"
 }
 
@@ -835,7 +881,7 @@ cmd_update() {
     
     # Re-stow dotfiles
     if confirm "Re-stow dotfiles?" "y"; then
-        stow_dotfiles
+        _stow_dotfiles
     fi
 }
 
@@ -975,11 +1021,23 @@ cmd_doctor() {
         print_warning "GitHub SSH key not found"
     fi
     
-    # Check key development tools
-    local dev_tools=("git" "nvim" "tmux" "node" "npm" "bun")
+    # Check key development tools (from registry + extras installed via brew)
     local missing_tools=()
-    
-    for tool in "${dev_tools[@]}"; do
+
+    # Tools from the registry (doctor=true entries)
+    for entry in "${TOOL_REGISTRY[@]}"; do
+        _parse_tool_entry "$entry"
+        [[ "$r_doctor" != "true" ]] && continue
+        if command_exists "$r_check"; then
+            print_success "$r_check is available"
+        else
+            missing_tools+=("$r_check")
+        fi
+    done
+
+    # Additional tools managed outside the registry (brew packages, etc.)
+    local extra_tools=("git" "nvim" "tmux" "node" "npm")
+    for tool in "${extra_tools[@]}"; do
         if command_exists "$tool"; then
             print_success "$tool is available"
         else
