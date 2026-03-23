@@ -11,7 +11,13 @@ type ExaEventPayload = {
 			type?: string;
 			text?: string;
 		}>;
+		isError?: boolean;
 	};
+};
+
+type ExaMessage = {
+	text: string;
+	isError: boolean;
 };
 
 export class ExaSearchProvider implements SearchProvider {
@@ -34,7 +40,7 @@ export class ExaSearchProvider implements SearchProvider {
 					name: "web_search_exa",
 					arguments: {
 						query: input.query,
-						type: input.depth,
+						type: normalizeExaDepth(input.depth),
 						numResults: input.maxResults,
 						livecrawl: "fallback",
 						contextMaxCharacters: DEFAULT_CONTEXT_MAX_CHARACTERS,
@@ -60,7 +66,13 @@ export class ExaSearchProvider implements SearchProvider {
 		const parsedContentType = parseContentType(response.headers.get("content-type"));
 		const { buffer } = await readBodyWithLimit(response, MAX_SEARCH_RESPONSE_BYTES, signal);
 		const { text: responseText } = decodeTextBuffer(buffer, parsedContentType.charset);
-		const searchText = extractSearchTextFromResponse(responseText, parsedContentType.contentType || parsedContentType.mime);
+		const contentType = parsedContentType.contentType || parsedContentType.mime;
+		const providerError = extractSearchErrorFromResponse(responseText, contentType);
+		if (providerError) {
+			throw new Error(providerError);
+		}
+
+		const searchText = extractSearchTextFromResponse(responseText, contentType);
 		const results = parseExaSearchText(searchText);
 
 		if (results.length === 0 && !isExplicitNoResultsText(searchText)) {
@@ -71,39 +83,57 @@ export class ExaSearchProvider implements SearchProvider {
 	}
 }
 
+export function normalizeExaDepth(depth: SearchRequest["depth"]): Exclude<SearchRequest["depth"], "deep"> {
+	// Exa MCP currently accepts only "auto" and "fast". Keep "deep" as a caller-facing
+	// compatibility alias so existing prompts and docs continue to work.
+	return depth === "deep" ? "fast" : depth;
+}
+
 export function extractSearchTextFromResponse(body: string, contentType: string): string {
+	return extractSearchMessagesFromResponse(body, contentType)
+		.filter((message) => !message.isError)
+		.map((message) => message.text)
+		.join("\n\n")
+		.trim();
+}
+
+export function extractSearchErrorFromResponse(body: string, contentType: string): string | undefined {
+	const text = extractSearchMessagesFromResponse(body, contentType)
+		.filter((message) => message.isError)
+		.map((message) => message.text)
+		.join("\n\n")
+		.trim();
+	return text || undefined;
+}
+
+function extractSearchMessagesFromResponse(body: string, contentType: string): ExaMessage[] {
 	const normalizedContentType = contentType.toLowerCase();
 	if (normalizedContentType.includes("text/event-stream") || body.includes("\ndata:")) {
 		const chunks = parseSseDataLines(body);
-		const texts = chunks
-			.map((chunk) => {
-				let payload: ExaEventPayload;
-				try {
-					payload = JSON.parse(chunk) as ExaEventPayload;
-				} catch {
-					return "";
-				}
-				return (payload.result?.content ?? [])
-					.filter((item) => item.type === "text" && typeof item.text === "string")
-					.map((item) => item.text?.trim() ?? "")
-					.filter(Boolean)
-					.join("\n\n");
-			})
-			.filter(Boolean);
-		return texts.join("\n\n").trim();
+		return chunks.flatMap((chunk) => {
+			try {
+				return payloadToMessages(JSON.parse(chunk) as ExaEventPayload);
+			} catch {
+				return [];
+			}
+		});
 	}
 
 	try {
-		const payload = JSON.parse(body) as ExaEventPayload;
-		return (payload.result?.content ?? [])
-			.filter((item) => item.type === "text" && typeof item.text === "string")
-			.map((item) => item.text?.trim() ?? "")
-			.filter(Boolean)
-			.join("\n\n")
-			.trim();
+		return payloadToMessages(JSON.parse(body) as ExaEventPayload);
 	} catch {
-		return body.trim();
+		const text = body.trim();
+		return text ? [{ text, isError: false }] : [];
 	}
+}
+
+function payloadToMessages(payload: ExaEventPayload): ExaMessage[] {
+	const isError = Boolean(payload.result?.isError);
+	return (payload.result?.content ?? [])
+		.filter((item) => item.type === "text" && typeof item.text === "string")
+		.map((item) => item.text?.trim() ?? "")
+		.filter(Boolean)
+		.map((text) => ({ text, isError }));
 }
 
 export function parseSseDataLines(input: string): string[] {
@@ -152,7 +182,7 @@ function splitSearchSections(input: string): string[] {
 			sawUrlOrText = false;
 			continue;
 		}
-		if (line.startsWith("URL: ") || line.startsWith("Text: ")) {
+		if (line.startsWith("URL: ") || line.startsWith("Text:") || line.startsWith("Highlights:")) {
 			sawUrlOrText = true;
 		}
 		current.push(line);
@@ -185,15 +215,19 @@ function parseSearchSection(section: string): NormalizedSearchResult | undefined
 			continue;
 		}
 		if (!inText && line.startsWith("Published Date: ")) {
-			publishedAt = line.slice("Published Date: ".length).trim();
+			publishedAt = normalizeMetadataValue(line.slice("Published Date: ".length));
+			continue;
+		}
+		if (!inText && line.startsWith("Published: ")) {
+			publishedAt = normalizeMetadataValue(line.slice("Published: ".length));
 			continue;
 		}
 		if (!inText && line.startsWith("Source: ")) {
-			source = line.slice("Source: ".length).trim();
+			source = normalizeMetadataValue(line.slice("Source: ".length));
 			continue;
 		}
 		if (!inText && line.startsWith("Author: ") && !source) {
-			source = line.slice("Author: ".length).trim();
+			source = normalizeMetadataValue(line.slice("Author: ".length));
 			continue;
 		}
 		if (!inText && line.startsWith("Score: ")) {
@@ -201,9 +235,14 @@ function parseSearchSection(section: string): NormalizedSearchResult | undefined
 			if (Number.isFinite(parsedScore)) score = parsedScore;
 			continue;
 		}
-		if (!inText && line.startsWith("Text: ")) {
+		if (!inText && line.startsWith("Text:")) {
 			inText = true;
-			snippetLines.push(line.slice("Text: ".length).trim());
+			snippetLines.push(line.slice("Text:".length).trim());
+			continue;
+		}
+		if (!inText && line.startsWith("Highlights:")) {
+			inText = true;
+			snippetLines.push(line.slice("Highlights:".length).trim());
 			continue;
 		}
 		if (inText) {
@@ -226,6 +265,7 @@ function parseSearchSection(section: string): NormalizedSearchResult | undefined
 function summarizeSnippet(text: string, title: string): string | undefined {
 	const collapsed = text
 		.replace(/\r\n/g, "\n")
+		.replace(/^\s*---+\s*$/gm, "")
 		.replace(/^#+\s+/gm, "")
 		.replace(/\n{3,}/g, "\n\n")
 		.replace(/[ \t]+/g, " ")
@@ -254,6 +294,18 @@ function stripRepeatedLeadingTitle(snippet: string, title: string): string {
 		current = lines.slice(firstIndex + 1).join("\n").trim();
 	}
 	return current.trim();
+}
+
+function normalizeMetadataValue(value: string): string | undefined {
+	const normalized = value.trim();
+	if (!normalized) return undefined;
+
+	const lowered = normalized.toLowerCase();
+	if (["n/a", "na", "none", "null", "undefined", "unknown"].includes(lowered)) {
+		return undefined;
+	}
+
+	return normalized;
 }
 
 function isExplicitNoResultsText(text: string): boolean {

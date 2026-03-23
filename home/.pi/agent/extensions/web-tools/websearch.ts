@@ -30,7 +30,8 @@ export function createWebSearchTool() {
 			),
 			depth: Type.Optional(
 				StringEnum([...SEARCH_DEPTHS], {
-					description: "Search depth. Overrides the web-tools search default depth setting.",
+					description:
+						"Search depth. Overrides the web-tools search default depth setting. 'deep' is accepted as a compatibility alias and mapped to 'fast' for the current Exa provider.",
 				}),
 			),
 		}),
