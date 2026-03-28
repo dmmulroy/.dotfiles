@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 
-type InstallMethod = "bun" | "npm" | "homebrew" | "native";
+type InstallMethod = "bun" | "npm" | "homebrew" | "vite-plus" | "native";
 type NotifyType = "info" | "error" | "success" | "warning";
 
 type Reporter = {
@@ -141,6 +141,15 @@ async function detectInstallMethod(pi: ExtensionAPI): Promise<DetectionResult> {
 	const candidatePaths = [piPath, resolvedPiPath].filter((value): value is string => Boolean(value));
 
 	if (candidatePaths.length > 0) {
+		if (candidatePaths.some((path) => path.includes(".vite-plus/") || path.includes("/vite-plus/"))) {
+			return {
+				method: "vite-plus",
+				details: `Installed via vite-plus at: ${resolvedPiPath ?? piPath}`,
+				piPath,
+				resolvedPiPath,
+			};
+		}
+
 		const brew = await detectHomebrewFormula(pi, candidatePaths);
 		if (brew.formula) {
 			return {
@@ -255,12 +264,20 @@ function isTransientRegistryError(result: ExecResult): boolean {
 	return /E404|404 Not Found|ETARGET|ERESOLVE|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ERR_SOCKET_TIMEOUT|fetch failed/i.test(output);
 }
 
+function isVitePlusInstall(result: ExecResult): boolean {
+	const output = `${result.stdout}\n${result.stderr}`;
+	return /vite-plus|viteplus|\.vite-plus/i.test(output);
+}
+
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function clearPackageCache(pi: ExtensionAPI, method: InstallMethod, reporter: Reporter): Promise<void> {
-	if (method === "npm") {
+	if (method === "vite-plus") {
+		reporter.notify("Clearing vite-plus cache...", "info");
+		await safeExec(pi, "vp", ["cache", "clean"], 30_000);
+	} else if (method === "npm") {
 		reporter.notify("Clearing npm cache...", "info");
 		await safeExec(pi, "npm", ["cache", "clean", "--force"], 30_000);
 	} else if (method === "bun") {
@@ -274,6 +291,10 @@ async function runUpdate(pi: ExtensionAPI, detection: DetectionResult, reporter:
 	let args: string[] = [];
 
 	switch (detection.method) {
+		case "vite-plus":
+			command = "vp";
+			args = ["install", "-g", PACKAGE_NAME];
+			break;
 		case "bun":
 			command = "bun";
 			args = ["install", "-g", PACKAGE_NAME];
