@@ -1,17 +1,19 @@
 {
   "name": ".pi",
-  "module": "index.ts",
-  "type": "module",
   "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+  "type": "module",
+  "packageManager": "npm@11.11.0",
+  "workspaces": [
+    "agent/extensions/*"
+  ],
+  "scripts": {
+    "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-web-tools-extension",
+    "test:web-tools": "npm run test --workspace=pi-web-tools-extension"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.64.0",
     "@mariozechner/pi-coding-agent": "^0.64.0",
-    "@mariozechner/pi-tui": "^0.64.0"
+    "@mariozechner/pi-tui": "^0.64.0",
+    "@sinclair/typebox": "^0.34.48"
   }
 }

@@ -1,15 +1,32 @@
 # .pi
 
-To install dependencies:
+Global pi config, synced via dotfiles and stowed into `~/.pi`.
+
+## Extension dependency workspace
+
+Package-style global extensions stay in `agent/extensions/` so pi can still auto-discover them from:
+
+- `~/.pi/agent/extensions/*.ts`
+- `~/.pi/agent/extensions/*/index.ts`
+
+This directory is now the shared npm workspace root for extensions with their own `package.json` files.
+
+Install or refresh all extension dependencies from here:
 
 ```bash
-bun install
+npm install
 ```
 
-To run:
+Run workspace checks:
 
 ```bash
-bun run index.ts
+npm run check
 ```
 
-This project was created using `bun init` in bun v1.3.10. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Current workspace-managed extensions live under:
+
+- `agent/extensions/web-tools`
+- `agent/extensions/pi-mcp`
+- `agent/extensions/opencode-cloudflare`
+
+After changing extension code, reload pi with `/reload`.
