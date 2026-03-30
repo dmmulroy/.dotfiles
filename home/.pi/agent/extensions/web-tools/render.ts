@@ -30,5 +30,5 @@ export function appendExpandedPreview(
 
 export function appendExpandHint(base: string, expanded: boolean): string {
 	if (expanded) return base;
-	return `${base} ${keyHint("expandTools", "for details")}`;
+	return `${base} ${keyHint("app.tools.expand" as any, "for details")}`;
 }

@@ -311,7 +311,10 @@ function findLastCompletedAssistantMessage(ctx: ExtensionContext): {
 async function selectExtractionModel(
   modelRegistry: {
     find: (provider: string, modelId: string) => Model<Api> | undefined;
-    getApiKey: (model: Model<Api>) => Promise<string | undefined>;
+    getApiKeyAndHeaders: (model: Model<Api>) => Promise<
+      | { ok: true; apiKey?: string; headers?: Record<string, string> }
+      | { ok: false; error: string }
+    >;
     getAvailable: () => Model<Api>[];
   },
   preferences: ExtractionModelPreference[],
@@ -322,8 +325,8 @@ async function selectExtractionModel(
       : modelRegistry.getAvailable().filter((model) => model.id === candidate.modelId && model.input.includes("text"));
 
     for (const model of models) {
-      const apiKey = await modelRegistry.getApiKey(model);
-      if (apiKey) {
+      const auth = await modelRegistry.getApiKeyAndHeaders(model);
+      if (auth.ok) {
         return model;
       }
     }
@@ -633,11 +636,12 @@ export default function (pi: ExtensionAPI) {
       loader.onAbort = () => done({ type: "cancelled" });
 
       const doExtract = async () => {
-        const apiKey = await ctx.modelRegistry.getApiKey(extractionModel);
-        if (!apiKey) {
+        const auth = await ctx.modelRegistry.getApiKeyAndHeaders(extractionModel);
+        if (!auth.ok) {
+          const authError = "error" in auth ? auth.error : "Unknown auth error";
           return {
             type: "error",
-            message: `No API key available for ${extractionModel.provider}/${extractionModel.id}`,
+            message: `No auth available for ${extractionModel.provider}/${extractionModel.id}: ${authError}`,
           } as ExtractionOutcome;
         }
 
@@ -650,7 +654,7 @@ export default function (pi: ExtensionAPI) {
         const response = await complete(
           extractionModel,
           { systemPrompt: SYSTEM_PROMPT, messages: [userMessage] },
-          { apiKey, signal: loader.signal },
+          { apiKey: auth.apiKey, headers: auth.headers, signal: loader.signal },
         );
 
         if (response.stopReason === "aborted") {

@@ -1,100 +1,72 @@
+local parser_languages = {
+	"bash",
+	"css",
+	"gleam",
+	"go",
+	"html",
+	"javascript",
+	"json",
+	"lua",
+	"markdown",
+	"markdown_inline",
+	"ocaml",
+	"ocaml_interface",
+	"rust",
+	"svelte",
+	"terraform",
+	"tsx",
+	"typescript",
+	"vimdoc",
+	"yaml",
+	"zig",
+}
+
+local function install_missing_parsers()
+	local treesitter = require("nvim-treesitter")
+	local installed = {}
+
+	for _, language in ipairs(treesitter.get_installed()) do
+		installed[language] = true
+	end
+
+	local missing = vim.tbl_filter(function(language)
+		return not installed[language]
+	end, parser_languages)
+
+	if #missing > 0 then
+		treesitter.install(missing)
+	end
+end
+
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
+		branch = "main",
+		lazy = false,
 		build = function()
-			require("nvim-treesitter.install").update({ with_sync = true })
+			local treesitter = require("nvim-treesitter")
+			treesitter.install(parser_languages):wait(300000)
+			treesitter.update(parser_languages):wait(300000)
 		end,
-		event = { "BufEnter" },
 		config = function()
-			---@diagnostic disable: missing-fields
-			require("nvim-treesitter.configs").setup({
-				ensure_installed = {
-					"bash",
-					"css",
-					"gleam",
-					"go",
-					"html",
-					"javascript",
-					"json",
-					"lua",
-					"markdown",
-					"markdown_inline",
-					"ocaml",
-					"ocaml_interface",
-					"rust",
-					"svelte",
-					"terraform",
-					"tsx",
-					"typescript",
-					"vimdoc",
-					"yaml",
-					"zig",
-				},
-				sync_install = false,
-				highlight = {
-					enable = true,
-				},
-				indent = {
-					enable = true,
-					disable = { "ocaml", "ocaml_interface" },
-				},
-				autopairs = {
-					enable = true,
-				},
-				autotag = {
-					enable = true,
-				},
-				incremental_selection = {
-					enable = true,
-					keymaps = {
-						init_selection = "<c-space>",
-						node_incremental = "<c-space>",
-						scope_incremental = "<c-s>",
-						node_decremental = "<c-backspace>",
-					},
-				},
-				textobjects = {
-					select = {
-						enable = true,
-						lookahead = true, -- Automatically jump forward to textobj, similar to targets.vim
-						keymaps = {
-							-- You can use the capture groups defined in textobjects.scm
-							["aa"] = "@parameter.outer",
-							["ia"] = "@parameter.inner",
-							["af"] = "@function.outer",
-							["if"] = "@function.inner",
-							["ac"] = "@class.outer",
-							["ic"] = "@class.inner",
-						},
-					},
-					move = {
-						enable = true,
-						set_jumps = true, -- whether to set jumps in the jumplist
-						goto_next_start = {
-							["]m"] = "@function.outer",
-							["]]"] = "@class.outer",
-						},
-						goto_next_end = {
-							["]M"] = "@function.outer",
-							["]["] = "@class.outer",
-						},
-						goto_previous_start = {
-							["[m"] = "@function.outer",
-							["[["] = "@class.outer",
-						},
-						goto_previous_end = {
-							["[M"] = "@function.outer",
-							["[]"] = "@class.outer",
-						},
-					},
-				},
-			})
+			require("nvim-treesitter").setup({})
+			install_missing_parsers()
 		end,
 	},
 	{
-		-- Additional text objects for treesitter
 		"nvim-treesitter/nvim-treesitter-textobjects",
+		branch = "main",
 		dependencies = { "nvim-treesitter/nvim-treesitter" },
+		config = function()
+			require("nvim-treesitter-textobjects").setup({
+				select = {
+					lookahead = true,
+				},
+				move = {
+					set_jumps = true,
+				},
+			})
+		end,
 	},
 	{
 		"nvim-treesitter/nvim-treesitter-context",
