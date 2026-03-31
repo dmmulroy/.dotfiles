@@ -351,40 +351,6 @@ _stow_dotfiles() {
     
     print_info "Stowing files from ${HOME_DIR} to ${HOME}..."
     
-    # Create backup directory for existing configs
-    local backup_dir
-    backup_dir="${DOTFILES_DIR}/backups/$(date +%Y%m%d_%H%M%S)"
-    local files_to_backup=()
-    
-    # Check for existing files that would be overwritten
-    while IFS= read -r -d '' file; do
-        local relative_path="${file#"${HOME_DIR}"/}"
-        local target_path="${HOME}/${relative_path}"
-        
-        if [[ -e "$target_path" && ! -L "$target_path" ]]; then
-            files_to_backup+=("$relative_path")
-        fi
-    done < <(find "${HOME_DIR}" -type f -print0)
-    
-    if [[ ${#files_to_backup[@]} -gt 0 ]]; then
-        print_warning "The following files will be replaced:"
-        printf "  %s\n" "${files_to_backup[@]}"
-        
-        if confirm "Create backups of existing files?" "y"; then
-            mkdir -p "$backup_dir"
-            for file in "${files_to_backup[@]}"; do
-                local src="${HOME}/${file}"
-                local dst="${backup_dir}/${file}"
-                mkdir -p "$(dirname "$dst")"
-                if ! cp -p "$src" "$dst"; then
-                    print_error "Failed to backup: $src"
-                    return 1
-                fi
-            done
-            print_success "Backups created in ${backup_dir}"
-        fi
-    fi
-    
     if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
         print_success "Dotfiles stowed successfully"
     else
