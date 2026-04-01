@@ -16,10 +16,18 @@ import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 
+/**
+ * Normalize assistant message metadata for display.
+ * 
+ * IMPORTANT: We preserve message.api from the delegated stream (e.g., "openai-responses")
+ * rather than overwriting with the visible model's custom API ("opencode-cloudflare").
+ * Pi's thinking block visibility logic gates on known API types, so preserving the real
+ * API ensures thinking traces respect the user's visibility settings.
+ */
 function normalizeAssistantMessage(message: AssistantMessage, visibleModel: Model<Api>): AssistantMessage {
 	return {
 		...message,
-		api: visibleModel.api,
+		// Preserve message.api from delegated stream - do NOT overwrite with visibleModel.api
 		provider: visibleModel.provider,
 		model: visibleModel.id,
 	};
@@ -36,11 +44,15 @@ function normalizeEvent(event: AssistantMessageEvent, visibleModel: Model<Api>):
 	}
 }
 
-function createErrorMessage(model: Model<Api>, error: unknown): AssistantMessage {
+/**
+ * Create an error message with the real API type from the route.
+ * Uses routeApi parameter to ensure errors have correct API for pi's handling.
+ */
+function createErrorMessage(model: Model<Api>, error: unknown, routeApi?: Api): AssistantMessage {
 	return {
 		role: "assistant",
 		content: [],
-		api: model.api,
+		api: routeApi || model.api,
 		provider: model.provider,
 		model: model.id,
 		usage: {
@@ -333,10 +345,12 @@ export function streamOpencodeCloudflare(
 			}
 			stream.end();
 		} catch (error) {
+			// Use route.api if available so errors have the real API type
+			const routeApi = route?.api;
 			stream.push({
 				type: "error",
 				reason: "error",
-				error: createErrorMessage(model, error),
+				error: createErrorMessage(model, error, routeApi),
 			});
 			stream.end();
 		}
