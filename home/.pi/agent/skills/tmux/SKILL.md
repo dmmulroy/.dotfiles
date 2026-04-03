@@ -16,11 +16,12 @@ Use tmux as a programmable terminal multiplexer for interactive work. Works on L
 SOCKET_DIR=${TMPDIR:-/tmp}/claude-tmux-sockets  # well-known dir for all agent sockets
 mkdir -p "$SOCKET_DIR"
 SOCKET="$SOCKET_DIR/claude.sock"                # keep agent sessions separate from your personal tmux
-SESSION=claude-python                           # slug-like names; avoid spaces
+SESSION=app-name-command                       # slug-like names; avoid spaces
 tmux -S "$SOCKET" new -d -s "$SESSION" -n shell
-tmux -S "$SOCKET" send-keys -t "$SESSION":1.1 -- 'python3 -q' Enter
-tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":1.1 -S -200  # watch output
-tmux -S "$SOCKET" kill-session -t "$SESSION"                   # clean up
+TARGET=$(tmux -S "$SOCKET" list-panes -t "$SESSION" -F '#S:#I.#P' | head -n1)
+tmux -S "$SOCKET" send-keys -t "$TARGET" -- 'pnpm run dev' Enter
+tmux -S "$SOCKET" capture-pane -p -J -t "$TARGET" -S -200  # watch output
+tmux -S "$SOCKET" kill-session -t "$SESSION"               # clean up
 ```
 
 After starting a session ALWAYS tell the user how to monitor the session by giving them a command to copy paste:
@@ -30,7 +31,8 @@ To monitor this session yourself:
   tmux -S "$SOCKET" attach -t claude-lldb
 
 Or to capture the output once:
-  tmux -S "$SOCKET" capture-pane -p -J -t claude-lldb:1.1 -S -200
+  TARGET=$(tmux -S "$SOCKET" list-panes -t claude-lldb -F '#S:#I.#P' | head -n1)
+  tmux -S "$SOCKET" capture-pane -p -J -t "$TARGET" -S -200
 ```
 
 This must ALWAYS be printed right after a session was started and once again at the end of the tool loop. But the earlier you send it, the happier the user will be.
@@ -39,13 +41,17 @@ This must ALWAYS be printed right after a session was started and once again at 
 
 - Agents MUST place tmux sockets under `CLAUDE_TMUX_SOCKET_DIR` (defaults to `${TMPDIR:-/tmp}/claude-tmux-sockets`) and use `tmux -S "$SOCKET"` so we can enumerate/clean them. Create the dir first: `mkdir -p "$CLAUDE_TMUX_SOCKET_DIR"`.
 - Default socket path to use unless you must isolate further: `SOCKET="$CLAUDE_TMUX_SOCKET_DIR/claude.sock"`.
+- tmux reads the user's config when a server starts. If you connect to an already-running server on that socket, its existing options (like `base-index`/`pane-base-index`) stay in effect even if the user's config is different now.
+- If you need deterministic fresh tmux state, use a unique socket path or kill the existing server on that socket first. Use `-f /dev/null` only when you explicitly want stock tmux behavior.
 - The `CLAUDE_TMUX_SOCKET_DIR` name is preserved for upstream compatibility; using it from Pi is fine.
 
 ## Targeting panes and naming
 
-- Target format: `{session}:{window}.{pane}`, defaults to `:1.1` if omitted. Keep names short (e.g., `claude-py`, `claude-gdb`).
-- Use `-S "$SOCKET"` consistently to stay on the private socket path. If you need user config, drop `-f /dev/null`; otherwise `-f /dev/null` gives a clean config.
-- Inspect: `tmux -S "$SOCKET" list-sessions`, `tmux -S "$SOCKET" list-panes -a`.
+- Target format: `{session}:{window}.{pane}`. Examples like `:0.0` and `:1.1` are both valid depending on tmux server options.
+- Never hardcode pane indices from an example. Always discover the real target after creating a session: `TARGET=$(tmux -S "$SOCKET" list-panes -t "$SESSION" -F '#S:#I.#P' | head -n1)`.
+- User tmux config can change numbering via `base-index` and `pane-base-index`, but only for freshly started servers. Reused sockets may still be using older/default numbering.
+- Use `-S "$SOCKET"` consistently to stay on the private socket path.
+- Inspect: `tmux -S "$SOCKET" list-sessions`, `tmux -S "$SOCKET" list-panes -a`, `tmux -S "$SOCKET" show-options -g | rg '^base-index'`, `tmux -S "$SOCKET" show-window-options -g | rg '^pane-base-index'`.
 
 ## Finding sessions
 
@@ -76,7 +82,8 @@ Some special rules for processes:
 
 - Use timed polling to avoid races with interactive tools. Example: wait for a Python prompt before sending code:
   ```bash
-  ./scripts/wait-for-text.sh -S "$SOCKET" -t "$SESSION":1.1 -p '^>>>' -T 15 -l 4000
+  TARGET=$(tmux -S "$SOCKET" list-panes -t "$SESSION" -F '#S:#I.#P' | head -n1)
+  ./scripts/wait-for-text.sh -S "$SOCKET" -t "$TARGET" -p '^>>>' -T 15 -l 4000
   ```
 - For long-running commands, poll for completion text (`"Type quit to exit"`, `"Program exited"`, etc.) before proceeding.
 
@@ -97,7 +104,7 @@ Some special rules for processes:
 `./scripts/wait-for-text.sh` polls a pane for a regex (or fixed string) with a timeout. Works on Linux/macOS with bash + tmux + grep.
 
 ```bash
-./scripts/wait-for-text.sh [-L socket-name|-S socket-path] -t session:1.1 -p 'pattern' [-F] [-T 20] [-i 0.5] [-l 2000]
+./scripts/wait-for-text.sh [-L socket-name|-S socket-path] -t session:window.pane -p 'pattern' [-F] [-T 20] [-i 0.5] [-l 2000]
 ```
 
 - `-L`/`--socket` tmux socket name passed to `tmux -L`
