@@ -1,3 +1,8 @@
+# Vite Plus node shims can occasionally take longer than Starship's default
+# 500ms timeout to resolve. Give language-version commands a bit more room and
+# avoid probing Node in repos that merely contain JS/TS files.
+command_timeout = 2000
+
 # Put custom.scm right after directory
 format = "$directory${custom.scm}$all"
 
@@ -41,6 +46,13 @@ symbol = " "
 
 [nix_shell]
 symbol = " "
+
+[nodejs]
+# Only show Node for actual Node projects. This avoids unnecessary `node
+# --version` calls in repos that just happen to contain JS/TS files.
+detect_extensions = []
+detect_files = ["package.json", ".node-version", ".nvmrc", ".tool-versions"]
+detect_folders = ["node_modules"]
 
 [package]
 disabled = true
