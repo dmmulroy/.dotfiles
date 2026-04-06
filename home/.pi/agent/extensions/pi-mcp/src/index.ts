@@ -13,6 +13,32 @@ import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
 export default function mcpAdapter(pi: ExtensionAPI) {
   let state: McpExtensionState | null = null;
   let initPromise: Promise<McpExtensionState> | null = null;
+  let initGeneration = 0;
+
+  async function disposeState(current: McpExtensionState | null, reason: string): Promise<void> {
+    if (!current) return;
+
+    if (current.uiServer) {
+      current.uiServer.close(reason);
+      current.uiServer = null;
+    }
+
+    flushMetadataCache(current);
+    await current.lifecycle.gracefulShutdown();
+
+    if (current.ui) {
+      current.ui.setStatus("mcp", "");
+    }
+  }
+
+  async function cleanupCurrentState(reason: string): Promise<void> {
+    const current = state;
+    state = null;
+    initPromise = null;
+
+    await McpOAuthCallback.stop().catch(() => {});
+    await disposeState(current, reason);
+  }
 
   const earlyConfigPath = getConfigPathFromArgv();
   const earlyConfig = loadMcpConfig(earlyConfigPath);
@@ -47,40 +73,39 @@ export default function mcpAdapter(pi: ExtensionAPI) {
     type: "string",
   });
 
-  pi.on("session_start", async (_event, ctx) => {
-    initPromise = initializeMcp(pi, ctx);
+  pi.on("session_start", async (event, ctx) => {
+    const generation = ++initGeneration;
+    await cleanupCurrentState(`session_start:${event.reason}`);
 
-    initPromise.then(s => {
+    const promise = initializeMcp(pi, ctx);
+    initPromise = promise;
+
+    promise.then(async (s) => {
+      if (generation !== initGeneration) {
+        await disposeState(s, "stale_init");
+        return;
+      }
+
       state = s;
-      initPromise = null;
+      if (initPromise === promise) {
+        initPromise = null;
+      }
       updateStatusBar(s);
     }).catch(err => {
+      if (generation !== initGeneration) {
+        return;
+      }
+
       console.error("MCP initialization failed:", err);
-      initPromise = null;
+      if (initPromise === promise) {
+        initPromise = null;
+      }
     });
   });
 
   pi.on("session_shutdown", async () => {
-    if (initPromise) {
-      try {
-        state = await initPromise;
-      } catch {
-        // Initialization failed, nothing to clean up
-      }
-    }
-
-    // Stop OAuth callback server
-    await McpOAuthCallback.stop().catch(() => {});
-
-    if (state) {
-      if (state.uiServer) {
-        state.uiServer.close("session_shutdown");
-        state.uiServer = null;
-      }
-      flushMetadataCache(state);
-      await state.lifecycle.gracefulShutdown();
-      state = null;
-    }
+    initGeneration++;
+    await cleanupCurrentState("session_shutdown");
   });
 
   pi.registerCommand("mcp", {

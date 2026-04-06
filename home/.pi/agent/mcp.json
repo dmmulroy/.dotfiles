@@ -7,6 +7,12 @@
     "grep_app": {
       "url": "https://m.mulroy.dev/m/g",
       "lifecycle": "eager"
+    },
+    "fff": {
+      "command": "fff-mcp",
+      "args": [],
+      "lifecycle": "eager",
+      "directTools": true
     }
   }
 }
