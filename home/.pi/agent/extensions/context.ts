@@ -1136,7 +1136,7 @@ export default function contextExtension(pi: ExtensionAPI) {
             }
 
             const openExport = async (kind: "raw" | "annotated", tui: TUI | undefined) => {
-                if (!snapshot.capturedPayload) {
+                if (kind === "raw" && !snapshot.capturedPayload) {
                     ctx.ui.notify("No captured payload yet. Run at least one model request in this session first.", "warning");
                     return;
                 }
