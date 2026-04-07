@@ -17,7 +17,8 @@ const TEXT_MIME_TYPES = new Set([
 const RASTER_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 export interface FetchWithRedirectsOptions {
-	headers: Record<string, string>;
+	headers?: Record<string, string>;
+	getHeaders?: (url: URL) => Record<string, string> | Promise<Record<string, string>>;
 	signal?: AbortSignal;
 	maxRedirects: number;
 	blockPrivateHosts: boolean;
@@ -86,9 +87,10 @@ export async function fetchWithRedirects(
 			await assertPublicUrl(currentUrl);
 		}
 
+		const requestHeaders = options.getHeaders ? await options.getHeaders(currentUrl) : (options.headers ?? {});
 		const response = await fetch(currentUrl, {
 			method: "GET",
-			headers: options.headers,
+			headers: requestHeaders,
 			signal: options.signal,
 			redirect: "manual",
 		});

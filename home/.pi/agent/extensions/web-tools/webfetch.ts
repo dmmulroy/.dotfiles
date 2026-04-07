@@ -6,23 +6,29 @@ import { htmlToMarkdown, htmlToText, isPoorMarkdownConversion } from "./html.ts"
 import {
 	createOperationSignal,
 	decodeTextBuffer,
-	fetchWithRedirects,
+	fetchWithRedirects as defaultFetchWithRedirects,
 	isAbortError,
 	normalizeAndValidateUrl,
 	parseContentType,
 	readBodyWithLimit,
 } from "./network.ts";
+import { mergeCookieHeader, type ResolvedRequestAuth } from "./auth.ts";
 import { appendExpandHint, appendExpandedPreview, getTextContent } from "./render.ts";
 import { getWebToolsSettings } from "./settings.ts";
 import { truncateTextOutput } from "./truncation.ts";
 import type { WebFetchDetails, WebFetchFormat } from "./types.ts";
+
+export interface WebFetchToolOptions {
+	resolveAuth?: (url: URL, signal?: AbortSignal) => Promise<ResolvedRequestAuth>;
+	fetchWithRedirects?: typeof defaultFetchWithRedirects;
+}
 
 const WEBFETCH_FORMATS = ["text", "markdown", "html"] as const;
 export const OPENCODE_WEBFETCH_DEFAULT_USER_AGENT =
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
 export const OPENCODE_WEBFETCH_FALLBACK_USER_AGENT = "opencode";
 
-export function createWebFetchTool() {
+export function createWebFetchTool(options: WebFetchToolOptions = {}) {
 	return {
 		name: "webfetch",
 		label: "Web Fetch",
@@ -50,6 +56,8 @@ export function createWebFetchTool() {
 		async execute(_toolCallId: string, params: { url: string; format?: WebFetchFormat; timeout?: number }, signal?: AbortSignal, onUpdate?: (...args: any[]) => void) {
 			const settings = getWebToolsSettings();
 			const requestedUrl = normalizeAndValidateUrl(params.url);
+			const resolveAuth = options.resolveAuth;
+			const fetchWithRedirects = options.fetchWithRedirects ?? defaultFetchWithRedirects;
 			const format = params.format ?? settings.fetch.defaultFormat;
 			const timeoutSeconds = clampTimeoutSeconds(params.timeout ?? settings.fetch.timeoutSeconds);
 			const composed = createOperationSignal(timeoutSeconds * 1000, signal);
@@ -69,9 +77,29 @@ export function createWebFetchTool() {
 
 			try {
 				const accept = getAcceptHeader(format);
-				const baseHeaders = createWebFetchHeaders(accept);
+				let auth: ResolvedRequestAuth = { context: { identity: "public", strategy: "none", cookieCount: 0 } };
+				const authCache = new Map<string, Promise<ResolvedRequestAuth>>();
+				const getResolvedAuth = (targetUrl: URL) => {
+					const cacheKey = targetUrl.toString();
+					let pending = authCache.get(cacheKey);
+					if (!pending) {
+						pending = resolveAuth
+							? resolveAuth(targetUrl, composed.signal)
+							: Promise.resolve({ context: { identity: "public", strategy: "none", cookieCount: 0 } });
+						authCache.set(cacheKey, pending);
+					}
+					return pending;
+				};
+				const buildRequestHeaders = async (targetUrl: URL, userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT) => {
+					const baseHeaders = createWebFetchHeaders(accept, userAgent);
+					auth = await getResolvedAuth(targetUrl);
+					return {
+						...baseHeaders,
+						...(auth.cookieHeader ? { Cookie: mergeCookieHeader(baseHeaders.Cookie, auth.cookieHeader) } : {}),
+					};
+				};
 				let { response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-					headers: baseHeaders,
+					getHeaders: (url) => buildRequestHeaders(url),
 					signal: composed.signal,
 					maxRedirects: settings.fetch.maxRedirects,
 					blockPrivateHosts: settings.fetch.blockPrivateHosts,
@@ -79,9 +107,8 @@ export function createWebFetchTool() {
 
 				if (shouldRetryWithFallbackUserAgent(response)) {
 					await response.body?.cancel().catch(() => undefined);
-					const retryHeaders = createWebFetchHeaders(accept, getFallbackUserAgent(settings.fetch.fallbackUserAgent));
 					({ response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-						headers: retryHeaders,
+						getHeaders: (url) => buildRequestHeaders(url, getFallbackUserAgent(settings.fetch.fallbackUserAgent)),
 						signal: composed.signal,
 						maxRedirects: settings.fetch.maxRedirects,
 						blockPrivateHosts: settings.fetch.blockPrivateHosts,
@@ -113,6 +140,7 @@ export function createWebFetchTool() {
 						contentType: parsedContentType.contentType,
 						bytes,
 						image: true,
+						auth: auth.context,
 					};
 					return {
 						content: [
@@ -157,6 +185,7 @@ export function createWebFetchTool() {
 					bytes,
 					truncated: truncated.truncated,
 					fullOutputPath: truncated.fullOutputPath,
+					auth: auth.context,
 				};
 
 				return {
