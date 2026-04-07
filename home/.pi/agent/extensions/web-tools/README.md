@@ -5,6 +5,8 @@ Pi extension that registers two public-web tools:
 - `webfetch` — fetch one public URL as markdown, text, html, or an inline raster image
 - `websearch` — search the public web for current information and candidate URLs
 
+It also adds `/web-profile`, which lets `webfetch` reuse authenticated cookies from a selected Helium browser profile.
+
 ## Tools
 
 ### `webfetch`
@@ -32,6 +34,15 @@ Behavior notes:
 - HTML is converted to markdown or text when requested
 - binary content is rejected
 - if a site returns `403` with `cf-mitigated: challenge`, the tool retries with the fallback user agent
+- when `/web-profile` is set to a Helium profile, `webfetch` keeps using normal HTTP requests but injects cookies from that profile
+- auth source priority is:
+  1. live Helium cookies via CDP (`DevToolsActivePort`) when the selected profile can be scoped safely
+  2. persisted profile cookies from the Helium `Cookies` sqlite DB
+- if the selected Helium profile cannot be scoped safely through CDP (for example, ambiguous multi-profile state), the extension skips CDP rather than using potentially wrong-profile browser-wide cookies
+- if both Helium auth sources fail operationally, `webfetch` fails clearly instead of silently downgrading to public/zero-cookie behavior
+- persisted cookie fallback supports Helium's current Chromium-style macOS cookie store, including `v10` blobs backed by the `Helium Storage Key` keychain item and DB version `24` host-key digests
+- partitioned cookies (CHIPS / `top_frame_site_key` / CDP `partitionKey`) are currently excluded from header injection until profile-safe partition matching is implemented
+- the footer shows the active source as `web: public` or `web: Helium/<display-name>`
 
 ### `websearch`
 
@@ -58,6 +69,21 @@ Behavior notes:
 - provider requests currently send:
   - `livecrawl: "fallback"`
   - `contextMaxCharacters: 2000`
+
+## `/web-profile`
+
+`/web-profile` opens an overlay picker with:
+
+- `Public web`
+- discovered Helium profiles from `~/Library/Application Support/net.imput.helium/Local State`
+
+Selection is persisted in `~/.pi/agent/extensions/web-tools.json` and restored on the next reload/startup.
+
+Notes:
+
+- selecting a Helium profile means authenticated fetching is always desired
+- no separate authenticated fetch tool is added; the existing `webfetch` tool remains the only fetch entrypoint
+- no browser process is launched by the extension
 
 ## Configuration
 
