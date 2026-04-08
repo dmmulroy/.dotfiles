@@ -1,5 +1,5 @@
 import { formatAuthSourceError, toAuthSourceError } from "./auth-errors.ts";
-import type { ActiveWebIdentity, AuthCookie, ResolvedAuthContext, WebProfile } from "./types.ts";
+import type { ActiveWebIdentity, AuthCookie, AuthSourceName, ResolvedAuthContext, WebProfile } from "./types.ts";
 import { getCookiesFromCdp } from "./auth-cdp.ts";
 import { getCookiesFromProfileDb } from "./auth-cookies.ts";
 
@@ -14,12 +14,19 @@ export interface ResolveRequestAuthDependencies {
 	now?: () => number;
 }
 
+export interface ResolveRequestAuthOptions {
+	preferredSources?: AuthSourceName[];
+}
+
+const DEFAULT_AUTH_SOURCE_ORDER: AuthSourceName[] = ["disk-cookies", "cdp"];
+
 export async function resolveRequestAuth(
 	identity: ActiveWebIdentity,
 	url: URL,
 	profile: WebProfile | undefined,
 	deps: ResolveRequestAuthDependencies = {},
 	signal?: AbortSignal,
+	options: ResolveRequestAuthOptions = {},
 ): Promise<ResolvedRequestAuth> {
 	if (identity.kind === "public" || !profile) {
 		return {
@@ -28,36 +35,42 @@ export async function resolveRequestAuth(
 	}
 
 	const now = deps.now?.() ?? Date.now();
-	const getCdpCookies = deps.getCdpCookies ?? getCookiesFromCdp;
-	const getDiskCookies = deps.getDiskCookies ?? getCookiesFromProfileDb;
+	const preferredSources = options.preferredSources?.length ? options.preferredSources : DEFAULT_AUTH_SOURCE_ORDER;
+	const errors = [];
 
-	try {
-		const cdpCookies = await getCdpCookies(profile, url, undefined, signal);
-		const selected = selectCookiesForUrl(cdpCookies, url, now);
-		return {
-			cookieHeader: buildCookieHeader(selected),
-			context: { identity: "helium", strategy: "cdp", cookieCount: selected.length },
-		};
-	} catch (error) {
-		const cdpError = toAuthSourceError("cdp", error, "Unable to read Helium cookies via CDP");
+	for (const source of preferredSources) {
 		try {
-			const diskCookies = await getDiskCookies(profile, undefined, signal);
-			const selected = selectCookiesForUrl(diskCookies, url, now);
+			const cookies = await loadAuthCookiesForSource(profile, url, source, deps, signal);
+			const selected = selectCookiesForUrl(cookies, url, now);
 			return {
 				cookieHeader: buildCookieHeader(selected),
-				context: { identity: "helium", strategy: "disk-cookies", cookieCount: selected.length },
+				context: { identity: "helium", strategy: source, cookieCount: selected.length },
 			};
-		} catch (diskError) {
-			const resolvedDiskError = toAuthSourceError(
-				"disk-cookies",
-				diskError,
-				"Unable to read Helium cookies from the profile DB",
-			);
-			throw new Error(
-				`Authenticated Helium cookies unavailable (${formatAuthSourceError(cdpError)}; ${formatAuthSourceError(resolvedDiskError)})`,
-			);
+		} catch (error) {
+			errors.push(toAuthSourceError(source, error, getAuthSourceFailureMessage(source)));
 		}
 	}
+
+	throw new Error(`Authenticated Helium cookies unavailable (${errors.map(formatAuthSourceError).join("; ")})`);
+}
+
+export async function loadAuthCookiesForSource(
+	profile: WebProfile,
+	url: URL,
+	source: AuthSourceName,
+	deps: ResolveRequestAuthDependencies = {},
+	signal?: AbortSignal,
+): Promise<AuthCookie[]> {
+	switch (source) {
+		case "cdp":
+			return (deps.getCdpCookies ?? getCookiesFromCdp)(profile, url, undefined, signal);
+		case "disk-cookies":
+			return (deps.getDiskCookies ?? getCookiesFromProfileDb)(profile, undefined, signal);
+	}
+}
+
+function getAuthSourceFailureMessage(source: AuthSourceName): string {
+	return source === "cdp" ? "Unable to read Helium cookies via CDP" : "Unable to read Helium cookies from the profile DB";
 }
 
 export function selectCookiesForUrl(cookies: AuthCookie[], url: URL, now = Date.now()): AuthCookie[] {
