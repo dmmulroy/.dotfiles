@@ -50,8 +50,14 @@ Return exactly one JSON object with this shape:
 Rules:
 - Extract only questions that require user input.
 - Keep questions in the original order.
-- Keep question text concise but faithful to the source.
-- Include context only when it materially helps answer the question.
+- Each extracted question must be understandable on its own without requiring the user to reread earlier messages.
+- Prefer preserving the original wording with light cleanup over aggressive paraphrasing.
+- Preserve all details that could affect the answer, including the subject, options, constraints, file/component names, and requested output format.
+- Resolve ambiguous references like "it", "that", "this", or "the above" when nearby text makes the referent clear.
+- Keep the question concise only if conciseness does not remove answer-relevant context.
+- Do not shorten a question if the shortened version would force the user to scroll up to understand what is being asked.
+- If important setup would make the question clearer, include a short context field.
+- When unsure, favor completeness and clarity over brevity.
 - Do not add commentary outside the JSON object.
 - If there are no user-answerable questions, return {"questions": []}.`;
 

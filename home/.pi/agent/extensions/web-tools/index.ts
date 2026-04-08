@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { resolveRequestAuth } from "./auth.ts";
+import { createSessionAuthResolver } from "./auth-session.ts";
 import { discoverHeliumProfiles } from "./profiles.ts";
 import { loadActiveWebIdentity, saveActiveWebIdentity } from "./profile-state.ts";
 import { formatWebProfileStatus, resolveSelectedProfile, showWebProfilePicker } from "./profile-ui.ts";
@@ -11,6 +11,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 	let activeIdentity: ActiveWebIdentity = { kind: "public" };
 	let discoveredProfiles: WebProfile[] = [];
 	let activeProfile: WebProfile | undefined;
+	const authResolver = createSessionAuthResolver(() => ({ identity: activeIdentity, profile: activeProfile }));
 
 	const refreshStatus = (ctx: ExtensionContext) => {
 		ctx.ui.setStatus("web", formatWebProfileStatus(activeIdentity));
@@ -30,6 +31,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 	};
 
 	const applyIdentity = async (identity: ActiveWebIdentity, ctx: ExtensionContext) => {
+		authResolver.clear();
 		activeIdentity = identity;
 		activeProfile = resolveSelectedProfile(activeIdentity, discoveredProfiles);
 		if (activeIdentity.kind === "helium" && activeProfile) {
@@ -48,7 +50,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 	};
 
 	pi.registerTool(createWebFetchTool({
-		resolveAuth: async (url, signal) => resolveRequestAuth(activeIdentity, url, activeProfile, {}, signal),
+		resolveAuth: async (url, options, signal) => authResolver.resolve(url, options, signal),
 	}));
 	pi.registerTool(createWebSearchTool());
 
@@ -63,6 +65,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		authResolver.clear();
 		activeIdentity = await loadActiveWebIdentity();
 		await refreshProfiles();
 		if (activeIdentity.kind === "helium" && !activeProfile) {

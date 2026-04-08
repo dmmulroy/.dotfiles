@@ -6,6 +6,7 @@ import {
 	getFallbackUserAgent,
 	OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
 	OPENCODE_WEBFETCH_FALLBACK_USER_AGENT,
+	shouldRetryWithCdpAuth,
 	shouldRetryWithFallbackUserAgent,
 } from "../webfetch.ts";
 
@@ -44,6 +45,37 @@ test("shouldRetryWithFallbackUserAgent only retries the Cloudflare challenge cas
 			status: 429,
 			headers: new Headers({ "cf-mitigated": "challenge" }),
 		}),
+		false,
+	);
+});
+
+test("shouldRetryWithCdpAuth retries generic 401/403 disk-auth failures even when a challenge header is present", () => {
+	assert.equal(
+		shouldRetryWithCdpAuth(
+			{ status: 401, headers: new Headers() },
+			{ identity: "helium", strategy: "disk-cookies", cookieCount: 1 },
+		),
+		true,
+	);
+	assert.equal(
+		shouldRetryWithCdpAuth(
+			{ status: 403, headers: new Headers({ "cf-mitigated": "challenge" }) },
+			{ identity: "helium", strategy: "disk-cookies", cookieCount: 1 },
+		),
+		true,
+	);
+	assert.equal(
+		shouldRetryWithCdpAuth(
+			{ status: 403, headers: new Headers() },
+			{ identity: "helium", strategy: "cdp", cookieCount: 1 },
+		),
+		false,
+	);
+	assert.equal(
+		shouldRetryWithCdpAuth(
+			{ status: 403, headers: new Headers() },
+			{ identity: "public", strategy: "none", cookieCount: 0 },
+		),
 		false,
 	);
 });
@@ -122,6 +154,153 @@ test("webfetch reuses resolved auth across fallback retries for the same URL", a
 	assert.equal(seenUserAgents[0], OPENCODE_WEBFETCH_DEFAULT_USER_AGENT);
 	assert.equal(seenUserAgents[1], OPENCODE_WEBFETCH_FALLBACK_USER_AGENT);
 	assert.equal(result.details?.auth?.strategy, "cdp");
+});
+
+test("webfetch retries once with CDP auth after a disk-auth 401 and keeps the successful auth context", async () => {
+	const resolveAuthCalls: string[] = [];
+	const seenCookies: Array<string | null> = [];
+	const tool = createWebFetchTool({
+		resolveAuth: async (_url, options) => {
+			resolveAuthCalls.push(options?.preferredSources?.join(",") ?? "default");
+			if (options?.preferredSources?.[0] === "cdp") {
+				return {
+					cookieHeader: "session=fresh",
+					context: { identity: "helium", strategy: "cdp", cookieCount: 1 },
+				};
+			}
+			return {
+				cookieHeader: "session=stale",
+				context: { identity: "helium", strategy: "disk-cookies", cookieCount: 1 },
+			};
+		},
+		fetchWithRedirects: async (url, options) => {
+			const headers = options.getHeaders ? await options.getHeaders(url) : options.headers;
+			seenCookies.push(headers ? new Headers(headers).get("cookie") : null);
+			if (seenCookies.length === 1) {
+				return {
+					response: new Response("unauthorized", {
+						status: 401,
+						headers: { "content-type": "text/plain; charset=utf-8" },
+					}),
+					finalUrl: url,
+				};
+			}
+			return {
+				response: new Response("ok", {
+					status: 200,
+					headers: { "content-type": "text/plain; charset=utf-8" },
+				}),
+				finalUrl: url,
+			};
+		},
+	});
+
+	const result = await tool.execute("tool-call-auth-retry", {
+		url: "https://example.com/private",
+		format: "text",
+	});
+
+	assert.deepEqual(resolveAuthCalls, ["default", "cdp"]);
+	assert.deepEqual(seenCookies, ["session=stale", "session=fresh"]);
+	assert.equal(result.details?.auth?.strategy, "cdp");
+});
+
+test("webfetch still escalates to CDP after a fallback-user-agent retry leaves a disk-authenticated 403 in place", async () => {
+	const resolveAuthCalls: string[] = [];
+	const seenRequests: Array<{ userAgent: string; cookie: string | null }> = [];
+	const tool = createWebFetchTool({
+		resolveAuth: async (_url, options) => {
+			resolveAuthCalls.push(options?.preferredSources?.join(",") ?? "default");
+			if (options?.preferredSources?.[0] === "cdp") {
+				return {
+					cookieHeader: "session=fresh",
+					context: { identity: "helium", strategy: "cdp", cookieCount: 1 },
+				};
+			}
+			return {
+				cookieHeader: "session=stale",
+				context: { identity: "helium", strategy: "disk-cookies", cookieCount: 1 },
+			};
+		},
+		fetchWithRedirects: async (url, options) => {
+			const headers = options.getHeaders ? await options.getHeaders(url) : options.headers;
+			seenRequests.push({
+				userAgent: headers?.["User-Agent"] ?? "",
+				cookie: headers ? new Headers(headers).get("cookie") : null,
+			});
+			if (seenRequests.length < 3) {
+				return {
+					response: new Response("challenge", {
+						status: 403,
+						headers: { "cf-mitigated": "challenge", "content-type": "text/plain; charset=utf-8" },
+					}),
+					finalUrl: url,
+				};
+			}
+			return {
+				response: new Response("ok", {
+					status: 200,
+					headers: { "content-type": "text/plain; charset=utf-8" },
+				}),
+				finalUrl: url,
+			};
+		},
+	});
+
+	const result = await tool.execute("tool-call-cloudflare-auth-retry", {
+		url: "https://example.com/private",
+		format: "text",
+	});
+
+	assert.deepEqual(resolveAuthCalls, ["default", "cdp"]);
+	assert.deepEqual(seenRequests, [
+		{ userAgent: OPENCODE_WEBFETCH_DEFAULT_USER_AGENT, cookie: "session=stale" },
+		{ userAgent: OPENCODE_WEBFETCH_FALLBACK_USER_AGENT, cookie: "session=stale" },
+		{ userAgent: OPENCODE_WEBFETCH_FALLBACK_USER_AGENT, cookie: "session=fresh" },
+	]);
+	assert.equal(result.details?.auth?.strategy, "cdp");
+});
+
+test("webfetch includes attempt diagnostics when an authenticated request still fails", async () => {
+	const tool = createWebFetchTool({
+		resolveAuth: async (_url, options) => {
+			if (options?.preferredSources?.[0] === "cdp") {
+				return {
+					cookieHeader: "session=fresh",
+					context: { identity: "helium", strategy: "cdp", cookieCount: 1 },
+				};
+			}
+			return {
+				cookieHeader: "session=stale",
+				context: { identity: "helium", strategy: "disk-cookies", cookieCount: 1 },
+			};
+		},
+		fetchWithRedirects: async (url, options) => {
+			await options.getHeaders?.(url);
+			return {
+				response: new Response("forbidden", {
+					status: 403,
+					headers: { "cf-mitigated": "challenge", "content-type": "text/plain; charset=utf-8" },
+				}),
+				finalUrl: url,
+			};
+		},
+	});
+
+	await assert.rejects(
+		tool.execute("tool-call-debug-failure", {
+			url: "https://example.com/private",
+			format: "text",
+		}),
+		(error: unknown) => {
+			assert.ok(error instanceof Error);
+			assert.match(error.message, /Request failed \(403.*\) \[debug:/);
+			assert.match(error.message, /auth=helium\/disk-cookies/);
+			assert.match(error.message, /auth=helium\/cdp/);
+			assert.match(error.message, /cf-mitigated=challenge/);
+			return true;
+		},
+	);
 });
 
 test("webfetch surfaces Helium auth resolution failures instead of silently downgrading to public fetches", async () => {

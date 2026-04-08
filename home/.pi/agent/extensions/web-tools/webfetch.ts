@@ -12,14 +12,14 @@ import {
 	parseContentType,
 	readBodyWithLimit,
 } from "./network.ts";
-import { mergeCookieHeader, type ResolvedRequestAuth } from "./auth.ts";
+import { mergeCookieHeader, type ResolveRequestAuthOptions, type ResolvedRequestAuth } from "./auth.ts";
 import { appendExpandHint, appendExpandedPreview, getTextContent } from "./render.ts";
 import { getWebToolsSettings } from "./settings.ts";
 import { truncateTextOutput } from "./truncation.ts";
 import type { WebFetchDetails, WebFetchFormat } from "./types.ts";
 
 export interface WebFetchToolOptions {
-	resolveAuth?: (url: URL, signal?: AbortSignal) => Promise<ResolvedRequestAuth>;
+	resolveAuth?: (url: URL, options?: ResolveRequestAuthOptions, signal?: AbortSignal) => Promise<ResolvedRequestAuth>;
 	fetchWithRedirects?: typeof defaultFetchWithRedirects;
 }
 
@@ -78,45 +78,70 @@ export function createWebFetchTool(options: WebFetchToolOptions = {}) {
 			try {
 				const accept = getAcceptHeader(format);
 				let auth: ResolvedRequestAuth = { context: { identity: "public", strategy: "none", cookieCount: 0 } };
+				const attemptDebug: string[] = [];
 				const authCache = new Map<string, Promise<ResolvedRequestAuth>>();
-				const getResolvedAuth = (targetUrl: URL) => {
-					const cacheKey = targetUrl.toString();
+				const getResolvedAuth = (targetUrl: URL, authOptions: ResolveRequestAuthOptions = {}) => {
+					const cacheKey = `${authOptions.preferredSources?.join(",") ?? "default"}:${targetUrl.toString()}`;
 					let pending = authCache.get(cacheKey);
 					if (!pending) {
 						pending = resolveAuth
-							? resolveAuth(targetUrl, composed.signal)
+							? resolveAuth(targetUrl, authOptions, composed.signal)
 							: Promise.resolve({ context: { identity: "public", strategy: "none", cookieCount: 0 } });
 						authCache.set(cacheKey, pending);
 					}
 					return pending;
 				};
-				const buildRequestHeaders = async (targetUrl: URL, userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT) => {
+				const buildRequestHeaders = async (
+					targetUrl: URL,
+					userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
+					authOptions: ResolveRequestAuthOptions = {},
+				) => {
 					const baseHeaders = createWebFetchHeaders(accept, userAgent);
-					auth = await getResolvedAuth(targetUrl);
+					auth = await getResolvedAuth(targetUrl, authOptions);
 					return {
 						...baseHeaders,
 						...(auth.cookieHeader ? { Cookie: mergeCookieHeader(baseHeaders.Cookie, auth.cookieHeader) } : {}),
 					};
 				};
-				let { response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-					getHeaders: (url) => buildRequestHeaders(url),
-					signal: composed.signal,
-					maxRedirects: settings.fetch.maxRedirects,
-					blockPrivateHosts: settings.fetch.blockPrivateHosts,
-				});
-
-				if (shouldRetryWithFallbackUserAgent(response)) {
-					await response.body?.cancel().catch(() => undefined);
-					({ response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-						getHeaders: (url) => buildRequestHeaders(url, getFallbackUserAgent(settings.fetch.fallbackUserAgent)),
+				const performFetch = async (
+					userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
+					authOptions: ResolveRequestAuthOptions = {},
+				) =>
+					fetchWithRedirects(requestedUrl, {
+						getHeaders: (url) => buildRequestHeaders(url, userAgent, authOptions),
 						signal: composed.signal,
 						maxRedirects: settings.fetch.maxRedirects,
 						blockPrivateHosts: settings.fetch.blockPrivateHosts,
-					}));
+					});
+				const fallbackUserAgent = getFallbackUserAgent(settings.fetch.fallbackUserAgent);
+				let currentUserAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT;
+				let currentAuthOptions: ResolveRequestAuthOptions = {};
+				let { response, finalUrl } = await performFetch(currentUserAgent, currentAuthOptions);
+				attemptDebug.push(formatWebFetchAttemptDebug(response, auth.context, currentUserAgent, finalUrl));
+
+				if (shouldRetryWithFallbackUserAgent(response)) {
+					await response.body?.cancel().catch(() => undefined);
+					currentUserAgent = fallbackUserAgent;
+					({ response, finalUrl } = await performFetch(currentUserAgent, currentAuthOptions));
+					attemptDebug.push(formatWebFetchAttemptDebug(response, auth.context, currentUserAgent, finalUrl));
+				}
+
+				if (shouldRetryWithCdpAuth(response, auth.context)) {
+					await response.body?.cancel().catch(() => undefined);
+					currentAuthOptions = { preferredSources: ["cdp"] };
+					({ response, finalUrl } = await performFetch(currentUserAgent, currentAuthOptions));
+					attemptDebug.push(formatWebFetchAttemptDebug(response, auth.context, currentUserAgent, finalUrl));
+					if (shouldRetryWithFallbackUserAgent(response) && currentUserAgent !== fallbackUserAgent) {
+						await response.body?.cancel().catch(() => undefined);
+						currentUserAgent = fallbackUserAgent;
+						({ response, finalUrl } = await performFetch(currentUserAgent, currentAuthOptions));
+						attemptDebug.push(formatWebFetchAttemptDebug(response, auth.context, currentUserAgent, finalUrl));
+					}
 				}
 
 				if (!response.ok) {
-					throw new Error(`Request failed (${response.status} ${response.statusText || ""})`.trim());
+					const debugSuffix = attemptDebug.length > 0 ? ` [debug: ${attemptDebug.join(" | ")}]` : "";
+					throw new Error(`Request failed (${response.status} ${response.statusText || ""})${debugSuffix}`.trim());
 				}
 
 				const contentLength = response.headers.get("content-length");
@@ -280,6 +305,34 @@ export function getFallbackUserAgent(configuredUserAgent?: string): string {
 
 export function shouldRetryWithFallbackUserAgent(response: Pick<Response, "status" | "headers">): boolean {
 	return response.status === 403 && response.headers.get("cf-mitigated") === "challenge";
+}
+
+export function shouldRetryWithCdpAuth(
+	response: Pick<Response, "status" | "headers">,
+	auth: ResolvedRequestAuth["context"],
+): boolean {
+	return (response.status === 401 || response.status === 403) && auth.identity === "helium" && auth.strategy === "disk-cookies";
+}
+
+function formatWebFetchAttemptDebug(
+	response: Pick<Response, "status" | "statusText" | "headers">,
+	auth: ResolvedRequestAuth["context"],
+	userAgent: string,
+	finalUrl: URL,
+): string {
+	const userAgentLabel = userAgent === OPENCODE_WEBFETCH_DEFAULT_USER_AGENT ? "default-ua" : `ua=${userAgent}`;
+	const parts = [
+		`${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+		`auth=${auth.identity}/${auth.strategy}`,
+		`cookies=${auth.cookieCount ?? 0}`,
+		userAgentLabel,
+		`url=${finalUrl.toString()}`,
+	];
+	const mitigated = response.headers.get("cf-mitigated");
+	if (mitigated) {
+		parts.push(`cf-mitigated=${mitigated}`);
+	}
+	return parts.join(" ");
 }
 
 function clampTimeoutSeconds(timeout: number): number {

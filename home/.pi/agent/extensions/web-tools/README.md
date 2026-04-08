@@ -35,9 +35,13 @@ Behavior notes:
 - binary content is rejected
 - if a site returns `403` with `cf-mitigated: challenge`, the tool retries with the fallback user agent
 - when `/web-profile` is set to a Helium profile, `webfetch` keeps using normal HTTP requests but injects cookies from that profile
-- auth source priority is:
-  1. live Helium cookies via CDP (`DevToolsActivePort`) when the selected profile can be scoped safely
-  2. persisted profile cookies from the Helium `Cookies` sqlite DB
+- auth source priority is disk-first by default:
+  1. persisted profile cookies from the Helium `Cookies` sqlite DB
+  2. live Helium cookies via CDP (`DevToolsActivePort`) when disk-cookie auth fails or a disk-authenticated request still gets `401`/`403`
+- successful auth state is cached in memory per selected Helium profile for the current agent session
+  - disk-cookie auth uses a short TTL
+  - CDP auth uses a longer TTL so repeated authenticated fetches do not reconnect to CDP on every call
+  - if a fresh CDP cache already exists, `webfetch` reuses it preferentially until expiry to avoid repeat auth failures and prompts
 - if the selected Helium profile cannot be scoped safely through CDP (for example, ambiguous multi-profile state), the extension skips CDP rather than using potentially wrong-profile browser-wide cookies
 - if both Helium auth sources fail operationally, `webfetch` fails clearly instead of silently downgrading to public/zero-cookie behavior
 - persisted cookie fallback supports Helium's current Chromium-style macOS cookie store, including `v10` blobs backed by the `Helium Storage Key` keychain item and DB version `24` host-key digests

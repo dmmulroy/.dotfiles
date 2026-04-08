@@ -110,7 +110,7 @@ test("buildCookieHeader sorts longer paths first and mergeCookieHeader preserves
 	assert.equal(mergeCookieHeader("existing=ok", undefined), "existing=ok");
 });
 
-test("resolveRequestAuth prefers CDP cookies and falls back to disk cookies when CDP fails fast", async () => {
+test("resolveRequestAuth prefers disk cookies and falls back to CDP when disk auth fails", async () => {
 	const url = new URL("https://app.example.com/account");
 	const cdpCookie: AuthCookie = {
 		name: "cdp",
@@ -129,23 +129,23 @@ test("resolveRequestAuth prefers CDP cookies and falls back to disk cookies when
 		httpOnly: true,
 	};
 
-	const fromCdp = await resolveRequestAuth(identity, url, profile, {
-		getCdpCookies: async () => [cdpCookie],
-		getDiskCookies: async () => [diskCookie],
-		now: () => now,
-	});
-	assert.equal(fromCdp.cookieHeader, "cdp=fresh");
-	assert.deepEqual(fromCdp.context, { identity: "helium", strategy: "cdp", cookieCount: 1 });
-
 	const fromDisk = await resolveRequestAuth(identity, url, profile, {
-		getCdpCookies: async () => {
-			throw new AuthSourceError("cdp", "failed", "Helium CDP connection closed before reply for Storage.getCookies");
-		},
+		getCdpCookies: async () => [cdpCookie],
 		getDiskCookies: async () => [diskCookie],
 		now: () => now,
 	});
 	assert.equal(fromDisk.cookieHeader, "disk=stale");
 	assert.deepEqual(fromDisk.context, { identity: "helium", strategy: "disk-cookies", cookieCount: 1 });
+
+	const fromCdp = await resolveRequestAuth(identity, url, profile, {
+		getDiskCookies: async () => {
+			throw new AuthSourceError("disk-cookies", "failed", "Unable to decrypt one or more Helium cookies");
+		},
+		getCdpCookies: async () => [cdpCookie],
+		now: () => now,
+	});
+	assert.equal(fromCdp.cookieHeader, "cdp=fresh");
+	assert.deepEqual(fromCdp.context, { identity: "helium", strategy: "cdp", cookieCount: 1 });
 });
 
 test("resolveRequestAuth fails clearly when both auth sources fail operationally", async () => {
@@ -168,9 +168,10 @@ test("resolveRequestAuth fails clearly when both auth sources fail operationally
 	);
 });
 
-test("resolveRequestAuth keeps zero-cookie results non-fatal when auth sources succeed but nothing matches the URL", async () => {
+test("resolveRequestAuth keeps zero-cookie disk results non-fatal and does not escalate to CDP before the request runs", async () => {
+	let cdpCalls = 0;
 	const result = await resolveRequestAuth(identity, new URL("https://app.example.com/account"), profile, {
-		getCdpCookies: async () => [
+		getDiskCookies: async () => [
 			{
 				name: "other-domain",
 				value: "1",
@@ -180,9 +181,14 @@ test("resolveRequestAuth keeps zero-cookie results non-fatal when auth sources s
 				httpOnly: true,
 			},
 		],
+		getCdpCookies: async () => {
+			cdpCalls += 1;
+			return [];
+		},
 		now: () => now,
 	});
 
+	assert.equal(cdpCalls, 0);
 	assert.equal(result.cookieHeader, undefined);
-	assert.deepEqual(result.context, { identity: "helium", strategy: "cdp", cookieCount: 0 });
+	assert.deepEqual(result.context, { identity: "helium", strategy: "disk-cookies", cookieCount: 0 });
 });
