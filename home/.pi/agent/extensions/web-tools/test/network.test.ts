@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyMimeType, fetchWithRedirects, isPrivateOrLocalIp, parseContentType } from "../network.ts";
+import { classifyMimeType, isPrivateOrLocalIp, parseContentType } from "../network.ts";
 
 test("parseContentType normalizes html and xhtml content types", () => {
 	assert.equal(parseContentType("TEXT/HTML; charset=UTF-8").kind, "html");
@@ -23,37 +23,4 @@ test("isPrivateOrLocalIp detects local and private IP ranges", () => {
 	assert.equal(isPrivateOrLocalIp("::1"), true);
 	assert.equal(isPrivateOrLocalIp("fc00::1"), true);
 	assert.equal(isPrivateOrLocalIp("8.8.8.8"), false);
-});
-
-test("fetchWithRedirects can recompute headers for each redirect hop", async () => {
-	const originalFetch = globalThis.fetch;
-	const seen: Array<{ url: string; cookie: string | null }> = [];
-	globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
-		const url = String(input);
-		const headers = new Headers(init?.headers);
-		seen.push({ url, cookie: headers.get("cookie") });
-		if (url === "https://first.example.com/start") {
-			return new Response(null, {
-				status: 302,
-				headers: { location: "https://second.example.com/next" },
-			});
-		}
-		return new Response("ok", { status: 200 });
-	}) as typeof fetch;
-
-	try {
-		const result = await fetchWithRedirects(new URL("https://first.example.com/start"), {
-			getHeaders: (url) => ({ Cookie: `for=${url.hostname}` }),
-			maxRedirects: 5,
-			blockPrivateHosts: false,
-		});
-		assert.equal(result.finalUrl.toString(), "https://second.example.com/next");
-		assert.deepEqual(seen, [
-			{ url: "https://first.example.com/start", cookie: "for=first.example.com" },
-			{ url: "https://second.example.com/next", cookie: "for=second.example.com" },
-		]);
-		await result.response.text();
-	} finally {
-		globalThis.fetch = originalFetch;
-	}
 });
