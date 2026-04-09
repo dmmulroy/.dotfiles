@@ -31,42 +31,6 @@ export interface ParsedContentType {
 	kind: ContentKind;
 }
 
-export interface WebProfile {
-	browser: "helium";
-	profileId: string;
-	displayName: string;
-	userDataDir: string;
-	profileDir: string;
-	cookieDbPath: string;
-	isLastActive?: boolean;
-	cdpReachable?: boolean;
-	diskCookiesAvailable?: boolean;
-}
-
-export type ActiveWebIdentity =
-	| { kind: "public" }
-	| { kind: "helium"; profileId: string; displayName: string; userDataDir: string };
-
-export interface AuthCookie {
-	name: string;
-	value: string;
-	domain: string;
-	path: string;
-	secure: boolean;
-	httpOnly: boolean;
-	expiresAt?: number;
-	hostOnly?: boolean;
-}
-
-export type AuthStrategy = "none" | "cdp" | "disk-cookies";
-export type AuthSourceName = Exclude<AuthStrategy, "none">;
-
-export interface ResolvedAuthContext {
-	identity: "public" | "helium";
-	strategy: AuthStrategy;
-	cookieCount?: number;
-}
-
 export interface WebFetchDetails {
 	requestedUrl: string;
 	finalUrl: string;
@@ -80,7 +44,6 @@ export interface WebFetchDetails {
 	image?: boolean;
 	truncated?: boolean;
 	fullOutputPath?: string;
-	auth?: ResolvedAuthContext;
 }
 
 export interface NormalizedSearchResult {
