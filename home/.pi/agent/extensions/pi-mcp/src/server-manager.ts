@@ -138,9 +138,15 @@ export class McpServerManager {
     if (definition.auth === "bearer") {
       const token = definition.bearerToken
         ?? (definition.bearerTokenEnv ? process.env[definition.bearerTokenEnv] : undefined);
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+
+      if (!token) {
+        const missingSource = definition.bearerTokenEnv
+          ? `environment variable "${definition.bearerTokenEnv}"`
+          : "configured bearer token";
+        throw new Error(`Missing bearer token for MCP server "${serverName ?? definition.url}" (${missingSource})`);
       }
+
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const requestInit = Object.keys(headers).length > 0 ? { headers } : undefined;
@@ -184,6 +190,7 @@ export class McpServerManager {
     ];
 
     let lastError: Error | undefined;
+    const transportErrors: string[] = [];
     for (const { name, factory } of transports) {
       const transport = factory();
       try {
@@ -214,7 +221,12 @@ export class McpServerManager {
         }
 
         logger.debug(`${serverName ?? "?"}: ${name} transport failed: ${lastError.message}`);
+        transportErrors.push(`${name}: ${lastError.message}`);
       }
+    }
+
+    if (transportErrors.length > 0) {
+      throw new Error(`All transports failed for "${serverName ?? definition.url}": ${transportErrors.join(" | ")}`);
     }
 
     throw lastError ?? new Error("All transports failed");
