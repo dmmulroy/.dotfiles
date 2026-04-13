@@ -247,6 +247,7 @@ const messages = [
   "Singling...",
   "Ringling...",
   "Kingling...",
+  "Tokenmaxxing...",
 
   // Long
   "Consulting the void...",
