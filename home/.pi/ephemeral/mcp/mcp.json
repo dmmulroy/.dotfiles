@@ -1,13 +1,33 @@
 {
   "mcpServers": {
-    "cloudflare-api": {
-      "url": "https://mcp.cloudflare.com/mcp",
-      "auth": "oauth"
-    },
     "uidotsh": {
       "url": "https://ui.sh/mcp?agent=opencode",
       "auth": "bearer",
       "bearerTokenEnv": "UIDOTSH_TOKEN"
+    },
+    "cloudflare-api": {
+      "url": "https://mcp.cloudflare.com/mcp",
+      "auth": "oauth"
+    },
+    "backstage": {
+      "url": "https://backstage.mcp.cfdata.org/mcp",
+      "auth": "oauth"
+    },
+    "gitlab": {
+      "url": "https://gitlab.mcp.cfdata.org/mcp",
+      "auth": "oauth"
+    },
+    "jira": {
+      "url": "https://jira.mcp.cfdata.org/mcp",
+      "auth": "oauth"
+    },
+    "wiki": {
+      "url": "https://wiki.mcp.cfdata.org/mcp",
+      "auth": "oauth"
+    },
+    "elasticsearch": {
+      "url": "https://elasticsearch.mcp.cfdata.org/mcp",
+      "auth": "oauth"
     }
   }
 }
