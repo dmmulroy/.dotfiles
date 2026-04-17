@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "uidotsh": {
-      "url": "https://ui.sh/mcp?agent=opencode",
+      "url": "https://ui.sh/mcp?agent=pi",
       "auth": "bearer",
       "bearerTokenEnv": "UIDOTSH_TOKEN"
     },
