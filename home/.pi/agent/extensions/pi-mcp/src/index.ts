@@ -3,12 +3,49 @@ import type { McpExtensionState } from "./state.js";
 import { Type } from "@sinclair/typebox";
 import { showStatus, showTools, reconnectServers, authenticateServer, removeAuth, openMcpPanel } from "./commands.js";
 import { loadMcpConfig } from "./config.js";
-import { buildProxyDescription, createDirectToolExecutor, resolveDirectTools } from "./direct-tools.js";
+import { buildProxyDescription, createDirectToolExecutor, renderDirectToolCall, resolveDirectTools } from "./direct-tools.js";
 import { flushMetadataCache, initializeMcp, updateStatusBar } from "./init.js";
 import { loadMetadataCache } from "./metadata-cache.js";
 import { McpOAuthCallback } from "./mcp-oauth-callback.js";
 import { executeCall, executeConnect, executeDescribe, executeList, executeSearch, executeStatus, executeUiMessages } from "./proxy-modes.js";
 import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
+import { Text } from "@mariozechner/pi-tui";
+
+type McpProxyParams = {
+  tool?: string;
+  args?: string;
+  connect?: string;
+  describe?: string;
+  search?: string;
+  regex?: boolean;
+  includeSchemas?: boolean;
+  server?: string;
+  action?: string;
+};
+
+function formatMcpProxyArgs(input: unknown): string {
+  const params = (input && typeof input === "object" && !Array.isArray(input)) ? input as McpProxyParams : {};
+  if (params.tool) {
+    let text = `call ${params.server ? `${params.server}/` : ""}${params.tool}`;
+    if (params.args) {
+      try {
+        text += `\narguments:\n${JSON.stringify(JSON.parse(params.args), null, 2)}`;
+      } catch {
+        text += `\narguments:\n${params.args}`;
+      }
+    } else {
+      text += `\narguments:\n{}`;
+    }
+    return text;
+  }
+
+  if (params.connect) return `connect ${params.connect}`;
+  if (params.describe) return `describe ${params.describe}`;
+  if (params.search) return `search ${params.regex ? "(regex) " : ""}${params.search}`;
+  if (params.server) return `list ${params.server}`;
+  if (params.action) return `action ${params.action}`;
+  return "status";
+}
 
 export default function mcpAdapter(pi: ExtensionAPI) {
   let state: McpExtensionState | null = null;
@@ -63,6 +100,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       promptSnippet: truncateAtWord(spec.description, 100) || `MCP tool from ${spec.serverName}`,
       parameters: Type.Unsafe<Record<string, unknown>>(spec.inputSchema || { type: "object", properties: {} }),
       execute: createDirectToolExecutor(() => state, () => initPromise, spec),
+      renderCall: renderDirectToolCall(spec),
     });
   }
 
@@ -257,17 +295,11 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       server: Type.Optional(Type.String({ description: "Filter to specific server (also disambiguates tool calls)" })),
       action: Type.Optional(Type.String({ description: "Action: 'ui-messages' to retrieve prompts/intents from UI sessions" })),
     }),
-    async execute(_toolCallId, params: {
-      tool?: string;
-      args?: string;
-      connect?: string;
-      describe?: string;
-      search?: string;
-      regex?: boolean;
-      includeSchemas?: boolean;
-      server?: string;
-      action?: string;
-    }, _signal, _onUpdate, _ctx) {
+    renderCall(params, theme) {
+      const text = theme.fg("toolTitle", theme.bold("mcp")) + " " + theme.fg("muted", formatMcpProxyArgs(params));
+      return new Text(text, 0, 0);
+    },
+    async execute(_toolCallId, params: McpProxyParams, _signal, _onUpdate, _ctx) {
       let parsedArgs: Record<string, unknown> | undefined;
       if (params.args) {
         try {

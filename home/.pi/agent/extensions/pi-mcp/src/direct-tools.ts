@@ -10,8 +10,34 @@ import { maybeStartUiSession, type UiSessionRuntime } from "./ui-session.js";
 import { formatToolName } from "./types.js";
 import { resourceNameToToolName } from "./resource-tools.js";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
+import { Text } from "@mariozechner/pi-tui";
 
 const BUILTIN_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "mcp"]);
+
+function formatArgs(args: Record<string, unknown> | undefined): string {
+  if (!args || Object.keys(args).length === 0) return "{}";
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return String(args);
+  }
+}
+
+export function renderDirectToolCall(spec: DirectToolSpec): NonNullable<ToolDefinition["renderCall"]> {
+  return (args, theme) => {
+    const recordArgs = (args && typeof args === "object" && !Array.isArray(args)) ? args as Record<string, unknown> : undefined;
+    let text = theme.fg("toolTitle", theme.bold(spec.prefixedName));
+    text += theme.fg("muted", ` → ${spec.serverName}/${spec.originalName}`);
+
+    if (spec.resourceUri) {
+      text += `\n${theme.fg("muted", "resource:")} ${spec.resourceUri}`;
+    } else {
+      text += `\n${theme.fg("muted", "arguments:")}\n${formatArgs(recordArgs)}`;
+    }
+
+    return new Text(text, 0, 0);
+  };
+}
 
 export function resolveDirectTools(
   config: McpConfig,
@@ -176,6 +202,7 @@ export function createDirectToolExecutor(
   spec: DirectToolSpec
 ): DirectToolExecute {
   return async function execute(_toolCallId, params) {
+    const toolArgs = (params && typeof params === "object" && !Array.isArray(params)) ? params as Record<string, unknown> : {};
     let state = getState();
     const initPromise = getInitPromise();
 
@@ -236,7 +263,7 @@ export function createDirectToolExecutor(
         ? await maybeStartUiSession(state, {
             serverName: spec.serverName,
             toolName: spec.originalName,
-            toolArgs: params ?? {},
+            toolArgs,
             uiResourceUri: spec.uiResourceUri!,
             streamMode: spec.uiStreamMode,
           })
@@ -244,7 +271,7 @@ export function createDirectToolExecutor(
 
       const resultPromise = connection.client.callTool({
         name: spec.originalName,
-        arguments: params ?? {},
+        arguments: toolArgs,
         _meta: uiSession?.requestMeta,
       });
 
