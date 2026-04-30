@@ -21,6 +21,7 @@ export interface GatewayModelModalities {
 }
 
 export interface GatewayModelConfig {
+	id?: string;
 	name?: string;
 	attachment?: boolean;
 	reasoning?: boolean;
@@ -29,6 +30,7 @@ export interface GatewayModelConfig {
 	interleaved?: { field?: string };
 	modalities?: GatewayModelModalities;
 	limit?: GatewayModelLimit;
+	cost?: { input?: number; output?: number; cache_read?: number };
 	options?: Record<string, unknown>;
 }
 
@@ -36,6 +38,7 @@ export interface GatewayRouteConfig {
 	baseUrl: string;
 	headers: Record<string, string>;
 	models: Record<string, GatewayModelConfig>;
+	whitelist?: string[];
 }
 
 export interface GatewayWellKnownResponse {
@@ -45,11 +48,14 @@ export interface GatewayWellKnownResponse {
 	};
 	config?: {
 		enabled_providers?: string[];
-		provider?: Partial<Record<Backend, {
+		provider?: Partial<Record<Backend | "cloudflare-workers-ai", {
 			name?: string;
+			npm?: string;
+			whitelist?: string[];
 			options?: {
 				baseURL?: string;
 				baseUrl?: string;
+				apiKey?: string;
 				headers?: Record<string, unknown>;
 			};
 			models?: Record<string, GatewayModelConfig>;
@@ -84,9 +90,18 @@ export function normalizeGatewayOrigin(input: string): string {
 	return url.origin;
 }
 
+/** Map external provider names from the gateway to internal Backend identifiers. */
+const PROVIDER_ALIASES: Record<string, Backend> = {
+	"cloudflare-workers-ai": "workers-ai",
+};
+
+function normalizeProviderName(name: string): string {
+	return PROVIDER_ALIASES[name] || name;
+}
+
 function normalizeBackendList(enabledProviders: string[] | undefined): Backend[] {
 	if (!enabledProviders?.length) return [...ENABLED_BACKENDS];
-	const enabled = new Set(enabledProviders);
+	const enabled = new Set(enabledProviders.map(normalizeProviderName));
 	return ENABLED_BACKENDS.filter((backend) => enabled.has(backend));
 }
 
@@ -113,7 +128,17 @@ function normalizeHeaders(headers: Record<string, unknown> | undefined, backend:
 }
 
 function getRouteProviderConfig(raw: GatewayWellKnownResponse["config"], backend: Backend) {
-	return raw?.provider?.[backend];
+	// Try the canonical internal name first, then check aliases
+	const provider = raw?.provider;
+	if (!provider) return undefined;
+	if (provider[backend]) return provider[backend];
+	// Look for an aliased key that maps to this backend
+	for (const [alias, target] of Object.entries(PROVIDER_ALIASES)) {
+		if (target === backend && provider[alias as keyof typeof provider]) {
+			return provider[alias as keyof typeof provider];
+		}
+	}
+	return undefined;
 }
 
 function resolveRouteConfig(raw: GatewayWellKnownResponse | undefined, backend: Backend): GatewayRouteConfig {
@@ -124,6 +149,7 @@ function resolveRouteConfig(raw: GatewayWellKnownResponse | undefined, backend: 
 		baseUrl: options?.baseURL || options?.baseUrl || DEFAULT_ROUTE_URLS[backend],
 		headers: normalizeHeaders(options?.headers, backend),
 		models: providerConfig?.models || {},
+		whitelist: providerConfig?.whitelist,
 	};
 }
 

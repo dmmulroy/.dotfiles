@@ -104,13 +104,16 @@ function buildBuiltInModels(backend: Exclude<Backend, "workers-ai">, gatewayMode
 	return builtIns.map((model) => applyGatewayModelLimit(model, gatewayModels, backend));
 }
 
-function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, baseUrl: string, headers: Record<string, string>) {
+function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, baseUrl: string, headers: Record<string, string>, whitelist?: string[]) {
 	const source = Object.keys(gatewayModels).length > 0 ? gatewayModels : DEFAULT_WORKERS_MODELS;
+	const allowedIds = whitelist?.length ? new Set(whitelist) : undefined;
 	const models: ProviderModelConfig[] = [];
 	const routes = new Map<string, RouteDescriptor>();
 
 	for (const [fullModelId, config] of Object.entries(source)) {
 		const shortId = stripRoutePrefix(fullModelId, "workers-ai");
+		// Skip models not in whitelist (match against both full ID and short ID)
+		if (allowedIds && !allowedIds.has(fullModelId) && !allowedIds.has(shortId)) continue;
 		models.push({
 			id: shortId,
 			name: `${fullModelId} (${config.name || shortId})`,
@@ -131,7 +134,7 @@ function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, b
 			api: "openai-completions",
 			baseUrl,
 			headers,
-			requestModelId: fullModelId,
+			requestModelId: config.id || fullModelId,
 			compat: {
 				supportsStore: false,
 				supportsDeveloperRole: false,
@@ -157,7 +160,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
 	for (const backend of gateway.enabledBackends) {
 		const route = gateway.routes[backend];
 		if (backend === "workers-ai") {
-			const workers = buildWorkersModels(route.models, route.baseUrl || DEFAULT_ROUTE_URLS[backend], route.headers);
+			const workers = buildWorkersModels(route.models, route.baseUrl || DEFAULT_ROUTE_URLS[backend], route.headers, route.whitelist);
 			models.push(...workers.models);
 			for (const [modelId, descriptor] of workers.routes.entries()) {
 				routes.set(modelId, descriptor);
