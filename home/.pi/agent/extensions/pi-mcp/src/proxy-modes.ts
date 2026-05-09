@@ -1,4 +1,4 @@
-import type { AgentToolResult, ToolInfo } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ToolInfo } from "@earendil-works/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
 import type { ToolMetadata, McpContent } from "./types.js";
 import { getServerPrefix, parseUiPromptHandoff } from "./types.js";

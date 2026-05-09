@@ -1,4 +1,4 @@
-import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
 import type { DirectToolSpec, McpConfig, McpContent } from "./types.js";
 import type { MetadataCache } from "./metadata-cache.js";
@@ -10,7 +10,7 @@ import { maybeStartUiSession, type UiSessionRuntime } from "./ui-session.js";
 import { formatToolName } from "./types.js";
 import { resourceNameToToolName } from "./resource-tools.js";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
-import { Text } from "@mariozechner/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
 
 const BUILTIN_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "mcp"]);
 

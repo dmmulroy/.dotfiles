@@ -12,8 +12,8 @@
  *    The agent should fix hook failures or ask the human for help instead.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
 const GIT_ENV_PREFIX =
 	"export GIT_EDITOR=true GIT_SEQUENCE_EDITOR=true GIT_MERGE_AUTOEDIT=no\n";

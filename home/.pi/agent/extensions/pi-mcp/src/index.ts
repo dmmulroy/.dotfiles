@@ -1,6 +1,6 @@
-import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@earendil-works/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { showStatus, showTools, reconnectServers, authenticateServer, removeAuth, openMcpPanel } from "./commands.js";
 import { loadMcpConfig } from "./config.js";
 import { buildProxyDescription, createDirectToolExecutor, renderDirectToolCall, resolveDirectTools } from "./direct-tools.js";
@@ -9,7 +9,7 @@ import { loadMetadataCache } from "./metadata-cache.js";
 import { McpOAuthCallback } from "./mcp-oauth-callback.js";
 import { executeCall, executeConnect, executeDescribe, executeList, executeSearch, executeStatus, executeUiMessages } from "./proxy-modes.js";
 import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
-import { Text } from "@mariozechner/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
 
 type McpProxyParams = {
   tool?: string;

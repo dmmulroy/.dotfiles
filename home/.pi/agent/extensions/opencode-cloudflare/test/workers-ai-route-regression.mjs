@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { streamSimpleOpenAICompletions } from "@mariozechner/pi-ai";
+import { streamSimpleOpenAICompletions } from "@earendil-works/pi-ai";
 
 const gatewayToken = "cf-access-token-value";
 const capturedRequests = [];

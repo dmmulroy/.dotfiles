@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { platform } from "node:os";
 
 export async function openUrl(pi: ExtensionAPI, url: string, browser?: string): Promise<void> {

@@ -47,7 +47,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
     return {
       redirect_uris: [this.redirectUrl],
       client_name: "Pi Coding Agent",
-      client_uri: "https://github.com/badlogic/pi-mono",
+      client_uri: "https://github.com/earendil-works/pi",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: this.config.clientSecret ? "client_secret_post" : "none",

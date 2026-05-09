@@ -1,7 +1,7 @@
 # FISH SHELL CONFIG
 
-**Generated:** 2026-01-29T00:00:00Z
-**Commit:** f2997bb
+**Generated:** 2026-05-09T00:00:00Z
+**Commit:** 871ce6f
 
 Layered: `config.fish` -> `conf.d/*.fish` (auto) -> `functions/*.fish` (lazy)
 
@@ -9,19 +9,22 @@ Layered: `config.fish` -> `conf.d/*.fish` (auto) -> `functions/*.fish` (lazy)
 
 ```
 fish/
-├── config.fish         # Core: greeting, EDITOR, PATH additions
-├── conf.d/             # Auto-sourced config fragments
-│   ├── aliases.fish    # Shell aliases (c, code, pn, oc, wr)
-│   ├── paths.fish      # PATH modifications
+├── config.fish         # Core: greeting, EDITOR, MANPAGER, dotfiles PATH
+├── conf.d/             # Auto-sourced config fragments (17 files)
+│   ├── aliases.fish    # Shell aliases (c, code, pn, wr)
+│   ├── paths.fish      # PATH modifications (.dotfiles, .local/bin, ghostty)
 │   ├── git.fish        # Git abbreviations init
 │   ├── brew.fish       # Homebrew setup
-│   ├── opencode.fish   # Experimental feature flags
-│   └── ...             # Tool-specific (fnm, bun, zoxide, starship)
-├── functions/          # Lazy-loaded functions
-│   ├── __git.*.fish    # Internal git helpers
+│   ├── tmux_keys.fish  # CSI-u Shift+Enter workaround for tmux extended-keys
+│   ├── vite-plus.fish  # Sources Vite+ env
+│   ├── starship.fish   # Starship prompt init
+│   ├── secrets.fish    # Env tokens (GITIGNORED)
+│   └── ...             # Tool-specific (bun, zoxide, rustup, orbstack)
+├── functions/          # Lazy-loaded functions (31 files)
+│   ├── __git.*.fish    # Internal git helpers (5 files)
 │   ├── gwip.fish       # WIP commit
-│   └── ...             # Utilities (uuid, timer, notify)
-└── completions/        # Command completions (dot, bun, wrangler)
+│   └── ...             # Utilities (uuid, ulid, timer, notify, nato, rn)
+└── completions/        # Command completions (dot, bun, wrangler, kubectl, vp)
 ```
 
 ## WHERE TO LOOK
@@ -30,10 +33,11 @@ fish/
 |------|----------|
 | Add alias | `conf.d/aliases.fish` |
 | Add PATH | `conf.d/paths.fish` |
-| Add function | `functions/<name>.fish` |
+| Add function | `functions/<name>.fish` (1 function per file) |
 | Git abbr | `functions/__git.init.fish` (180+ abbrs) |
 | Tool setup | `conf.d/<tool>.fish` |
 | Completions | `completions/<cmd>.fish` |
+| Env secrets | `conf.d/secrets.fish` (gitignored) |
 
 ## CONVENTIONS
 
@@ -57,13 +61,13 @@ fish/
 | Alias | Expands To |
 |-------|------------|
 | `c` | clear |
-| `code`/`vim`/`vi` | nvim (with `.` default) |
+| `code` | vim (which maps to nvim) |
+| `vim`/`vi` | nvim with `.` default (defined in `conf.d/functions.fish`) |
 | `pn` | pnpm |
-| `oc` | opencode |
 | `wr` | wrangler |
-| `lc` | localcode (dev opencode) |
 | `ks` | tmux kill-server |
 | `pbc`/`pbp` | pbcopy/pbpaste |
+| `scratch` | nvim with nofile buftype |
 
 ## GIT ABBREVIATIONS
 
@@ -86,20 +90,23 @@ fish/
 | `gtest <cmd>` | Test command against staged changes only |
 | `gbage` | List branches by age |
 | `grename <old> <new>` | Rename branch locally + remote |
-| `fvim [query]` | fzf -> nvim |
+| `fvim [query]` | fzf → nvim |
 | `uuid`/`ulid` | Generate IDs |
 | `timer <duration>` | Countdown with notification (5s, 10m, 1h) |
 | `notify <msg>` | Desktop notification |
-| `scratch` | Temp file in editor |
 | `tempd` | cd into new temp directory |
 | `trash <file>` | Safe delete to ~/.Trash |
 | `httpstatus <code>` | HTTP status lookup (supports wildcards) |
+| `nato <text>` | Convert text to NATO phonetic alphabet |
+| `rn` | Right now — current time + calendar |
 
-## OPENCODE FLAGS
+## TMUX CSI-U WORKAROUND
 
-```fish
-# conf.d/opencode.fish
-OPENCODE_EXPERIMENTAL_LSP_TOOL=1
-OPENCODE_EXPERIMENTAL_PLAN_MODE=1
-OPENCODE_ENABLE_EXA=1
-```
+`conf.d/tmux_keys.fish` binds `\e[13;2u` (Shift+Enter CSI-u) to `execute` inside tmux. Required because tmux `extended-keys always` sends CSI-u to ALL programs, but fish doesn't natively handle them. Only needed inside tmux; TUI apps (pi, nvim) parse CSI-u natively.
+
+## NOTES
+
+- `secrets.fish` + `vault-funcs.fish` are gitignored — contain sensitive tokens
+- `fish_frozen_key_bindings.fish` exists in conf.d — prevents fish from re-generating bindings
+- `catppuccin_macchiato_theme.fish` sets shell colors to match global theme
+- `config.fish` is minimal: greeting off, EDITOR=nvim, MANPAGER=nvim, dotfiles PATH

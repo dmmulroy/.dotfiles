@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { AuthStorage, type OAuthCredential } from "@mariozechner/pi-coding-agent";
-import type { OAuthCredentials, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
+import { AuthStorage, type OAuthCredential } from "@earendil-works/pi-coding-agent";
+import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import {
 	DEFAULT_TOKEN_EXPIRY_MS,
 	GATEWAY_ORIGIN,
