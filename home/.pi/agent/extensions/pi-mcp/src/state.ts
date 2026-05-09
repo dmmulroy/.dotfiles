@@ -1,4 +1,4 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ConsentManager } from "./consent-manager.js";
 import type { McpLifecycleManager } from "./lifecycle.js";
 import type { McpServerManager } from "./server-manager.js";

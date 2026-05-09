@@ -1,4 +1,4 @@
-import { keyHint } from "@mariozechner/pi-coding-agent";
+import { keyHint } from "@earendil-works/pi-coding-agent";
 
 export function getTextContent(content: Array<{ type: string; text?: string }> | undefined): string {
 	if (!content) return "";

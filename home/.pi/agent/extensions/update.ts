@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 type InstallMethod = "bun" | "npm" | "homebrew" | "vite-plus" | "native";
 type NotifyType = "info" | "error" | "success" | "warning";
@@ -22,7 +22,7 @@ type ExecResult = {
 	killed?: boolean;
 };
 
-const PACKAGE_NAME = "@mariozechner/pi-coding-agent";
+const PACKAGE_NAME = "@earendil-works/pi-coding-agent";
 const BREW_FORMULA_CANDIDATES = ["pi", "pi-coding-agent"] as const;
 const EXEC_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2;
@@ -308,7 +308,7 @@ async function runUpdate(pi: ExtensionAPI, detection: DetectionResult, reporter:
 			args = ["upgrade", detection.brewFormula ?? "pi"];
 			break;
 		case "native":
-			throw new Error("Native/manual install detected. Please download the latest release manually from https://github.com/badlogic/pi-mono/releases");
+			throw new Error("Native/manual install detected. Please download the latest release manually from https://github.com/earendil-works/pi/releases");
 	}
 
 	reporter.notify(`Running: ${formatCommand(command, args)}`, "info");
@@ -334,7 +334,7 @@ async function performUpdate(
 
 		if (detection.method === "native") {
 			reporter.notify(
-				"Native/manual install detected. Download the latest release from https://github.com/badlogic/pi-mono/releases",
+				"Native/manual install detected. Download the latest release from https://github.com/earendil-works/pi/releases",
 				"warning",
 			);
 			return;

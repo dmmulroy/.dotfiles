@@ -1,5 +1,5 @@
-import { getModels, type Api, type Model } from "@mariozechner/pi-ai";
-import type { ProviderModelConfig } from "@mariozechner/pi-coding-agent";
+import { getModels, type Api, type Model } from "@earendil-works/pi-ai";
+import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_ROUTE_URLS, type Backend } from "./constants.ts";
 import { getDefaultGatewayConfig, getGatewayConfig, stripRoutePrefix, type GatewayModelConfig } from "./wellknown.ts";
 

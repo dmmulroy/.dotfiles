@@ -1,0 +1,11 @@
+--- /tmp/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md	2026-05-09 16:12:22
++++ /Users/dillon/.pi/agent/skills/improve-codebase-architecture/SKILL.md	2026-05-09 16:12:46
+@@ -34,7 +34,7 @@
+ 
+ Read the project's domain glossary and any ADRs in the area you're touching first.
+ 
+-Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
++Then walk the codebase using your tools (`read`, `grep`, `find`, `bash`). Don't follow rigid heuristics — explore organically and note where you experience friction:
+ 
+ - Where does understanding one concept require bouncing between many small modules?
+ - Where are modules **shallow** — interface nearly as complex as the implementation?

@@ -4,7 +4,7 @@ import {
 	formatSize,
 	type TruncationResult,
 	truncateHead,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { writeTempTextFile } from "./temp.ts";
 
 export interface TruncatedTextOutput {

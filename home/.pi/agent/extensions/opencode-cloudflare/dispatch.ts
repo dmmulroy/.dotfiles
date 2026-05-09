@@ -10,7 +10,7 @@ import {
 	streamSimpleOpenAIResponses,
 	type Model,
 	type SimpleStreamOptions,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import { getCatalog, refreshCatalog, type RouteDescriptor } from "./catalog.ts";
 import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";

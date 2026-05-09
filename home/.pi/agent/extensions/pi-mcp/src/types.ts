@@ -2,7 +2,7 @@
 import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { TextContent, ImageContent } from "@mariozechner/pi-ai";
+import type { TextContent, ImageContent } from "@earendil-works/pi-ai";
 
 // Transport type (stdio + HTTP)
 export type Transport = 
