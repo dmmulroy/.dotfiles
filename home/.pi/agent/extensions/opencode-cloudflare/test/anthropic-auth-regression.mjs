@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { streamSimpleAnthropic } from "@earendil-works/pi-ai";
+import { streamOpencodeCloudflare } from "../dispatch.ts";
 
 const gatewayToken = "cf-access-token-value";
 const capturedRequests = [];
@@ -21,9 +21,14 @@ const sseBody = [
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
+	const url = typeof input === "string" ? input : input.url;
+	if (url.endsWith("/.well-known/opencode")) {
+		return new Response("gateway config unavailable in test", { status: 503 });
+	}
+
 	capturedRequests.push({
-		url: typeof input === "string" ? input : input.url,
-		headers: new Headers(init?.headers),
+		url,
+		headers: new Headers(init?.headers ?? (typeof input === "string" ? undefined : input.headers)),
 	});
 
 	return new Response(sseBody, {
@@ -36,19 +41,14 @@ try {
 	const model = {
 		id: "claude-opus-4-6",
 		name: "Claude Opus 4.6",
-		api: "anthropic-messages",
-		provider: "github-copilot",
-		baseUrl: "https://opencode.cloudflare.dev/anthropic",
+		api: "opencode-cloudflare",
+		provider: "opencode.cloudflare.dev",
+		baseUrl: "https://opencode.cloudflare.dev",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 1000000,
 		maxTokens: 128000,
-		headers: {
-			"cf-access-token": gatewayToken,
-			"X-Requested-With": "xmlhttprequest",
-			"anthropic-beta": "context-1m-2025-08-07,fine-grained-tool-streaming-2025-05-14",
-		},
 	};
 
 	const context = {
@@ -57,10 +57,14 @@ try {
 		],
 	};
 
-	const stream = streamSimpleAnthropic(model, context, { apiKey: gatewayToken });
+	let done;
+	const stream = streamOpencodeCloudflare(model, context, { apiKey: gatewayToken });
 	for await (const event of stream) {
 		if (event.type === "error") {
 			throw new Error(event.error.errorMessage || "unexpected anthropic stream error");
+		}
+		if (event.type === "done") {
+			done = event.message;
 		}
 	}
 
@@ -70,8 +74,12 @@ try {
 	assert.equal(request.headers.get("authorization"), `Bearer ${gatewayToken}`);
 	assert.equal(request.headers.get("x-api-key"), null);
 	assert.equal(request.headers.get("cf-access-token"), gatewayToken);
-	assert.equal(request.headers.get("x-initiator"), "user");
-	assert.equal(request.headers.get("openai-intent"), "conversation-edits");
+	assert.equal(request.headers.get("x-initiator"), null);
+	assert.equal(request.headers.get("openai-intent"), null);
+	assert.equal(request.headers.get("cf-aig-authorization"), null);
+	assert.equal(done?.api, "anthropic-messages");
+	assert.equal(done?.provider, "opencode.cloudflare.dev");
+	assert.equal(done?.model, "claude-opus-4-6");
 
 	console.log("anthropic auth regression checks passed");
 } finally {

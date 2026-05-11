@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import {
 	type Api,
 	type AssistantMessage,
@@ -5,14 +6,14 @@ import {
 	type AssistantMessageEventStream,
 	type Context,
 	createAssistantMessageEventStream,
-	streamSimpleAnthropic,
 	streamSimpleOpenAICompletions,
 	streamSimpleOpenAIResponses,
 	type Model,
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
+import { streamAnthropic, type AnthropicOptions } from "@earendil-works/pi-ai/anthropic";
 import { getCatalog, refreshCatalog, type RouteDescriptor } from "./catalog.ts";
-import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
+import { PROVIDER_ID, TOKEN_ENV_OVERRIDE, TRACE_ANTHROPIC_ENV } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 
@@ -85,11 +86,256 @@ function buildDelegatedModel(
 	};
 }
 
-function buildAnthropicDelegatedModel(model: Model<Api>): Model<Api> {
-	return {
-		...model,
-		provider: "github-copilot",
+const ANTHROPIC_TRACE_TAIL_BYTES = 12 * 1024;
+
+function isAnthropicTraceEnabled(): boolean {
+	const value = process.env[TRACE_ANTHROPIC_ENV];
+	return value === "1" || value === "true" || value === "yes";
+}
+
+function redactHeaders(headers: Headers): Record<string, string> {
+	const redacted: Record<string, string> = {};
+	for (const [key, value] of headers.entries()) {
+		const lower = key.toLowerCase();
+		redacted[key] = lower === "authorization" || lower === "cf-access-token" || lower === "cookie" || lower === "set-cookie"
+			? "<redacted>"
+			: value;
+	}
+	return redacted;
+}
+
+function summarizeAnthropicPayload(body: BodyInit | null | undefined): Record<string, unknown> {
+	if (typeof body !== "string") return { body: typeof body };
+	try {
+		const payload = JSON.parse(body) as {
+			model?: unknown;
+			max_tokens?: unknown;
+			messages?: unknown;
+			tools?: unknown;
+			system?: unknown;
+		};
+		const system = payload.system;
+		const systemLength = typeof system === "string"
+			? system.length
+			: Array.isArray(system)
+				? system.reduce((total, part) => total + (typeof part?.text === "string" ? part.text.length : 0), 0)
+				: 0;
+		return {
+			model: payload.model,
+			max_tokens: payload.max_tokens,
+			message_count: Array.isArray(payload.messages) ? payload.messages.length : 0,
+			tool_count: Array.isArray(payload.tools) ? payload.tools.length : 0,
+			system_length: systemLength,
+		};
+	} catch (error) {
+		return { body: "unparseable", error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+function appendTail(current: string, next: string, limit: number): string {
+	const combined = current + next;
+	return combined.length > limit ? combined.slice(combined.length - limit) : combined;
+}
+
+function nextLineBreakIndex(text: string): number {
+	const carriageReturnIndex = text.indexOf("\r");
+	const newlineIndex = text.indexOf("\n");
+	if (carriageReturnIndex === -1) return newlineIndex;
+	if (newlineIndex === -1) return carriageReturnIndex;
+	return Math.min(carriageReturnIndex, newlineIndex);
+}
+
+function consumeLine(text: string): { line: string; rest: string } | null {
+	const lineBreakIndex = nextLineBreakIndex(text);
+	if (lineBreakIndex === -1) return null;
+	let nextIndex = lineBreakIndex + 1;
+	if (text[lineBreakIndex] === "\r" && text[nextIndex] === "\n") nextIndex += 1;
+	return { line: text.slice(0, lineBreakIndex), rest: text.slice(nextIndex) };
+}
+
+async function traceAnthropicResponse(
+	response: Response,
+	meta: { url: string; method: string; payload: Record<string, unknown>; startedAt: number },
+): Promise<void> {
+	const events: string[] = [];
+	const decoder = new TextDecoder("utf-8");
+	let buffer = "";
+	let tail = "";
+	let currentEvent: string | undefined;
+	let sawMessageStop = false;
+	let bytes = 0;
+
+	function consumeSseLine(line: string): void {
+		if (line === "") {
+			if (currentEvent) {
+				events.push(currentEvent);
+				if (currentEvent === "message_stop") sawMessageStop = true;
+			}
+			currentEvent = undefined;
+			return;
+		}
+		if (line.startsWith("event:")) {
+			currentEvent = line.slice("event:".length).trim();
+		}
+	}
+
+	try {
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error("response body is empty");
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				bytes += value.byteLength;
+				const chunk = decoder.decode(value, { stream: true });
+				tail = appendTail(tail, chunk, ANTHROPIC_TRACE_TAIL_BYTES);
+				buffer += chunk;
+				let consumed = consumeLine(buffer);
+				while (consumed) {
+					buffer = consumed.rest;
+					consumeSseLine(consumed.line);
+					consumed = consumeLine(buffer);
+				}
+			}
+			const finalChunk = decoder.decode();
+			if (finalChunk) {
+				tail = appendTail(tail, finalChunk, ANTHROPIC_TRACE_TAIL_BYTES);
+				buffer += finalChunk;
+			}
+			let consumed = consumeLine(buffer);
+			while (consumed) {
+				buffer = consumed.rest;
+				consumeSseLine(consumed.line);
+				consumed = consumeLine(buffer);
+			}
+			if (buffer) consumeSseLine(buffer);
+			consumeSseLine("");
+		} finally {
+			reader.releaseLock();
+		}
+
+		console.error(`[${PROVIDER_ID}] Anthropic SSE trace ${JSON.stringify({
+			url: meta.url,
+			method: meta.method,
+			status: response.status,
+			statusText: response.statusText,
+			duration_ms: Date.now() - meta.startedAt,
+			response_headers: redactHeaders(response.headers),
+			payload: meta.payload,
+			bytes,
+			events,
+			saw_message_stop: sawMessageStop,
+			tail,
+		})}`);
+	} catch (error) {
+		console.error(`[${PROVIDER_ID}] Anthropic SSE trace failed ${JSON.stringify({
+			url: meta.url,
+			method: meta.method,
+			duration_ms: Date.now() - meta.startedAt,
+			payload: meta.payload,
+			error: error instanceof Error ? error.message : String(error),
+		})}`);
+	}
+}
+
+function createAnthropicTraceFetch(): typeof fetch {
+	return async (input: RequestInfo | URL, init?: RequestInit) => {
+		const startedAt = Date.now();
+		const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;
+		const method = init?.method || (typeof input !== "string" && !(input instanceof URL) ? input.method : undefined) || "GET";
+		const payload = summarizeAnthropicPayload(init?.body);
+		const response = await fetch(input, init);
+		void traceAnthropicResponse(response.clone(), { url, method, payload, startedAt });
+		return response;
 	};
+}
+
+function mergeHeaders(...sources: Array<Record<string, string | null | undefined> | undefined>): Record<string, string | null> {
+	const merged: Record<string, string | null> = {};
+	for (const source of sources) {
+		for (const [key, value] of Object.entries(source || {})) {
+			if (value !== undefined) merged[key] = value;
+		}
+	}
+	return merged;
+}
+
+function supportsAdaptiveThinking(modelId: string): boolean {
+	return modelId.includes("opus-4-6") || modelId.includes("opus-4.6") ||
+		modelId.includes("opus-4-7") || modelId.includes("opus-4.7") ||
+		modelId.includes("sonnet-4-6") || modelId.includes("sonnet-4.6");
+}
+
+function mapThinkingLevelToEffort(model: Model<Api>, level: SimpleStreamOptions["reasoning"]): AnthropicOptions["effort"] {
+	const mapped = level ? model.thinkingLevelMap?.[level] : undefined;
+	if (typeof mapped === "string") return mapped as AnthropicOptions["effort"];
+	switch (level) {
+		case "minimal":
+		case "low":
+			return "low";
+		case "medium":
+			return "medium";
+		case "high":
+		default:
+			return "high";
+	}
+}
+
+function adjustMaxTokensForThinking(baseMaxTokens: number, modelMaxTokens: number, reasoningLevel: NonNullable<SimpleStreamOptions["reasoning"]>, customBudgets?: SimpleStreamOptions["thinkingBudgets"]): { maxTokens: number; thinkingBudget: number } {
+	const budgets = { minimal: 1024, low: 2048, medium: 8192, high: 16384, ...customBudgets };
+	const level = reasoningLevel === "xhigh" ? "high" : reasoningLevel;
+	let thinkingBudget = budgets[level] || 1024;
+	const maxTokens = Math.min(baseMaxTokens + thinkingBudget, modelMaxTokens);
+	if (maxTokens <= thinkingBudget) {
+		thinkingBudget = Math.max(0, maxTokens - 1024);
+	}
+	return { maxTokens, thinkingBudget };
+}
+
+function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions | undefined, token: string, client: Anthropic): AnthropicOptions {
+	const base: AnthropicOptions = {
+		temperature: options?.temperature,
+		maxTokens: options?.maxTokens ?? (model.maxTokens > 0 ? Math.min(model.maxTokens, 32000) : undefined),
+		signal: options?.signal,
+		apiKey: token,
+		transport: options?.transport,
+		cacheRetention: options?.cacheRetention,
+		sessionId: options?.sessionId,
+		headers: options?.headers,
+		onPayload: options?.onPayload,
+		onResponse: options?.onResponse,
+		timeoutMs: options?.timeoutMs,
+		maxRetries: options?.maxRetries,
+		maxRetryDelayMs: options?.maxRetryDelayMs,
+		metadata: options?.metadata,
+		// The extension imports the same SDK version as pi-ai, but TypeScript can
+		// still see two physical module paths under npm's install layout. Cast the
+		// client through AnthropicOptions so runtime construction stays explicit
+		// without reintroducing provider-specific auth hacks.
+		client: client as unknown as AnthropicOptions["client"],
+	};
+	if (!options?.reasoning) return { ...base, thinkingEnabled: false };
+	if (supportsAdaptiveThinking(model.id)) {
+		return { ...base, thinkingEnabled: true, effort: mapThinkingLevelToEffort(model, options.reasoning) };
+	}
+	const adjusted = adjustMaxTokensForThinking(base.maxTokens || 0, model.maxTokens, options.reasoning, options.thinkingBudgets);
+	return { ...base, maxTokens: adjusted.maxTokens, thinkingEnabled: true, thinkingBudgetTokens: adjusted.thinkingBudget };
+}
+
+function streamAnthropicViaGateway(model: Model<Api>, context: Context, options: SimpleStreamOptions | undefined, token: string): AssistantMessageEventStream {
+	const client = new Anthropic({
+		apiKey: null,
+		authToken: token,
+		baseURL: model.baseUrl,
+		dangerouslyAllowBrowser: true,
+		defaultHeaders: mergeHeaders({
+			accept: "application/json",
+			"anthropic-dangerous-direct-browser-access": "true",
+			"x-api-key": null,
+		}, model.headers, options?.headers),
+		...(isAnthropicTraceEnabled() ? { fetch: createAnthropicTraceFetch() } : {}),
+	});
+	return streamAnthropic(model as Model<"anthropic-messages">, context, buildAnthropicOptions(model, options, token, client));
 }
 
 function createGooglePayload(model: Model<Api>, context: Context, options: SimpleStreamOptions | undefined): Record<string, unknown> {
@@ -285,7 +531,7 @@ function createDelegatedStream(
 ): AssistantMessageEventStream {
 	switch (route.api) {
 		case "anthropic-messages":
-			return streamSimpleAnthropic(buildAnthropicDelegatedModel(model) as Model<"anthropic-messages">, context, options);
+			return streamAnthropicViaGateway(model, context, options, token);
 		case "openai-responses":
 			return streamSimpleOpenAIResponses(model as Model<"openai-responses">, context, options);
 		case "google-generative-ai":
