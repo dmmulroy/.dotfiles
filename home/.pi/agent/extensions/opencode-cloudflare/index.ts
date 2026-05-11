@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
@@ -15,15 +14,6 @@ import { getCatalog, refreshCatalog, summarizeCatalog } from "./catalog.ts";
 import { CUSTOM_API, GATEWAY_ORIGIN, PROVIDER_ID, PROVIDER_NAME, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { streamOpencodeCloudflare } from "./dispatch.ts";
 import { clearGatewayConfigCache, getGatewayConfig } from "./wellknown.ts";
-
-function shellQuote(value: string): string {
-	return JSON.stringify(value);
-}
-
-function buildTokenCommand(): string {
-	const scriptPath = fileURLToPath(new URL("./print-token.mjs", import.meta.url));
-	return `!${shellQuote(process.execPath)} ${shellQuote(scriptPath)}`;
-}
 
 function describeStoredCredential(): string {
 	const credential = getPiStoredGatewayCredential();
@@ -85,7 +75,7 @@ export default async function (pi: ExtensionAPI) {
 
 	pi.registerProvider(PROVIDER_ID, {
 		baseUrl: GATEWAY_ORIGIN,
-		apiKey: buildTokenCommand(),
+		apiKey: TOKEN_ENV_OVERRIDE,
 		api: CUSTOM_API,
 		models: catalog.models,
 		oauth: {

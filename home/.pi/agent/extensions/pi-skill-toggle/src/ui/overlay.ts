@@ -135,7 +135,7 @@ class SkillToggleOverlay {
     }
 
     this.selectedIndex = clamp(this.selectedIndex, 0, filtered.length - 1);
-    const visibleCount = Math.max(4, height);
+    const visibleCount = Math.max(4, Math.floor(height / 2));
     const start = Math.max(0, Math.min(this.selectedIndex - Math.floor(visibleCount / 2), Math.max(0, filtered.length - visibleCount)));
     const end = Math.min(filtered.length, start + visibleCount);
 
@@ -215,7 +215,7 @@ class SkillToggleOverlay {
 
   private getPanelHeight(): number {
     const rows = this.tui.terminal.rows ?? 30;
-    return clamp(Math.floor(rows * 0.82), 16, 34);
+    return clamp(Math.floor(rows * 0.82), 16, 52);
   }
 }
 
