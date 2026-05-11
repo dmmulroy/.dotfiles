@@ -316,8 +316,9 @@ export function streamOpencodeCloudflare(
 	const stream = createAssistantMessageEventStream();
 
 	(async () => {
+		let route: RouteDescriptor | undefined;
 		try {
-			const route = await resolveRoute(model);
+			route = await resolveRoute(model);
 			const token = resolveGatewayToken(options?.apiKey);
 			if (!token) {
 				throw new Error(

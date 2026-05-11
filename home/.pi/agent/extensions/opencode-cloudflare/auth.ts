@@ -102,11 +102,19 @@ export function createGatewayCredentials(
 	};
 }
 
+function isUsableGatewayToken(token: string | undefined): token is string {
+	if (!token?.trim()) return false;
+	const expiresAt = getGatewayTokenExpiry(token);
+	return !expiresAt || expiresAt > Date.now();
+}
+
 export function resolveGatewayToken(apiKey?: string): string | undefined {
-	const preferred = resolvePreferredToken(apiKey);
-	if (preferred) return preferred;
+	const preferred = apiKey?.trim() === TOKEN_ENV_OVERRIDE
+		? process.env[TOKEN_ENV_OVERRIDE]?.trim()
+		: resolvePreferredToken(apiKey);
+	if (isUsableGatewayToken(preferred)) return preferred;
 	const imported = readImportedGatewayToken();
-	if (imported?.token) return imported.token;
+	if (isUsableGatewayToken(imported?.token)) return imported.token;
 	return undefined;
 }
 
@@ -157,7 +165,7 @@ export async function loginOpencodeCloudflare(callbacks: OAuthLoginCallbacks): P
 
 export async function refreshOpencodeCloudflare(credentials: OAuthCredentials): Promise<OAuthCredentials> {
 	const imported = readImportedGatewayToken();
-	if (imported?.token && imported.token !== credentials.access) {
+	if (imported?.token && imported.token !== credentials.access && isUsableGatewayToken(imported.token)) {
 		return createGatewayCredentials(imported.token, {
 			source: "opencode-auth",
 			importedFrom: imported.authPath,

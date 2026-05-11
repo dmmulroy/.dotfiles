@@ -20,6 +20,24 @@ function normalizeKeys() {
 	return [GATEWAY_ORIGIN, `${GATEWAY_ORIGIN}/`, WELL_KNOWN_URL];
 }
 
+function getGatewayTokenExpiry(token) {
+	const parts = token.split(".");
+	if (parts.length < 2) return undefined;
+	try {
+		const payloadPart = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+		const payload = JSON.parse(Buffer.from(payloadPart.padEnd(payloadPart.length + ((4 - payloadPart.length % 4) % 4), "="), "base64").toString("utf8"));
+		return typeof payload.exp === "number" && Number.isFinite(payload.exp) ? payload.exp * 1000 : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function isUsableToken(token) {
+	if (!token) return false;
+	const expiresAt = getGatewayTokenExpiry(token);
+	return !expiresAt || expiresAt > Date.now();
+}
+
 function readImportedToken() {
 	for (const authPath of listCandidates()) {
 		if (!fs.existsSync(authPath)) continue;
@@ -27,7 +45,7 @@ function readImportedToken() {
 			const auth = JSON.parse(fs.readFileSync(authPath, "utf8"));
 			for (const key of normalizeKeys()) {
 				const record = auth?.[key];
-				if (record && typeof record.token === "string" && record.token.trim()) {
+				if (record && typeof record.token === "string" && isUsableToken(record.token.trim())) {
 					return record.token.trim();
 				}
 			}
@@ -39,7 +57,7 @@ function readImportedToken() {
 }
 
 const envToken = process.env[TOKEN_ENV_OVERRIDE]?.trim();
-if (envToken) {
+if (isUsableToken(envToken)) {
 	process.stdout.write(envToken);
 	process.exit(0);
 }
@@ -47,4 +65,8 @@ if (envToken) {
 const imported = readImportedToken();
 if (imported) {
 	process.stdout.write(imported);
+	process.exit(0);
 }
+
+// Let pi's OAuth provider path or custom stream surface the actionable login error.
+process.exit(0);
