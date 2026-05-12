@@ -81,18 +81,6 @@ Google:
 pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.cloudflare.dev --model gemini-2.5-flash "Reply with exactly: ok"
 ```
 
-## Diagnostics
-
-Anthropic streams can be traced without changing normal logging:
-
-```sh
-export OPENCODE_CLOUDFLARE_TRACE_ANTHROPIC=1
-```
-
-When enabled, each Anthropic gateway request logs one sanitized JSON line to stderr with response status/headers, a payload summary, raw SSE event names, whether `message_stop` was observed, byte count, and the final 12 KiB of the raw SSE stream. `authorization`, `cf-access-token`, cookies, and set-cookies are redacted.
-
-Use this to distinguish upstream/gateway truncation (`message_stop` absent from the raw SSE tail/events) from local parser/wrapper behavior.
-
 ## Notes
 
 - The extension uses a single custom Pi API (`opencode-cloudflare`) and dispatches each request to the appropriate built-in Pi streamer.

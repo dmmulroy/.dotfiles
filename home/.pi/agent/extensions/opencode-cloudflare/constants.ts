@@ -10,7 +10,6 @@ export const WELL_KNOWN_URL = `${GATEWAY_ORIGIN}${WELL_KNOWN_PATH}`;
 
 export const OPENCODE_AUTH_FILE_ENV = "OPENCODE_CLOUDFLARE_AUTH_FILE";
 export const TOKEN_ENV_OVERRIDE = "OPENCODE_CLOUDFLARE_TOKEN";
-export const TRACE_ANTHROPIC_ENV = "OPENCODE_CLOUDFLARE_TRACE_ANTHROPIC";
 export const DEFAULT_TOKEN_EXPIRY_MS = 12 * 60 * 60 * 1000;
 export const EXPIRY_SAFETY_BUFFER_MS = 5 * 60 * 1000;
 export const WELL_KNOWN_CACHE_TTL_MS = 60 * 1000;
@@ -26,7 +25,7 @@ export const DEFAULT_ROUTE_HEADERS: Record<Backend, Record<string, string>> = {
 	anthropic: {
 		"cf-access-token": "{env:TOKEN}",
 		"X-Requested-With": "xmlhttprequest",
-		"anthropic-beta": "context-1m-2025-08-07",
+		"anthropic-beta": "interleaved-thinking-2025-05-14",
 	},
 	openai: {
 		"cf-access-token": "{env:TOKEN}",

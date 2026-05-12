@@ -6,14 +6,15 @@ import {
 	type AssistantMessageEventStream,
 	type Context,
 	createAssistantMessageEventStream,
+	stream as streamByApi,
 	streamSimpleOpenAICompletions,
 	streamSimpleOpenAIResponses,
 	type Model,
 	type SimpleStreamOptions,
+	type AnthropicOptions,
 } from "@earendil-works/pi-ai";
-import { streamAnthropic, type AnthropicOptions } from "@earendil-works/pi-ai/anthropic";
 import { getCatalog, refreshCatalog, type RouteDescriptor } from "./catalog.ts";
-import { PROVIDER_ID, TOKEN_ENV_OVERRIDE, TRACE_ANTHROPIC_ENV } from "./constants.ts";
+import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 
@@ -83,170 +84,6 @@ function buildDelegatedModel(
 		baseUrl,
 		headers,
 		compat: route.compat,
-	};
-}
-
-const ANTHROPIC_TRACE_TAIL_BYTES = 12 * 1024;
-
-function isAnthropicTraceEnabled(): boolean {
-	const value = process.env[TRACE_ANTHROPIC_ENV];
-	return value === "1" || value === "true" || value === "yes";
-}
-
-function redactHeaders(headers: Headers): Record<string, string> {
-	const redacted: Record<string, string> = {};
-	for (const [key, value] of headers.entries()) {
-		const lower = key.toLowerCase();
-		redacted[key] = lower === "authorization" || lower === "cf-access-token" || lower === "cookie" || lower === "set-cookie"
-			? "<redacted>"
-			: value;
-	}
-	return redacted;
-}
-
-function summarizeAnthropicPayload(body: BodyInit | null | undefined): Record<string, unknown> {
-	if (typeof body !== "string") return { body: typeof body };
-	try {
-		const payload = JSON.parse(body) as {
-			model?: unknown;
-			max_tokens?: unknown;
-			messages?: unknown;
-			tools?: unknown;
-			system?: unknown;
-		};
-		const system = payload.system;
-		const systemLength = typeof system === "string"
-			? system.length
-			: Array.isArray(system)
-				? system.reduce((total, part) => total + (typeof part?.text === "string" ? part.text.length : 0), 0)
-				: 0;
-		return {
-			model: payload.model,
-			max_tokens: payload.max_tokens,
-			message_count: Array.isArray(payload.messages) ? payload.messages.length : 0,
-			tool_count: Array.isArray(payload.tools) ? payload.tools.length : 0,
-			system_length: systemLength,
-		};
-	} catch (error) {
-		return { body: "unparseable", error: error instanceof Error ? error.message : String(error) };
-	}
-}
-
-function appendTail(current: string, next: string, limit: number): string {
-	const combined = current + next;
-	return combined.length > limit ? combined.slice(combined.length - limit) : combined;
-}
-
-function nextLineBreakIndex(text: string): number {
-	const carriageReturnIndex = text.indexOf("\r");
-	const newlineIndex = text.indexOf("\n");
-	if (carriageReturnIndex === -1) return newlineIndex;
-	if (newlineIndex === -1) return carriageReturnIndex;
-	return Math.min(carriageReturnIndex, newlineIndex);
-}
-
-function consumeLine(text: string): { line: string; rest: string } | null {
-	const lineBreakIndex = nextLineBreakIndex(text);
-	if (lineBreakIndex === -1) return null;
-	let nextIndex = lineBreakIndex + 1;
-	if (text[lineBreakIndex] === "\r" && text[nextIndex] === "\n") nextIndex += 1;
-	return { line: text.slice(0, lineBreakIndex), rest: text.slice(nextIndex) };
-}
-
-async function traceAnthropicResponse(
-	response: Response,
-	meta: { url: string; method: string; payload: Record<string, unknown>; startedAt: number },
-): Promise<void> {
-	const events: string[] = [];
-	const decoder = new TextDecoder("utf-8");
-	let buffer = "";
-	let tail = "";
-	let currentEvent: string | undefined;
-	let sawMessageStop = false;
-	let bytes = 0;
-
-	function consumeSseLine(line: string): void {
-		if (line === "") {
-			if (currentEvent) {
-				events.push(currentEvent);
-				if (currentEvent === "message_stop") sawMessageStop = true;
-			}
-			currentEvent = undefined;
-			return;
-		}
-		if (line.startsWith("event:")) {
-			currentEvent = line.slice("event:".length).trim();
-		}
-	}
-
-	try {
-		const reader = response.body?.getReader();
-		if (!reader) throw new Error("response body is empty");
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				bytes += value.byteLength;
-				const chunk = decoder.decode(value, { stream: true });
-				tail = appendTail(tail, chunk, ANTHROPIC_TRACE_TAIL_BYTES);
-				buffer += chunk;
-				let consumed = consumeLine(buffer);
-				while (consumed) {
-					buffer = consumed.rest;
-					consumeSseLine(consumed.line);
-					consumed = consumeLine(buffer);
-				}
-			}
-			const finalChunk = decoder.decode();
-			if (finalChunk) {
-				tail = appendTail(tail, finalChunk, ANTHROPIC_TRACE_TAIL_BYTES);
-				buffer += finalChunk;
-			}
-			let consumed = consumeLine(buffer);
-			while (consumed) {
-				buffer = consumed.rest;
-				consumeSseLine(consumed.line);
-				consumed = consumeLine(buffer);
-			}
-			if (buffer) consumeSseLine(buffer);
-			consumeSseLine("");
-		} finally {
-			reader.releaseLock();
-		}
-
-		console.error(`[${PROVIDER_ID}] Anthropic SSE trace ${JSON.stringify({
-			url: meta.url,
-			method: meta.method,
-			status: response.status,
-			statusText: response.statusText,
-			duration_ms: Date.now() - meta.startedAt,
-			response_headers: redactHeaders(response.headers),
-			payload: meta.payload,
-			bytes,
-			events,
-			saw_message_stop: sawMessageStop,
-			tail,
-		})}`);
-	} catch (error) {
-		console.error(`[${PROVIDER_ID}] Anthropic SSE trace failed ${JSON.stringify({
-			url: meta.url,
-			method: meta.method,
-			duration_ms: Date.now() - meta.startedAt,
-			payload: meta.payload,
-			error: error instanceof Error ? error.message : String(error),
-		})}`);
-	}
-}
-
-function createAnthropicTraceFetch(): typeof fetch {
-	return async (input: RequestInfo | URL, init?: RequestInit) => {
-		const startedAt = Date.now();
-		const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;
-		const method = init?.method || (typeof input !== "string" && !(input instanceof URL) ? input.method : undefined) || "GET";
-		const payload = summarizeAnthropicPayload(init?.body);
-		const response = await fetch(input, init);
-		void traceAnthropicResponse(response.clone(), { url, method, payload, startedAt });
-		return response;
 	};
 }
 
@@ -322,6 +159,11 @@ function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions |
 	return { ...base, maxTokens: adjusted.maxTokens, thinkingEnabled: true, thinkingBudgetTokens: adjusted.thinkingBudget };
 }
 
+// Use stream() from the main pi-ai entry (available as a jiti virtual module)
+// instead of importing streamAnthropic from the "/anthropic" subpath, which is
+// NOT registered in pi's virtual modules map and fails jiti filesystem fallback.
+// stream() dispatches via the API provider registry; for "anthropic-messages" it
+// lazy-loads the real streamAnthropic which accepts AnthropicOptions.client.
 function streamAnthropicViaGateway(model: Model<Api>, context: Context, options: SimpleStreamOptions | undefined, token: string): AssistantMessageEventStream {
 	const client = new Anthropic({
 		apiKey: null,
@@ -333,9 +175,8 @@ function streamAnthropicViaGateway(model: Model<Api>, context: Context, options:
 			"anthropic-dangerous-direct-browser-access": "true",
 			"x-api-key": null,
 		}, model.headers, options?.headers),
-		...(isAnthropicTraceEnabled() ? { fetch: createAnthropicTraceFetch() } : {}),
 	});
-	return streamAnthropic(model as Model<"anthropic-messages">, context, buildAnthropicOptions(model, options, token, client));
+	return streamByApi(model as Model<"anthropic-messages">, context, buildAnthropicOptions(model, options, token, client) as any);
 }
 
 function createGooglePayload(model: Model<Api>, context: Context, options: SimpleStreamOptions | undefined): Record<string, unknown> {
