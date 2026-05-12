@@ -120,6 +120,7 @@ function normalizeHeaders(headers: Record<string, unknown> | undefined, backend:
 				.map((value) => value.trim())
 				.filter(Boolean),
 		);
+		mergedValues.add("interleaved-thinking-2025-05-14");
 		mergedValues.add("fine-grained-tool-streaming-2025-05-14");
 		resolved["anthropic-beta"] = Array.from(mergedValues).join(",");
 	}
