@@ -267,6 +267,16 @@ export namespace McpOAuthCallback {
     pendingAuths.clear();
   }
 
+  /**
+   * Stop the callback server if there are no pending auth flows.
+   * Call this after each auth flow completes to free the port for other tools.
+   */
+  export async function stopIfIdle(): Promise<void> {
+    if (pendingAuths.size === 0) {
+      await stop();
+    }
+  }
+
   export function isRunning(): boolean {
     return server !== undefined;
   }

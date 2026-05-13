@@ -319,6 +319,8 @@ export async function authenticateServer(
   } finally {
     // Always close the auth transport — reconnectServers() creates its own
     await pendingTransport?.close().catch(() => {});
+    // Free the callback port if no other auth flows are in progress
+    await McpOAuthCallback.stopIfIdle().catch(() => {});
   }
 }
 
@@ -338,6 +340,8 @@ export async function removeAuth(
   }
 
   McpAuth.remove(serverName);
+  // Free the callback port if no other auth flows are in progress
+  await McpOAuthCallback.stopIfIdle().catch(() => {});
   ctx.ui.notify(`Removed OAuth credentials for "${serverName}"`, "info");
 }
 
