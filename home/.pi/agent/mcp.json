@@ -1,11 +1,8 @@
 {
   "mcpServers": {
-    "context7": {
-      "url": "https://m.mulroy.dev/m/c7",
-      "lifecycle": "eager"
-    },
-    "grep_app": {
-      "url": "https://m.mulroy.dev/m/g",
+    "cf-portal": {
+      "url": "https://portal.mcp.cfdata.org/mcp",
+      "auth": "oauth",
       "lifecycle": "eager"
     }
   }
