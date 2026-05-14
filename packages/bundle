@@ -4,6 +4,7 @@ cask_args appdir: "/Applications"
 
 brew "ast-grep"
 brew "awscli"
+brew "btop"
 brew "cloc"
 brew "cmake"
 brew "direnv"
