@@ -1,5 +1,5 @@
---- /tmp/mattpocock-skills/skills/engineering/improve-codebase-architecture/INTERFACE-DESIGN.md	2026-05-09 16:12:22
-+++ /Users/dillon/.pi/agent/skills/improve-codebase-architecture/INTERFACE-DESIGN.md	2026-05-09 16:03:29
+--- upstream/improve-codebase-architecture/INTERFACE-DESIGN.md
++++ ours/improve-codebase-architecture/INTERFACE-DESIGN.md
 @@ -1,6 +1,6 @@
  # Interface Design
  

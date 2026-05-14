@@ -1,5 +1,5 @@
---- /tmp/mattpocock-skills/skills/engineering/setup-matt-pocock-skills/SKILL.md	2026-05-09 16:12:22
-+++ /Users/dillon/.pi/agent/skills/setup-matt-pocock-skills/SKILL.md	2026-05-09 16:03:29
+--- upstream/setup-matt-pocock-skills/SKILL.md
++++ ours/setup-matt-pocock-skills/SKILL.md
 @@ -1,6 +1,6 @@
  ---
  name: setup-matt-pocock-skills

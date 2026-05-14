@@ -6,3 +6,4 @@ setup-pre-commit
 scaffold-exercises
 migrate-to-shoehorn
 write-a-skill
+grill-me

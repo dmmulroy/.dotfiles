@@ -1,24 +1,79 @@
 #!/usr/bin/env bash
 # sync.sh — Deterministic portion of the pocock skills sync.
 #
-# Clones upstream, compares against our installed skills, applies patches,
-# and scans for patterns that need new patches.
+# Clones upstream, compares against our installed skills, applies configured
+# local overrides, and scans for patterns that need new patches.
 #
 # Usage:
-#   bash sync.sh <skills_dir> <patches_dir>
+#   bash sync.sh <skills_dir> <patches_dir> [--keep-upstream] [--upstream-dir <dir>]
 #
 # Output: structured report on stdout for the agent to parse.
 # Exit 0 = success, exit 1 = clone failure.
 
 set -euo pipefail
 
-SKILLS_DIR="${1:?Usage: sync.sh <skills_dir> <patches_dir>}"
-PATCHES_DIR="${2:?Usage: sync.sh <skills_dir> <patches_dir>}"
-UPSTREAM_REPO="https://github.com/mattpocock/skills.git"
-WORK_DIR=$(mktemp -d)
-UPSTREAM_DIR="$WORK_DIR/upstream"
+usage() {
+  echo "Usage: sync.sh <skills_dir> <patches_dir> [--keep-upstream] [--upstream-dir <dir>]" >&2
+}
 
-cleanup() { rm -rf "$WORK_DIR"; }
+[[ $# -ge 2 ]] || { usage; exit 2; }
+
+SKILLS_DIR="$1"
+PATCHES_DIR="$2"
+shift 2
+
+KEEP_UPSTREAM=0
+REQUESTED_UPSTREAM_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --keep-upstream)
+      KEEP_UPSTREAM=1
+      shift
+      ;;
+    --upstream-dir)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      REQUESTED_UPSTREAM_DIR="$2"
+      KEEP_UPSTREAM=1
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+UPSTREAM_REPO="https://github.com/mattpocock/skills.git"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+OVERRIDES_SCRIPT="$SCRIPT_DIR/apply-frontmatter-overrides.py"
+
+if [[ -n "$REQUESTED_UPSTREAM_DIR" ]]; then
+  WORK_DIR=$(mktemp -d)
+  UPSTREAM_DIR="$REQUESTED_UPSTREAM_DIR"
+elif [[ "$KEEP_UPSTREAM" -eq 1 ]]; then
+  WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/pocock-skills-sync.XXXXXX")
+  UPSTREAM_DIR="$WORK_DIR/upstream"
+else
+  WORK_DIR=$(mktemp -d)
+  UPSTREAM_DIR="$WORK_DIR/upstream"
+fi
+
+cleanup() {
+  if [[ "$KEEP_UPSTREAM" -eq 1 ]]; then
+    # Keep the clone for follow-up reads. Remove only temp files if the clone
+    # lives outside WORK_DIR via --upstream-dir.
+    if [[ -n "$REQUESTED_UPSTREAM_DIR" ]]; then
+      rm -rf "$WORK_DIR"
+    fi
+  else
+    rm -rf "$WORK_DIR"
+  fi
+}
 trap cleanup EXIT
 
 # --- Exclusions: skills we deliberately don't sync ---
@@ -30,8 +85,22 @@ is_excluded() {
   grep -qxF "$name" "$EXCLUDED_FILE" 2>/dev/null
 }
 
+apply_local_overrides_quiet() {
+  local skill_name=$1
+  local rel_path=$2
+  local file=$3
+
+  [[ "$rel_path" == "SKILL.md" ]] || return 0
+  [[ -f "$OVERRIDES_SCRIPT" ]] || return 0
+  python3 "$OVERRIDES_SCRIPT" "$skill_name" "$file" "$PATCHES_DIR" --quiet
+}
+
 # --- Clone upstream ---
 echo "STATUS: cloning upstream"
+if [[ -n "$REQUESTED_UPSTREAM_DIR" ]]; then
+  rm -rf "$UPSTREAM_DIR"
+  mkdir -p "$(dirname "$UPSTREAM_DIR")"
+fi
 if ! git clone --depth 1 --quiet "$UPSTREAM_REPO" "$UPSTREAM_DIR" 2>/dev/null; then
   echo "ERROR: failed to clone $UPSTREAM_REPO"
   exit 1
@@ -92,7 +161,8 @@ while IFS=$'\t' read -r name our_path; do
   upstream_path=$(get_upstream_path "$name")
   [[ -z "$upstream_path" ]] && continue
 
-  # Compare all files in the upstream skill dir against ours
+  # Compare all files in the upstream skill dir against ours, after applying
+  # our patch files and configured local overrides to a temporary upstream copy.
   changed_files=()
   while IFS= read -r upstream_file; do
     rel_path="${upstream_file#"$upstream_path"/}"
@@ -100,27 +170,33 @@ while IFS=$'\t' read -r name our_path; do
 
     if [[ ! -f "$our_file" ]]; then
       changed_files+=("$rel_path (new file upstream)")
-    elif ! diff -q "$upstream_file" "$our_file" >/dev/null 2>&1; then
-      # Check if the diff is ONLY our patches or also has upstream changes
-      patch_file="$PATCHES_DIR/${name}__${rel_path//\//__}.patch"
-      if [[ -f "$patch_file" ]]; then
-        # Reverse-apply our patch to get what upstream should look like,
-        # then compare against actual upstream
-        patched_tmp="$WORK_DIR/patched_check"
-        cp "$our_file" "$patched_tmp"
-        if patch -R --quiet "$patched_tmp" "$patch_file" 2>/dev/null; then
-          if ! diff -q "$upstream_file" "$patched_tmp" >/dev/null 2>&1; then
-            changed_files+=("$rel_path (upstream changed, has patch)")
-          fi
-          # else: only our patch differs — no upstream change, skip
-        else
-          changed_files+=("$rel_path (patch conflict)")
-        fi
-        rm -f "$patched_tmp"
+      continue
+    fi
+
+    expected_tmp="$WORK_DIR/expected_${name//[^A-Za-z0-9_.-]/_}_${rel_path//[^A-Za-z0-9_.-]/_}"
+    cp "$upstream_file" "$expected_tmp"
+
+    patch_file="$PATCHES_DIR/${name}__${rel_path//\//__}.patch"
+    patch_status="none"
+    if [[ -f "$patch_file" ]]; then
+      patch_status="has patch"
+      if ! patch --quiet --forward "$expected_tmp" "$patch_file" 2>/dev/null; then
+        changed_files+=("$rel_path (patch conflict)")
+        rm -f "$expected_tmp"
+        continue
+      fi
+    fi
+
+    apply_local_overrides_quiet "$name" "$rel_path" "$expected_tmp"
+
+    if ! diff -q "$expected_tmp" "$our_file" >/dev/null 2>&1; then
+      if [[ "$patch_status" == "has patch" ]]; then
+        changed_files+=("$rel_path (upstream changed, has patch)")
       else
         changed_files+=("$rel_path (changed, no patch)")
       fi
     fi
+    rm -f "$expected_tmp"
   done < <(find "$upstream_path" -type f | sort)
 
   # Check for files we have that upstream removed
@@ -155,13 +231,18 @@ while IFS=$'\t' read -r name our_path; do
         echo "  $line"
       done
     fi
-  done < <(find "$our_path" -name "*.md" -o -name "*.sh" | sort)
+  done < <(find "$our_path" \( -name "*.md" -o -name "*.sh" \) | sort)
 done < "$OUR_LIST"
 
 # --- Section 4: Upstream dir for agent to read ---
 echo ""
 echo "=== UPSTREAM_DIR ==="
 echo "$UPSTREAM_DIR/skills/"
+if [[ "$KEEP_UPSTREAM" -eq 1 ]]; then
+  echo "STATUS: upstream retained"
+else
+  echo "STATUS: upstream temp dir will be removed on exit; use --keep-upstream to inspect it"
+fi
 
 echo ""
 echo "STATUS: sync analysis complete"

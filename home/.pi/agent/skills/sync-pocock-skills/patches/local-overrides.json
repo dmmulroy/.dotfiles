@@ -1,0 +1,24 @@
+{
+  "frontmatter": {
+    "preserve": {
+      "diagnose": {
+        "disable-model-invocation": true
+      },
+      "improve-codebase-architecture": {
+        "disable-model-invocation": true
+      },
+      "prototype": {
+        "disable-model-invocation": true
+      },
+      "to-issues": {
+        "disable-model-invocation": true
+      },
+      "to-prd": {
+        "disable-model-invocation": true
+      },
+      "triage": {
+        "disable-model-invocation": true
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
---- /tmp/mattpocock-skills/skills/engineering/improve-codebase-architecture/SKILL.md	2026-05-09 16:12:22
-+++ /Users/dillon/.pi/agent/skills/improve-codebase-architecture/SKILL.md	2026-05-09 16:12:46
+--- upstream/improve-codebase-architecture/SKILL.md
++++ ours/improve-codebase-architecture/SKILL.md
 @@ -34,7 +34,7 @@
  
  Read the project's domain glossary and any ADRs in the area you're touching first.
