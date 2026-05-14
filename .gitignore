@@ -31,6 +31,13 @@ home/.pi/agent/*
 home/.pi/todos/*
 .pi/todos/*
 
+# pi MCP adapter runtime/secrets
+home/.pi/agent/mcp-oauth/
+home/.pi/agent/mcp-cache.json
+home/.pi/agent/mcp-npx-cache.json
+home/.pi/agent/mcp-auth.json
+home/.local/share/pi/mcp-auth.json
+
 # pi extensions node_modules
 home/.pi/agent/extensions/**/node_modules/
 
