@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
 	DEFAULT_ROUTE_HEADERS,
 	DEFAULT_ROUTE_URLS,
@@ -5,6 +8,7 @@ import {
 	type Backend,
 	EXPIRY_SAFETY_BUFFER_MS,
 	GATEWAY_ORIGIN,
+	LOCAL_CONFIG_ENV,
 	TOKEN_ENV_OVERRIDE,
 	WELL_KNOWN_CACHE_TTL_MS,
 	WELL_KNOWN_URL,
@@ -16,7 +20,7 @@ export interface GatewayModelLimit {
 }
 
 export interface GatewayModelModalities {
-	input?: ("text" | "image")[];
+	input?: string[];
 	output?: string[];
 }
 
@@ -72,6 +76,21 @@ export interface ResolvedGatewayConfig {
 	raw?: GatewayWellKnownResponse;
 }
 
+interface GatewayLocalOverlay {
+	provider?: GatewayWellKnownResponse["config"] extends infer Config
+		? Config extends { provider?: infer Provider }
+			? Provider
+			: never
+		: never;
+	config?: {
+		provider?: GatewayWellKnownResponse["config"] extends infer Config
+			? Config extends { provider?: infer Provider }
+				? Provider
+				: never
+			: never;
+	};
+}
+
 let cachedGatewayConfig: { expiresAt: number; value: ResolvedGatewayConfig } | undefined;
 
 export function isAllowedGatewayOrigin(input: string): boolean {
@@ -103,6 +122,58 @@ function normalizeBackendList(enabledProviders: string[] | undefined): Backend[]
 	if (!enabledProviders?.length) return [...ENABLED_BACKENDS];
 	const enabled = new Set(enabledProviders.map(normalizeProviderName));
 	return ENABLED_BACKENDS.filter((backend) => enabled.has(backend));
+}
+
+function getLocalConfigPath(): string {
+	return process.env[LOCAL_CONFIG_ENV]?.trim() || join(homedir(), ".pi", "agent", "opencode-cloudflare.local.jsonc");
+}
+
+/** Strip `//` line comments and trailing commas from JSONC, leaving string literals untouched. */
+function stripJsonComments(input: string): string {
+	return input
+		.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/g, (match) => (match[0] === '"' ? match : ""))
+		.replace(/"(?:\\.|[^"\\])*"|,(\s*[}\]])/g, (match, tail: string | undefined) => tail ?? (match[0] === '"' ? match : ""));
+}
+
+function readLocalOverlay(): GatewayLocalOverlay | undefined {
+	const path = getLocalConfigPath();
+	if (!existsSync(path)) return undefined;
+	try {
+		return JSON.parse(stripJsonComments(readFileSync(path, "utf8"))) as GatewayLocalOverlay;
+	} catch (error) {
+		console.warn(`Ignoring invalid ${LOCAL_CONFIG_ENV} file at ${path}: ${error instanceof Error ? error.message : error}`);
+		return undefined;
+	}
+}
+
+function getLocalProviderModels(overlay: GatewayLocalOverlay | undefined) {
+	const provider = overlay?.provider || overlay?.config?.provider;
+	if (!provider) return [];
+	return Object.entries(provider).flatMap(([providerName, providerConfig]) => {
+		const backend = normalizeProviderName(providerName);
+		if (!ENABLED_BACKENDS.includes(backend as Backend)) return [];
+		const models = providerConfig?.models || {};
+		return Object.keys(models).length > 0 ? [{ backend: backend as Backend, models }] : [];
+	});
+}
+
+function mergeLocalOverlay(resolved: ResolvedGatewayConfig): ResolvedGatewayConfig {
+	const localProviderModels = getLocalProviderModels(readLocalOverlay());
+	for (const { backend, models } of localProviderModels) {
+		if (!resolved.enabledBackends.includes(backend)) {
+			resolved.enabledBackends.push(backend);
+		}
+		Object.assign(resolved.routes[backend].models, models);
+		if (backend === "workers-ai" && resolved.routes[backend].whitelist?.length) {
+			const whitelist = new Set(resolved.routes[backend].whitelist);
+			for (const [modelId, config] of Object.entries(models)) {
+				whitelist.add(modelId);
+				if (config.id) whitelist.add(stripRoutePrefix(config.id, backend));
+			}
+			resolved.routes[backend].whitelist = Array.from(whitelist);
+		}
+	}
+	return resolved;
 }
 
 function normalizeHeaders(headers: Record<string, unknown> | undefined, backend: Backend): Record<string, string> {
@@ -156,7 +227,7 @@ function resolveRouteConfig(raw: GatewayWellKnownResponse | undefined, backend: 
 
 function resolveGatewayConfig(raw: GatewayWellKnownResponse | undefined): ResolvedGatewayConfig {
 	const enabledBackends = normalizeBackendList(raw?.config?.enabled_providers);
-	return {
+	return mergeLocalOverlay({
 		origin: GATEWAY_ORIGIN,
 		authEnv: raw?.auth?.env || "TOKEN",
 		authCommand: raw?.auth?.command,
@@ -168,7 +239,7 @@ function resolveGatewayConfig(raw: GatewayWellKnownResponse | undefined): Resolv
 			"workers-ai": resolveRouteConfig(raw, "workers-ai"),
 		},
 		raw,
-	};
+	});
 }
 
 export function getDefaultGatewayConfig(): ResolvedGatewayConfig {
