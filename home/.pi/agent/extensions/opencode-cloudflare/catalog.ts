@@ -53,6 +53,13 @@ const DEFAULT_WORKERS_MODELS: Record<string, GatewayModelConfig> = {
   },
 };
 
+const DEFAULT_BACKEND_APIS: Record<Backend, Api> = {
+  anthropic: "anthropic-messages",
+  openai: "openai-responses",
+  google: "google-generative-ai",
+  "workers-ai": "openai-completions",
+};
+
 let activeCatalog: CatalogData = buildCatalogFromGateway(getDefaultGatewayConfig());
 
 export function getCatalog(): CatalogData {
@@ -80,6 +87,29 @@ function toProviderModelConfig(model: Model<Api>): ProviderModelConfig {
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
     compat: model.compat,
+  };
+}
+
+function normalizeInputModalities(config: GatewayModelConfig): ("text" | "image")[] {
+  const input = config.modalities?.input?.filter((value): value is "text" | "image" => value === "text" || value === "image");
+  if (input?.length) return input;
+  return config.attachment ? ["text", "image"] : ["text"];
+}
+
+function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelConfig): ProviderModelConfig {
+  return {
+    id: modelId,
+    name: config.name || modelId,
+    reasoning: config.reasoning !== false,
+    input: normalizeInputModalities(config),
+    cost: {
+      input: config.cost?.input || 0,
+      output: config.cost?.output || 0,
+      cacheRead: config.cost?.cache_read || 0,
+      cacheWrite: 0,
+    },
+    contextWindow: config.limit?.context || 128000,
+    maxTokens: config.limit?.output || Number(config.options?.max_tokens) || 16384,
   };
 }
 
@@ -119,7 +149,7 @@ function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, b
       id: shortId,
       name: `${fullModelId} (${config.name || shortId})`,
       reasoning: config.reasoning !== false,
-      input: config.modalities?.input || (config.attachment ? ["text", "image"] : ["text"]),
+      input: normalizeInputModalities(config),
       cost: {
         input: config.cost?.input || 0,
         output: config.cost?.output || 0,
@@ -176,7 +206,9 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
     }
 
     const builtIns = buildBuiltInModels(backend, route.models);
+    const seenModelIds = new Set<string>();
     for (const model of builtIns) {
+      seenModelIds.add(model.id);
       models.push(toProviderModelConfig(model));
       routes.set(model.id, {
         backend,
@@ -186,7 +218,21 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         compat: model.compat,
       });
     }
-    counts[backend] = builtIns.length;
+
+    for (const [fullModelId, config] of Object.entries(route.models)) {
+      const shortId = stripRoutePrefix(fullModelId, backend);
+      if (seenModelIds.has(shortId)) continue;
+      seenModelIds.add(shortId);
+      models.push(toProviderModelConfigFromGateway(shortId, config));
+      routes.set(shortId, {
+        backend,
+        api: DEFAULT_BACKEND_APIS[backend],
+        baseUrl: route.baseUrl,
+        headers: route.headers,
+        requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
+      });
+    }
+    counts[backend] = seenModelIds.size;
   }
 
   return { models, routes, counts };

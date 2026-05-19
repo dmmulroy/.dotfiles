@@ -49,6 +49,49 @@ This is used for token import/fallback. If unset, the extension looks in:
 - `$XDG_DATA_HOME/opencode/auth.json`
 - `~/.local/share/opencode/auth.json`
 
+## Local model overlays
+
+Add local, machine-specific OpenCode-shaped provider model entries in:
+
+```sh
+~/.pi/agent/opencode-cloudflare.local.jsonc
+```
+
+The file is intentionally not tracked by this dotfiles repo. Override the path with:
+
+```sh
+export OPENCODE_CLOUDFLARE_LOCAL_CONFIG=/path/to/overlay.jsonc
+```
+
+Example shape:
+
+```jsonc
+{
+  "provider": {
+    "<gateway-provider>": {
+      "models": {
+        "<model-id>": {
+          "id": "<request-model-id>",
+          "name": "<Display Name>",
+          "attachment": true,
+          "reasoning": true,
+          "limit": {
+            "context": 128000,
+            "output": 32000
+          },
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Provider keys are normalized the same way as the gateway config, including aliases such as `cloudflare-workers-ai`.
+
 ## Commands
 
 - `/opencode-cf-status` — show Pi/OpenCode auth status and catalog counts
