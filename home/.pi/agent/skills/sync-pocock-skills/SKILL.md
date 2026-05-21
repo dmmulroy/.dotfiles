@@ -10,10 +10,11 @@ Sync our copies of [mattpocock/skills](https://github.com/mattpocock/skills) aga
 
 ## Quick start
 
-Run the sync analysis script, then follow its output:
+Run the sync analysis script, then follow its output. Use absolute paths from this skill directory so `$0`/current-directory confusion does not matter:
 
 ```bash
-bash scripts/sync.sh ~/.pi/agent/skills scripts/../patches --keep-upstream
+SKILL_ROOT="$HOME/.pi/agent/skills/sync-pocock-skills"
+bash "$SKILL_ROOT/scripts/sync.sh" "$HOME/.pi/agent/skills" "$SKILL_ROOT/patches" --keep-upstream
 ```
 
 ## Workflow
@@ -23,7 +24,8 @@ bash scripts/sync.sh ~/.pi/agent/skills scripts/../patches --keep-upstream
 Run `scripts/sync.sh` with args `<skills_dir>` `<patches_dir>`, usually with `--keep-upstream` so the printed upstream clone remains available for inspection:
 
 ```bash
-bash "$(dirname "$0")/scripts/sync.sh" "$HOME/.pi/agent/skills" "$(dirname "$0")/patches" --keep-upstream
+SKILL_ROOT="$HOME/.pi/agent/skills/sync-pocock-skills"
+bash "$SKILL_ROOT/scripts/sync.sh" "$HOME/.pi/agent/skills" "$SKILL_ROOT/patches" --keep-upstream
 ```
 
 Options:
@@ -36,7 +38,15 @@ Parse the output sections:
 - **NEW_SKILLS** — skills upstream we don't have. Ask the user which to add.
 - **UPSTREAM_CHANGES** — files that changed upstream in skills we track. Shows whether changes conflict with our patches.
 - **UNPATCHED_PATTERNS** — Claude Code / sub-agent references in our skills that lack patches.
-- **UPSTREAM_DIR** — path to the cloned upstream. It is retained only when you passed `--keep-upstream` or `--upstream-dir`.
+- **UPSTREAM_DIR** — path to the cloned upstream `skills/` root. It is retained only when you passed `--keep-upstream` or `--upstream-dir`.
+
+Important: `UPSTREAM_DIR` is the upstream skills root, not a directly usable skill directory. Upstream skills are grouped by category (for example `engineering/diagnose`), so do **not** call `apply-upstream.sh` with `$UPSTREAM_DIR/$skill`. Resolve the exact upstream skill directory first:
+
+```bash
+upstream_root="<UPSTREAM_DIR from sync output>"
+skill="diagnose"
+upstream_skill_dir=$(find "$upstream_root" -mindepth 2 -maxdepth 2 -type d -name "$skill" -print -quit)
+```
 
 ### 2. Handle new skills
 
@@ -64,8 +74,15 @@ For each `CHANGED:` entry:
 Apply with:
 
 ```bash
-bash scripts/apply-upstream.sh <skill_name> <upstream_skill_dir> <skills_dir> <patches_dir>
+SKILL_ROOT="$HOME/.pi/agent/skills/sync-pocock-skills"
+upstream_root="<UPSTREAM_DIR from sync output>"
+skill="<skill_name>"
+upstream_skill_dir=$(find "$upstream_root" -mindepth 2 -maxdepth 2 -type d -name "$skill" -print -quit)
+[[ -n "$upstream_skill_dir" ]] || { echo "missing upstream skill dir for $skill"; exit 1; }
+bash "$SKILL_ROOT/scripts/apply-upstream.sh" "$skill" "$upstream_skill_dir" "$HOME/.pi/agent/skills" "$SKILL_ROOT/patches"
 ```
+
+After each apply, inspect the actual working-tree diff for that skill before summarising. Local overrides can add frontmatter, but any existing local frontmatter that is not configured in `patches/local-overrides.json` may be removed when upstream is copied. Call out metadata-only changes explicitly, and if a removed frontmatter field should be preserved, add it to `local-overrides.json` rather than relying on manual edits.
 
 ### 4. Handle unpatched patterns
 
@@ -83,13 +100,21 @@ bash scripts/make-patch.sh <skill_name> <rel_path> <upstream_file> <our_file> <p
 
 `make-patch.sh` writes stable patch headers (`upstream/<skill>/<path>` and `ours/<skill>/<path>`) so patches do not churn when temp clone paths change. For `SKILL.md`, it strips configured `local-overrides.json` frontmatter from the comparison copy so metadata policy does not become a one-line text patch.
 
-### 5. Summary
+### 5. Verify and summarise
+
+After applying changes:
+
+1. Rerun `sync.sh` with `--keep-upstream` and confirm there are no unexpected `UPSTREAM_CHANGES` or `UNPATCHED_PATTERNS`.
+2. Run `git diff -- <changed skill paths>` and read it before reporting. Do not assume a `CHANGED:` entry means the skill body changed; the net diff may be metadata-only after patches and local overrides.
+3. Include the skill diffs in the final response. For short diffs, paste the full fenced `diff`. For very long diffs, include `git diff --stat`, the important hunks, and say that the full diff is available.
 
 Report to the user:
 - Skills added / excluded
 - Skills updated (with/without patch re-application)
 - New patches created
 - Any conflicts that need manual attention
+- Net skill changes, separating frontmatter/metadata changes from instruction-body changes
+- The actual diff for changed skill files
 
 ## Local overrides
 
