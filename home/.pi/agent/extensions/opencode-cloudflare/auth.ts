@@ -178,25 +178,55 @@ export async function refreshOpencodeCloudflare(credentials: OAuthCredentials): 
 	);
 }
 
+function getTrustedGatewayApp(command: string[]): string | undefined {
+	const appTargets: string[] = [];
+	for (let index = 0; index < command.length; index++) {
+		const argument = command[index]!;
+		if (argument.startsWith("-app=") || argument.startsWith("--app=")) {
+			appTargets.push(argument.slice(argument.indexOf("=") + 1));
+			continue;
+		}
+		if (argument === "-app" || argument === "--app") {
+			const target = command[index + 1];
+			if (target) appTargets.push(target);
+		}
+	}
+
+	if (appTargets.length !== 1 || !isAllowedGatewayOrigin(appTargets[0]!)) {
+		return undefined;
+	}
+	return appTargets[0];
+}
+
+function assertTrustedGatewayAuthCommand(command: string[]): asserts command is [string, ...string[]] {
+	if (command.length === 0) {
+		throw new Error(`Gateway auth command missing from ${WELL_KNOWN_URL}`);
+	}
+	if (command[0] !== "cloudflared" || command[1] !== "access" || command[2] !== "login") {
+		throw new Error(`Refusing unexpected gateway auth command from ${WELL_KNOWN_URL}; expected cloudflared access login.`);
+	}
+	if (!getTrustedGatewayApp(command)) {
+		throw new Error(`Refusing gateway auth command without exactly one trusted -app=${GATEWAY_ORIGIN} target.`);
+	}
+}
+
 export async function runGatewayAuthCommand(
 	command: string | string[] | undefined,
 	signal?: AbortSignal,
 ): Promise<string> {
-	if (!command || (Array.isArray(command) && command.length === 0)) {
+	if (!command) {
 		throw new Error(`Gateway auth command missing from ${WELL_KNOWN_URL}`);
 	}
+	if (!Array.isArray(command)) {
+		throw new Error(`Refusing string gateway auth command from ${WELL_KNOWN_URL}; expected a cloudflared argument array.`);
+	}
+	assertTrustedGatewayAuthCommand(command);
 
-	const child = Array.isArray(command)
-		? spawn(command[0]!, command.slice(1), {
-			stdio: ["ignore", "pipe", "pipe"],
-			shell: false,
-			env: process.env,
-		})
-		: spawn(command, {
-			stdio: ["ignore", "pipe", "pipe"],
-			shell: true,
-			env: process.env,
-		});
+	const child = spawn(command[0], command.slice(1), {
+		stdio: ["ignore", "pipe", "pipe"],
+		shell: false,
+		env: process.env,
+	});
 
 	const stdoutChunks: Buffer[] = [];
 	const stderrChunks: Buffer[] = [];

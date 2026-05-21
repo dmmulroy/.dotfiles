@@ -18,6 +18,59 @@ import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 
+interface GatewayStructuredError {
+	error?: string;
+	message?: string;
+	status?: number;
+}
+
+function getErrorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function parseGatewayStructuredError(error: unknown): GatewayStructuredError | undefined {
+	const text = getErrorText(error).trim();
+	const candidates = [text];
+	const objectStart = text.indexOf("{");
+	const objectEnd = text.lastIndexOf("}");
+	if (objectStart !== -1 && objectEnd > objectStart) {
+		candidates.push(text.slice(objectStart, objectEnd + 1));
+	}
+
+	for (const candidate of candidates) {
+		try {
+			const parsed = JSON.parse(candidate) as GatewayStructuredError;
+			if (!parsed || typeof parsed !== "object") continue;
+			if (typeof parsed.message !== "string" && typeof parsed.error !== "string" && typeof parsed.status !== "number") continue;
+			return parsed;
+		} catch {
+			// SDKs often prefix HTTP status text before the JSON body; try the next slice.
+		}
+	}
+	return undefined;
+}
+
+function formatGatewayErrorMessage(error: unknown): string {
+	const raw = getErrorText(error);
+	const structured = parseGatewayStructuredError(error);
+	if (!structured) return raw;
+
+	const status = typeof structured.status === "number" ? structured.status : undefined;
+	const backendMessage = structured.message || structured.error || "Gateway request failed";
+	const detail = `${status ? `${status} ` : ""}${structured.error || "Gateway Error"}: ${backendMessage}`;
+
+	if (status === 401 || structured.error === "Unauthorized") {
+		return `OpenCode Cloudflare rejected the Access token (${detail}). Run /login ${PROVIDER_ID}, or refresh OpenCode auth and run /opencode-cf-sync-auth.`;
+	}
+	if (structured.error === "Configuration Error" || backendMessage === "API key not configured") {
+		return `OpenCode Cloudflare is misconfigured (${detail}). The gateway service owner needs to restore its AI Gateway API key.`;
+	}
+	if (status !== undefined && status >= 500) {
+		return `OpenCode Cloudflare returned a server error (${detail}). Retry shortly; if it persists, run /opencode-cf-doctor.`;
+	}
+	return detail;
+}
+
 /**
  * Normalize assistant message metadata for display.
  * 
@@ -29,6 +82,7 @@ import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 function normalizeAssistantMessage(message: AssistantMessage, visibleModel: Model<Api>): AssistantMessage {
 	return {
 		...message,
+		...(message.errorMessage ? { errorMessage: formatGatewayErrorMessage(message.errorMessage) } : {}),
 		// Preserve message.api from delegated stream - do NOT overwrite with visibleModel.api
 		provider: visibleModel.provider,
 		model: visibleModel.id,
@@ -66,7 +120,7 @@ function createErrorMessage(model: Model<Api>, error: unknown, routeApi?: Api): 
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 		},
 		stopReason: "error",
-		errorMessage: error instanceof Error ? error.message : String(error),
+		errorMessage: formatGatewayErrorMessage(error),
 		timestamp: Date.now(),
 	};
 }
@@ -353,7 +407,7 @@ function streamGoogleViaGateway(
 				error: {
 					...output,
 					stopReason: options?.signal?.aborted ? "aborted" : "error",
-					errorMessage: error instanceof Error ? error.message : String(error),
+					errorMessage: formatGatewayErrorMessage(error),
 				},
 			});
 			stream.end();

@@ -12,8 +12,8 @@ const fixturesDir = path.join(testDir, "fixtures");
 const wellKnown = JSON.parse(fs.readFileSync(path.join(fixturesDir, "wellknown.json"), "utf8"));
 assert.equal(wellKnown.auth.env, "TOKEN");
 assert.equal(wellKnown.config.provider.openai.options.baseURL, "https://opencode.cloudflare.dev/openai");
-assert.equal(wellKnown.config.provider["workers-ai"].options.baseURL, "https://opencode.cloudflare.dev/compat");
-assert.ok(wellKnown.config.provider["workers-ai"].models["workers-ai/@cf/moonshotai/kimi-k2.5"]);
+assert.equal(wellKnown.config.provider["cloudflare-workers-ai"].options.baseURL, "https://opencode.cloudflare.dev/compat");
+assert.ok(wellKnown.config.provider["cloudflare-workers-ai"].models["@cf/moonshotai/kimi-k2.6"]);
 
 const importedToken = execFileSync(process.execPath, [path.join(rootDir, "print-token.mjs")], {
 	encoding: "utf8",

@@ -13,11 +13,15 @@
     "enabled_providers": [
       "anthropic",
       "openai",
-      "workers-ai",
+      "cloudflare-workers-ai",
       "google"
     ],
     "provider": {
       "anthropic": {
+        "blacklist": [
+          "claude-opus-4-6-fast",
+          "claude-opus-4-7-fast"
+        ],
         "options": {
           "baseURL": "https://opencode.cloudflare.dev/anthropic",
           "headers": {
@@ -32,10 +36,23 @@
               "context": 1000000,
               "output": 128000
             }
+          },
+          "anthropic/claude-opus-4-7-fast": {
+            "name": "Blocked Claude Opus Fast",
+            "limit": {
+              "context": 200000,
+              "output": 32000
+            }
           }
         }
       },
       "openai": {
+        "blacklist": [
+          "gpt-5.4-pro",
+          "gpt-5.4-fast",
+          "gpt-5.5-pro",
+          "gpt-5.5-fast"
+        ],
         "options": {
           "baseURL": "https://opencode.cloudflare.dev/openai",
           "headers": {
@@ -49,12 +66,12 @@
               "store": false
             }
           },
-          "gpt-5": {
+          "gpt-5.2": {
             "options": {
               "store": false
             }
           },
-          "codex-mini-latest": {
+          "gpt-5.4-pro": {
             "options": {
               "store": false
             }
@@ -70,7 +87,15 @@
           }
         }
       },
-      "workers-ai": {
+      "cloudflare-workers-ai": {
+        "whitelist": [
+          "@cf/moonshotai/kimi-k2.5",
+          "@cf/moonshotai/kimi-k2.6",
+          "@cf/zai-org/glm-4.7-flash",
+          "@cf/nvidia/nemotron-3-120b-a12b",
+          "@cf/google/gemma-4-26b-a4b-it",
+          "@cf/zai-org/glm-5.1"
+        ],
         "options": {
           "baseURL": "https://opencode.cloudflare.dev/compat",
           "headers": {
@@ -79,59 +104,126 @@
           }
         },
         "models": {
-          "workers-ai/@cf/moonshotai/kimi-k2.5": {
+          "@cf/moonshotai/kimi-k2.5": {
+            "id": "workers-ai/@cf/moonshotai/kimi-k2.5",
             "name": "Kimi K2.5",
             "attachment": true,
             "reasoning": true,
             "modalities": {
-              "input": [
-                "text",
-                "image"
-              ],
-              "output": [
-                "text"
-              ]
+              "input": ["text", "image"],
+              "output": ["text"]
+            },
+            "cost": {
+              "input": 0.6,
+              "cache_read": 0.1,
+              "output": 3
             },
             "limit": {
               "context": 256000,
-              "output": 64000
+              "output": 32000
             },
             "options": {
-              "max_tokens": 64000,
+              "max_tokens": 32000,
               "store": false
             }
           },
-          "workers-ai/@cf/zai-org/glm-4.7-flash": {
+          "@cf/moonshotai/kimi-k2.6": {
+            "id": "workers-ai/@cf/moonshotai/kimi-k2.6",
+            "name": "Kimi K2.6",
+            "attachment": true,
+            "reasoning": true,
+            "modalities": {
+              "input": ["text", "image"],
+              "output": ["text"]
+            },
+            "cost": {
+              "input": 0.95,
+              "cache_read": 0.16,
+              "output": 4
+            },
+            "limit": {
+              "context": 262144,
+              "output": 32000
+            },
+            "options": {
+              "max_tokens": 32000,
+              "store": false
+            }
+          },
+          "@cf/zai-org/glm-4.7-flash": {
+            "id": "workers-ai/@cf/zai-org/glm-4.7-flash",
             "name": "GLM-4.7-Flash",
             "attachment": true,
             "reasoning": true,
+            "cost": {
+              "input": 0.06,
+              "output": 0.4
+            },
             "limit": {
               "context": 131072,
-              "output": 64000
+              "output": 32000
             },
             "options": {
-              "max_tokens": 64000,
+              "max_tokens": 32000,
               "store": false
             }
           },
-          "workers-ai/@cf/nvidia/nemotron-3-120b-a12b": {
+          "@cf/nvidia/nemotron-3-120b-a12b": {
+            "id": "workers-ai/@cf/nvidia/nemotron-3-120b-a12b",
             "name": "Nemotron 3 Super 120B",
             "attachment": false,
             "reasoning": true,
             "modalities": {
-              "input": [
-                "text"
-              ],
-              "output": [
-                "text"
-              ]
+              "input": ["text"],
+              "output": ["text"]
+            },
+            "cost": {
+              "input": 0.5,
+              "output": 1.5
             },
             "limit": {
               "context": 256000,
-              "output": 64000
+              "output": 32000
             },
             "options": {
-              "max_tokens": 64000,
+              "max_tokens": 32000,
+              "store": false
+            }
+          },
+          "@cf/google/gemma-4-26b-a4b-it": {
+            "id": "workers-ai/@cf/google/gemma-4-26b-a4b-it",
+            "name": "Gemma 4 26B A4B IT",
+            "attachment": true,
+            "reasoning": true,
+            "modalities": {
+              "input": ["text", "image"],
+              "output": ["text"]
+            },
+            "cost": {
+              "input": 0.1,
+              "output": 0.3
+            }
+          },
+          "@cf/zai-org/glm-5.1": {
+            "id": "workers-ai/@cf/zai-org/glm-5.1",
+            "name": "GLM 5.1",
+            "attachment": false,
+            "reasoning": true,
+            "modalities": {
+              "input": ["text"],
+              "output": ["text"]
+            },
+            "cost": {
+              "input": 1.4,
+              "cache_read": 0.26,
+              "output": 4.4
+            },
+            "limit": {
+              "context": 200000,
+              "output": 32000
+            },
+            "options": {
+              "max_tokens": 32000,
               "store": false
             }
           }

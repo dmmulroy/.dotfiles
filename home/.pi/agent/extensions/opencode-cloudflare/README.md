@@ -9,6 +9,7 @@ It supports:
 - native Pi `/login`
 - importing existing OpenCode auth from `~/.local/share/opencode/auth.json`
 - routed Anthropic / OpenAI / Google / Workers AI access through `https://opencode.cloudflare.dev`
+- the service's provider allowlists/blacklists, so intentionally blocked gateway models are not advertised in Pi
 
 ## Usage
 
@@ -94,9 +95,9 @@ Provider keys are normalized the same way as the gateway config, including alias
 
 ## Commands
 
-- `/opencode-cf-status` — show Pi/OpenCode auth status and catalog counts
+- `/opencode-cf-status` — show Pi/OpenCode auth status, whether the catalog is using live well-known config or fallback defaults, the last fetch result, and catalog counts
 - `/opencode-cf-sync-auth` — copy the current OpenCode token into Pi auth storage, then reload
-- `/opencode-cf-doctor` — refetch `.well-known/opencode` and validate the extension state
+- `/opencode-cf-doctor` — refetch `.well-known/opencode`, report live config diagnostics, and validate the extension state
 
 ## Example prompts
 
@@ -127,6 +128,7 @@ pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.clo
 ## Notes
 
 - The extension uses a single custom Pi API (`opencode-cloudflare`) and dispatches each request to the appropriate built-in Pi streamer.
+- Structured gateway JSON failures are translated into actionable Pi errors, such as prompting `/login opencode.cloudflare.dev` or `/opencode-cf-sync-auth` for rejected Access tokens.
 - Anthropic gateway requests use the Anthropic SDK with explicit `authToken`, producing `Authorization: Bearer <token>` plus `cf-access-token`; the old `provider: "github-copilot"` auth shim is no longer used.
 - If you refresh your OpenCode token outside of Pi while Pi is already running, use `/reload` so Pi refreshes its cached fallback token command.
-- The gateway auth flow is allowlisted to `https://opencode.cloudflare.dev` only.
+- The gateway auth flow is allowlisted to `https://opencode.cloudflare.dev` only. Native `/login` accepts only a gateway-provided `cloudflared access login ... -app=https://opencode.cloudflare.dev` argument array; remote shell command strings or different app targets are refused.
