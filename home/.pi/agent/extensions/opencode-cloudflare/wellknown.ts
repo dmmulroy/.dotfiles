@@ -43,6 +43,7 @@ export interface GatewayRouteConfig {
 	headers: Record<string, string>;
 	models: Record<string, GatewayModelConfig>;
 	whitelist?: string[];
+	blacklist?: string[];
 }
 
 export interface GatewayWellKnownResponse {
@@ -56,6 +57,7 @@ export interface GatewayWellKnownResponse {
 			name?: string;
 			npm?: string;
 			whitelist?: string[];
+			blacklist?: string[];
 			options?: {
 				baseURL?: string;
 				baseUrl?: string;
@@ -67,13 +69,23 @@ export interface GatewayWellKnownResponse {
 	};
 }
 
+export type GatewayConfigSource = "live" | "fallback";
+
 export interface ResolvedGatewayConfig {
 	origin: string;
+	source: GatewayConfigSource;
 	authEnv: string;
 	authCommand?: string | string[];
 	enabledBackends: Backend[];
 	routes: Record<Backend, GatewayRouteConfig>;
 	raw?: GatewayWellKnownResponse;
+}
+
+export interface GatewayConfigStatus {
+	cacheSource?: GatewayConfigSource;
+	cacheExpiresAt?: number;
+	lastFetchAt?: number;
+	lastFetchError?: string;
 }
 
 interface GatewayLocalOverlay {
@@ -92,6 +104,7 @@ interface GatewayLocalOverlay {
 }
 
 let cachedGatewayConfig: { expiresAt: number; value: ResolvedGatewayConfig } | undefined;
+let lastGatewayFetch: { attemptedAt: number; error?: string } | undefined;
 
 export function isAllowedGatewayOrigin(input: string): boolean {
 	try {
@@ -222,13 +235,18 @@ function resolveRouteConfig(raw: GatewayWellKnownResponse | undefined, backend: 
 		headers: normalizeHeaders(options?.headers, backend),
 		models: providerConfig?.models || {},
 		whitelist: providerConfig?.whitelist,
+		blacklist: providerConfig?.blacklist,
 	};
 }
 
-function resolveGatewayConfig(raw: GatewayWellKnownResponse | undefined): ResolvedGatewayConfig {
+function resolveGatewayConfig(
+	raw: GatewayWellKnownResponse | undefined,
+	source: GatewayConfigSource = raw ? "live" : "fallback",
+): ResolvedGatewayConfig {
 	const enabledBackends = normalizeBackendList(raw?.config?.enabled_providers);
 	return mergeLocalOverlay({
 		origin: GATEWAY_ORIGIN,
+		source,
 		authEnv: raw?.auth?.env || "TOKEN",
 		authCommand: raw?.auth?.command,
 		enabledBackends,
@@ -248,6 +266,15 @@ export function getDefaultGatewayConfig(): ResolvedGatewayConfig {
 
 export function clearGatewayConfigCache(): void {
 	cachedGatewayConfig = undefined;
+}
+
+export function getGatewayConfigStatus(): GatewayConfigStatus {
+	return {
+		cacheSource: cachedGatewayConfig?.value.source,
+		cacheExpiresAt: cachedGatewayConfig?.expiresAt,
+		lastFetchAt: lastGatewayFetch?.attemptedAt,
+		lastFetchError: lastGatewayFetch?.error,
+	};
 }
 
 export async function getGatewayConfig(options?: {
@@ -272,10 +299,13 @@ export async function getGatewayConfig(options?: {
 		}
 
 		const raw = (await response.json()) as GatewayWellKnownResponse;
-		const resolved = resolveGatewayConfig(raw);
+		const resolved = resolveGatewayConfig(raw, "live");
+		lastGatewayFetch = { attemptedAt: now };
 		cachedGatewayConfig = { expiresAt: now + WELL_KNOWN_CACHE_TTL_MS, value: resolved };
 		return resolved;
 	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		lastGatewayFetch = { attemptedAt: now, error: message };
 		if (!fallbackToDefault) {
 			throw error;
 		}

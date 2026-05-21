@@ -19,7 +19,8 @@ export interface CatalogData {
 }
 
 const DEFAULT_WORKERS_MODELS: Record<string, GatewayModelConfig> = {
-  "workers-ai/@cf/moonshotai/kimi-k2.5": {
+  "@cf/moonshotai/kimi-k2.5": {
+    id: "workers-ai/@cf/moonshotai/kimi-k2.5",
     name: "Kimi K2.5",
     attachment: true,
     reasoning: true,
@@ -27,20 +28,37 @@ const DEFAULT_WORKERS_MODELS: Record<string, GatewayModelConfig> = {
     temperature: true,
     interleaved: { field: "reasoning_content" },
     modalities: { input: ["text", "image"], output: ["text"] },
-    limit: { context: 256000, output: 64000 },
-    options: { max_tokens: 64000, store: false, parallel_tool_calls: true },
+    cost: { input: 0.6, cache_read: 0.1, output: 3 },
+    limit: { context: 256000, output: 32000 },
+    options: { temperature: 1, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
   },
-  "workers-ai/@cf/zai-org/glm-4.7-flash": {
+  "@cf/moonshotai/kimi-k2.6": {
+    id: "workers-ai/@cf/moonshotai/kimi-k2.6",
+    name: "Kimi K2.6",
+    attachment: true,
+    reasoning: true,
+    tool_call: true,
+    temperature: true,
+    interleaved: { field: "reasoning_content" },
+    modalities: { input: ["text", "image"], output: ["text"] },
+    cost: { input: 0.95, cache_read: 0.16, output: 4 },
+    limit: { context: 262144, output: 32000 },
+    options: { temperature: 1, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
+  },
+  "@cf/zai-org/glm-4.7-flash": {
+    id: "workers-ai/@cf/zai-org/glm-4.7-flash",
     name: "GLM-4.7-Flash",
     attachment: true,
     reasoning: true,
     tool_call: true,
     temperature: true,
     interleaved: { field: "reasoning_content" },
-    limit: { context: 131072, output: 64000 },
-    options: { max_tokens: 64000, store: false, parallel_tool_calls: true },
+    cost: { input: 0.06, output: 0.4 },
+    limit: { context: 131072, output: 32000 },
+    options: { temperature: 0.95, top_p: 0.7, max_tokens: 32000, store: false, parallel_tool_calls: true },
   },
-  "workers-ai/@cf/nvidia/nemotron-3-120b-a12b": {
+  "@cf/nvidia/nemotron-3-120b-a12b": {
+    id: "workers-ai/@cf/nvidia/nemotron-3-120b-a12b",
     name: "Nemotron 3 Super 120B",
     attachment: false,
     reasoning: true,
@@ -48,8 +66,33 @@ const DEFAULT_WORKERS_MODELS: Record<string, GatewayModelConfig> = {
     temperature: true,
     interleaved: { field: "reasoning_content" },
     modalities: { input: ["text"], output: ["text"] },
-    limit: { context: 256000, output: 64000 },
-    options: { max_tokens: 64000, store: false, parallel_tool_calls: false },
+    cost: { input: 0.5, output: 1.5 },
+    limit: { context: 256000, output: 32000 },
+    options: { temperature: 0.6, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: false },
+  },
+  "@cf/google/gemma-4-26b-a4b-it": {
+    id: "workers-ai/@cf/google/gemma-4-26b-a4b-it",
+    name: "Gemma 4 26B A4B IT",
+    attachment: true,
+    reasoning: true,
+    tool_call: true,
+    temperature: true,
+    interleaved: { field: "reasoning_content" },
+    modalities: { input: ["text", "image"], output: ["text"] },
+    cost: { input: 0.1, output: 0.3 },
+  },
+  "@cf/zai-org/glm-5.1": {
+    id: "workers-ai/@cf/zai-org/glm-5.1",
+    name: "GLM 5.1",
+    attachment: false,
+    reasoning: true,
+    tool_call: true,
+    temperature: true,
+    interleaved: { field: "reasoning_content" },
+    modalities: { input: ["text"], output: ["text"] },
+    cost: { input: 1.4, cache_read: 0.26, output: 4.4 },
+    limit: { context: 200000, output: 32000 },
+    options: { temperature: 0.7, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
   },
 };
 
@@ -96,6 +139,21 @@ function normalizeInputModalities(config: GatewayModelConfig): ("text" | "image"
   return config.attachment ? ["text", "image"] : ["text"];
 }
 
+function isBlacklistedModel(
+  modelId: string,
+  backend: Backend,
+  blacklist: string[] | undefined,
+  config?: GatewayModelConfig,
+): boolean {
+  if (!blacklist?.length) return false;
+  const denied = new Set(blacklist.flatMap((id) => [id, stripRoutePrefix(id, backend)]));
+  const candidates = [modelId, stripRoutePrefix(modelId, backend)];
+  if (config?.id) {
+    candidates.push(config.id, stripRoutePrefix(config.id, backend));
+  }
+  return candidates.some((candidate) => denied.has(candidate));
+}
+
 function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelConfig): ProviderModelConfig {
   return {
     id: modelId,
@@ -123,19 +181,31 @@ function applyGatewayModelLimit(model: Model<Api>, gatewayModels: Record<string,
   };
 }
 
-function buildBuiltInModels(backend: Exclude<Backend, "workers-ai">, gatewayModels: Record<string, GatewayModelConfig>): Model<Api>[] {
+function buildBuiltInModels(
+  backend: Exclude<Backend, "workers-ai">,
+  gatewayModels: Record<string, GatewayModelConfig>,
+  blacklist?: string[],
+): Model<Api>[] {
   const provider = backend === "google" ? "google" : backend;
-  const builtIns = getModels(provider as "anthropic" | "openai" | "google") as Model<Api>[];
+  let builtIns = getModels(provider as "anthropic" | "openai" | "google") as Model<Api>[];
 
   if (backend === "openai" && Object.keys(gatewayModels).length > 0) {
     const allowlist = new Set(Object.keys(gatewayModels).map((id) => stripRoutePrefix(id, backend)));
-    return builtIns.filter((model) => allowlist.has(model.id)).map((model) => applyGatewayModelLimit(model, gatewayModels, backend));
+    builtIns = builtIns.filter((model) => allowlist.has(model.id));
   }
 
-  return builtIns.map((model) => applyGatewayModelLimit(model, gatewayModels, backend));
+  return builtIns
+    .filter((model) => !isBlacklistedModel(model.id, backend, blacklist))
+    .map((model) => applyGatewayModelLimit(model, gatewayModels, backend));
 }
 
-function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, baseUrl: string, headers: Record<string, string>, whitelist?: string[]) {
+function buildWorkersModels(
+  gatewayModels: Record<string, GatewayModelConfig>,
+  baseUrl: string,
+  headers: Record<string, string>,
+  whitelist?: string[],
+  blacklist?: string[],
+) {
   const source = Object.keys(gatewayModels).length > 0 ? gatewayModels : DEFAULT_WORKERS_MODELS;
   const allowedIds = whitelist?.length ? new Set(whitelist) : undefined;
   const models: ProviderModelConfig[] = [];
@@ -145,6 +215,7 @@ function buildWorkersModels(gatewayModels: Record<string, GatewayModelConfig>, b
     const shortId = stripRoutePrefix(fullModelId, "workers-ai");
     // Skip models not in whitelist (match against both full ID and short ID)
     if (allowedIds && !allowedIds.has(fullModelId) && !allowedIds.has(shortId)) continue;
+    if (isBlacklistedModel(fullModelId, "workers-ai", blacklist, config)) continue;
     models.push({
       id: shortId,
       name: `${fullModelId} (${config.name || shortId})`,
@@ -196,7 +267,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
   for (const backend of gateway.enabledBackends) {
     const route = gateway.routes[backend];
     if (backend === "workers-ai") {
-      const workers = buildWorkersModels(route.models, route.baseUrl || DEFAULT_ROUTE_URLS[backend], route.headers, route.whitelist);
+      const workers = buildWorkersModels(route.models, route.baseUrl || DEFAULT_ROUTE_URLS[backend], route.headers, route.whitelist, route.blacklist);
       models.push(...workers.models);
       for (const [modelId, descriptor] of workers.routes.entries()) {
         routes.set(modelId, descriptor);
@@ -205,7 +276,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
       continue;
     }
 
-    const builtIns = buildBuiltInModels(backend, route.models);
+    const builtIns = buildBuiltInModels(backend, route.models, route.blacklist);
     const seenModelIds = new Set<string>();
     for (const model of builtIns) {
       seenModelIds.add(model.id);
@@ -221,7 +292,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
 
     for (const [fullModelId, config] of Object.entries(route.models)) {
       const shortId = stripRoutePrefix(fullModelId, backend);
-      if (seenModelIds.has(shortId)) continue;
+      if (seenModelIds.has(shortId) || isBlacklistedModel(fullModelId, backend, route.blacklist, config)) continue;
       seenModelIds.add(shortId);
       models.push(toProviderModelConfigFromGateway(shortId, config));
       routes.set(shortId, {
