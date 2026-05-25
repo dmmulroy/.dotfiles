@@ -1326,8 +1326,10 @@ EOF
         print_error "Failed to create temp file"
         return 1
     fi
-    # Use RETURN trap instead of EXIT to avoid conflicts with other functions
-    trap 'rm -f "$temp_script"' RETURN
+    # Clean up on return and immediately remove this function-local trap. If
+    # the trap survives until main returns, nounset expands an out-of-scope
+    # temp_script variable and turns a successful benchmark into an error.
+    trap 'rm -f "$temp_script"; trap - RETURN' RETURN
     echo "exit 0" > "$temp_script"
     
     # Array to store timing results
@@ -1463,7 +1465,7 @@ printf '%.3f', \$end - \$start;
             print_info "  - Review Fish config.fish for expensive operations"
             print_info "  - Consider lazy-loading plugins and functions"
             print_info "  - Check for slow network operations in startup scripts"
-            print_info "  - Use 'fish --profile' to identify bottlenecks"
+            print_info "  - Use 'fish --profile-startup /tmp/fish-startup.profile -ic exit' to identify startup bottlenecks"
         fi
     else
         # Fallback assessment without bc
@@ -1479,7 +1481,8 @@ printf '%.3f', \$end - \$start;
     fi
     
     echo ""
-    print_info "To profile Fish startup in detail, run: fish --profile"
+    print_info "To profile Fish startup in detail, run: fish --profile-startup /tmp/fish-startup.profile -ic exit"
+    print_info "Then inspect the slowest commands: sort -nr /tmp/fish-startup.profile | head -20"
     print_info "Fish config location: ~/.config/fish/config.fish"
 }
 
