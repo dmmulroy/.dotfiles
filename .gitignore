@@ -5,7 +5,6 @@ home/.config/fish/conf.d/secrets.fish
 home/.config/fish/conf.d/vault-funcs.fish
 home/.config/opencode/amp_stuff/
 .envrc
-*/**/tmux/plugins/*
 backups/
 packages/failed_packages_*.txt
 tmp/
