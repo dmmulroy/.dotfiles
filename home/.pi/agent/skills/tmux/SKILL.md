@@ -13,9 +13,9 @@ Use tmux as a programmable terminal multiplexer for interactive work. Works on L
 ## Quickstart (isolated socket)
 
 ```bash
-SOCKET_DIR=${TMPDIR:-/tmp}/claude-tmux-sockets  # well-known dir for all agent sockets
+SOCKET_DIR=${TMPDIR:-/tmp}/pi-tmux-sockets  # well-known dir for all agent sockets
 mkdir -p "$SOCKET_DIR"
-SOCKET="$SOCKET_DIR/claude.sock"                # keep agent sessions separate from your personal tmux
+SOCKET="$SOCKET_DIR/pi.sock"                # keep agent sessions separate from your personal tmux
 SESSION=app-name-command                       # slug-like names; avoid spaces
 tmux -S "$SOCKET" new -d -s "$SESSION" -n shell
 TARGET=$(tmux -S "$SOCKET" list-panes -t "$SESSION" -F '#S:#I.#P' | head -n1)
@@ -28,10 +28,10 @@ After starting a session ALWAYS tell the user how to monitor the session by givi
 
 ```
 To monitor this session yourself:
-  tmux -S "$SOCKET" attach -t claude-lldb
+  tmux -S "$SOCKET" attach -t pi-lldb
 
 Or to capture the output once:
-  TARGET=$(tmux -S "$SOCKET" list-panes -t claude-lldb -F '#S:#I.#P' | head -n1)
+  TARGET=$(tmux -S "$SOCKET" list-panes -t pi-lldb -F '#S:#I.#P' | head -n1)
   tmux -S "$SOCKET" capture-pane -p -J -t "$TARGET" -S -200
 ```
 
@@ -39,11 +39,11 @@ This must ALWAYS be printed right after a session was started and once again at 
 
 ## Socket convention
 
-- Agents MUST place tmux sockets under `CLAUDE_TMUX_SOCKET_DIR` (defaults to `${TMPDIR:-/tmp}/claude-tmux-sockets`) and use `tmux -S "$SOCKET"` so we can enumerate/clean them. Create the dir first: `mkdir -p "$CLAUDE_TMUX_SOCKET_DIR"`.
-- Default socket path to use unless you must isolate further: `SOCKET="$CLAUDE_TMUX_SOCKET_DIR/claude.sock"`.
+- Agents MUST place tmux sockets under `PI_TMUX_SOCKET_DIR` (defaults to `${TMPDIR:-/tmp}/pi-tmux-sockets`) and use `tmux -S "$SOCKET"` so we can enumerate/clean them. Create the dir first: `mkdir -p "$PI_TMUX_SOCKET_DIR"`.
+- Default socket path to use unless you must isolate further: `SOCKET="$PI_TMUX_SOCKET_DIR/pi.sock"`.
 - tmux reads the user's config when a server starts. If you connect to an already-running server on that socket, its existing options (like `base-index`/`pane-base-index`) stay in effect even if the user's config is different now.
 - If you need deterministic fresh tmux state, use a unique socket path or kill the existing server on that socket first. Use `-f /dev/null` only when you explicitly want stock tmux behavior.
-- The `CLAUDE_TMUX_SOCKET_DIR` name is preserved for upstream compatibility; using it from Pi is fine.
+- The `PI_TMUX_SOCKET_DIR` name is preserved for upstream compatibility; using it from Pi is fine.
 
 ## Targeting panes and naming
 
@@ -56,7 +56,7 @@ This must ALWAYS be printed right after a session was started and once again at 
 ## Finding sessions
 
 - List sessions on your active socket with metadata: `./scripts/find-sessions.sh -S "$SOCKET"`; add `-q partial-name` to filter.
-- Scan all sockets under the shared directory: `./scripts/find-sessions.sh --all` (uses `CLAUDE_TMUX_SOCKET_DIR` or `${TMPDIR:-/tmp}/claude-tmux-sockets`).
+- Scan all sockets under the shared directory: `./scripts/find-sessions.sh --all` (uses `PI_TMUX_SOCKET_DIR` or `${TMPDIR:-/tmp}/pi-tmux-sockets`).
 
 ## Sending input safely
 
