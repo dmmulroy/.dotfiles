@@ -159,15 +159,17 @@ function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelC
     id: modelId,
     name: config.name || modelId,
     reasoning: config.reasoning !== false,
+    thinkingLevelMap: config.thinkingLevelMap,
     input: normalizeInputModalities(config),
     cost: {
       input: config.cost?.input || 0,
       output: config.cost?.output || 0,
       cacheRead: config.cost?.cache_read || 0,
-      cacheWrite: 0,
+      cacheWrite: config.cost?.cache_write || 0,
     },
     contextWindow: config.limit?.context || 128000,
     maxTokens: config.limit?.output || Number(config.options?.max_tokens) || 16384,
+    compat: config.compat,
   };
 }
 
@@ -301,6 +303,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         baseUrl: route.baseUrl,
         headers: route.headers,
         requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
+        compat: config.compat,
       });
     }
     counts[backend] = seenModelIds.size;

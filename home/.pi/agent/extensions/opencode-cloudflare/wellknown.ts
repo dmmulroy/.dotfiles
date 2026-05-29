@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import {
 	DEFAULT_ROUTE_HEADERS,
 	DEFAULT_ROUTE_URLS,
@@ -34,7 +35,9 @@ export interface GatewayModelConfig {
 	interleaved?: { field?: string };
 	modalities?: GatewayModelModalities;
 	limit?: GatewayModelLimit;
-	cost?: { input?: number; output?: number; cache_read?: number };
+	cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number };
+	thinkingLevelMap?: Model<Api>["thinkingLevelMap"];
+	compat?: Model<Api>["compat"];
 	options?: Record<string, unknown>;
 }
 

@@ -91,7 +91,31 @@ Example shape:
 }
 ```
 
-Provider keys are normalized the same way as the gateway config, including aliases such as `cloudflare-workers-ai`.
+Provider keys are normalized the same way as the gateway config, including aliases such as `cloudflare-workers-ai`. Local model entries may also provide Pi-specific `thinkingLevelMap` and `compat` fields and `cost.cache_write` for accurate adaptive-thinking behavior and usage reporting.
+
+For example, a newly released adaptive Anthropic model that is not yet in Pi's built-in catalog can be exposed immediately as follows:
+
+```jsonc
+{
+  "provider": {
+    "anthropic": {
+      "models": {
+        "anthropic/claude-opus-4-8": {
+          "id": "claude-opus-4-8",
+          "name": "Claude Opus 4.8",
+          "attachment": true,
+          "reasoning": true,
+          "thinkingLevelMap": { "xhigh": "xhigh" },
+          "compat": { "forceAdaptiveThinking": true },
+          "cost": { "input": 5, "output": 25, "cache_read": 0.5, "cache_write": 6.25 },
+          "limit": { "context": 1000000, "output": 128000 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] }
+        }
+      }
+    }
+  }
+}
+```
 
 ## Commands
 
