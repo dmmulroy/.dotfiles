@@ -13,7 +13,7 @@ import {
 	type SimpleStreamOptions,
 	type AnthropicOptions,
 } from "@earendil-works/pi-ai";
-import { getCatalog, refreshCatalog, type RouteDescriptor } from "./catalog.ts";
+import { getCatalog, refreshCatalog, type ResponseVerbosity, type RouteDescriptor } from "./catalog.ts";
 import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
@@ -418,6 +418,31 @@ function streamGoogleViaGateway(
 	return stream;
 }
 
+function applyResponseVerbosity(
+	payload: unknown,
+	verbosity: ResponseVerbosity,
+): unknown {
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+	const body = payload as Record<string, unknown>;
+	const existingText = body.text;
+	const text = existingText && typeof existingText === "object" && !Array.isArray(existingText)
+		? existingText as Record<string, unknown>
+		: {};
+	return { ...body, text: { ...text, verbosity } };
+}
+
+function applyRoutePayloadOptions(options: SimpleStreamOptions, route: RouteDescriptor): SimpleStreamOptions {
+	if (route.api !== "openai-responses" || !route.responseVerbosity) return options;
+	const onPayload = options.onPayload;
+	return {
+		...options,
+		onPayload: async (payload, model) => {
+			const configuredPayload = applyResponseVerbosity(payload, route.responseVerbosity!);
+			return (await onPayload?.(configuredPayload, model)) ?? configuredPayload;
+		},
+	};
+}
+
 function createDelegatedStream(
 	model: Model<Api>,
 	route: RouteDescriptor,
@@ -477,10 +502,10 @@ export function streamOpencodeCloudflare(
 				delegatedHeaders,
 				latestRoute?.baseUrl || route.baseUrl,
 			);
-			const delegatedOptions: SimpleStreamOptions = {
+			const delegatedOptions = applyRoutePayloadOptions({
 				...options,
 				apiKey: token,
-			};
+			}, route);
 
 			const innerStream = createDelegatedStream(delegatedModel, route, context, delegatedOptions, token);
 			for await (const event of innerStream) {

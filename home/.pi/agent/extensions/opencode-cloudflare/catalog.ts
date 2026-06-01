@@ -3,12 +3,15 @@ import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_ROUTE_URLS, type Backend } from "./constants.ts";
 import { getDefaultGatewayConfig, getGatewayConfig, stripRoutePrefix, type GatewayModelConfig } from "./wellknown.ts";
 
+export type ResponseVerbosity = "low" | "medium" | "high";
+
 export interface RouteDescriptor {
   backend: Backend;
   api: Api;
   baseUrl: string;
   headers: Record<string, string>;
   requestModelId?: string;
+  responseVerbosity?: ResponseVerbosity;
   compat?: Model<Api>["compat"];
 }
 
@@ -173,8 +176,23 @@ function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelC
   };
 }
 
+function resolveGatewayModelConfig(
+  modelId: string,
+  gatewayModels: Record<string, GatewayModelConfig>,
+  backend: Backend,
+): GatewayModelConfig | undefined {
+  return gatewayModels[modelId] || gatewayModels[`${backend}/${modelId}`] || gatewayModels[`anthropic/${modelId}`];
+}
+
+function getResponseVerbosity(config: GatewayModelConfig | undefined): ResponseVerbosity | undefined {
+  const text = config?.options?.text;
+  if (!text || typeof text !== "object" || Array.isArray(text)) return undefined;
+  const verbosity = (text as Record<string, unknown>).verbosity;
+  return verbosity === "low" || verbosity === "medium" || verbosity === "high" ? verbosity : undefined;
+}
+
 function applyGatewayModelLimit(model: Model<Api>, gatewayModels: Record<string, GatewayModelConfig>, backend: Backend): Model<Api> {
-  const gatewayConfig = gatewayModels[model.id] || gatewayModels[`${backend}/${model.id}`] || gatewayModels[`anthropic/${model.id}`];
+  const gatewayConfig = resolveGatewayModelConfig(model.id, gatewayModels, backend);
   if (!gatewayConfig?.limit) return model;
   return {
     ...model,
@@ -288,6 +306,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         api: model.api,
         baseUrl: route.baseUrl,
         headers: route.headers,
+        responseVerbosity: getResponseVerbosity(resolveGatewayModelConfig(model.id, route.models, backend)),
         compat: model.compat,
       });
     }
@@ -303,6 +322,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         baseUrl: route.baseUrl,
         headers: route.headers,
         requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
+        responseVerbosity: getResponseVerbosity(config),
         compat: config.compat,
       });
     }
