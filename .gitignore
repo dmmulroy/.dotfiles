@@ -20,6 +20,7 @@ __pycache__/
 
 # opencode
 home/.config/opencode/node_modules/
+home/.config/opencode/plugins/git-ai.ts
 .opencode/plans/
 
 # jj per-repo configs
