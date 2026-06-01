@@ -9,9 +9,9 @@ fs.writeFileSync(overlayPath, JSON.stringify({
 	provider: {
 		anthropic: {
 			models: {
-				"anthropic/claude-opus-4-8": {
-					id: "claude-opus-4-8",
-					name: "Claude Opus 4.8",
+				"anthropic/fixture-adaptive-anthropic-model": {
+					id: "fixture-adaptive-anthropic-model",
+					name: "Fixture Adaptive Anthropic Model",
 					reasoning: true,
 					thinkingLevelMap: { xhigh: "xhigh" },
 					compat: { forceAdaptiveThinking: true },
@@ -29,7 +29,7 @@ const capturedRequests = [];
 
 const sseBody = [
 	'event: message_start\n',
-	'data: {"type":"message_start","message":{"id":"msg_test","type":"message","role":"assistant","content":[],"model":"claude-opus-4-8","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
+	'data: {"type":"message_start","message":{"id":"msg_test","type":"message","role":"assistant","content":[],"model":"fixture-adaptive-anthropic-model","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":0}}}\n\n',
 	'event: content_block_start\n',
 	'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
 	'event: content_block_delta\n',
@@ -63,8 +63,8 @@ globalThis.fetch = async (input, init) => {
 
 try {
 	const model = {
-		id: "claude-opus-4-8",
-		name: "Claude Opus 4.8",
+		id: "fixture-adaptive-anthropic-model",
+		name: "Fixture Adaptive Anthropic Model",
 		api: "opencode-cloudflare",
 		provider: "opencode.cloudflare.dev",
 		baseUrl: "https://opencode.cloudflare.dev",
@@ -102,12 +102,12 @@ try {
 	assert.equal(request.headers.get("x-initiator"), null);
 	assert.equal(request.headers.get("openai-intent"), null);
 	assert.equal(request.headers.get("cf-aig-authorization"), null);
-	assert.equal(request.body.model, "claude-opus-4-8");
+	assert.equal(request.body.model, "fixture-adaptive-anthropic-model");
 	assert.deepEqual(request.body.thinking, { type: "adaptive", display: "summarized" });
 	assert.deepEqual(request.body.output_config, { effort: "xhigh" });
 	assert.equal(done?.api, "anthropic-messages");
 	assert.equal(done?.provider, "opencode.cloudflare.dev");
-	assert.equal(done?.model, "claude-opus-4-8");
+	assert.equal(done?.model, "fixture-adaptive-anthropic-model");
 
 	console.log("anthropic auth regression checks passed");
 } finally {

@@ -4,6 +4,11 @@
       "url": "https://portal.mcp.cfdata.org/mcp",
       "auth": "oauth",
       "lifecycle": "eager"
+    },
+    "cloudflare-api": {
+      "url": "https://mcp.cloudflare.com/mcp",
+      "auth": "oauth",
+      "lifecycle": "lazy"
     }
   }
 }

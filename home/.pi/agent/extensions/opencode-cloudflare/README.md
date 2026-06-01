@@ -93,16 +93,16 @@ Example shape:
 
 Provider keys are normalized the same way as the gateway config, including aliases such as `cloudflare-workers-ai`. Local model entries may also provide Pi-specific `thinkingLevelMap` and `compat` fields and `cost.cache_write` for accurate adaptive-thinking behavior and usage reporting. For OpenAI Responses models, `options.text.verbosity` may set an explicit `low`, `medium`, or `high` response verbosity.
 
-For example, a newly released adaptive Anthropic model that is not yet in Pi's built-in catalog can be exposed immediately as follows:
+For example, a private adaptive Anthropic model that is not yet in Pi's built-in catalog can be exposed immediately using placeholders rather than a real private model ID:
 
 ```jsonc
 {
   "provider": {
     "anthropic": {
       "models": {
-        "anthropic/claude-opus-4-8": {
-          "id": "claude-opus-4-8",
-          "name": "Claude Opus 4.8",
+        "anthropic/<private-adaptive-model-id>": {
+          "id": "<private-adaptive-request-id>",
+          "name": "Private Adaptive Anthropic Model",
           "attachment": true,
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh" },

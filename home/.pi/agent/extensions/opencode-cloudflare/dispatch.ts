@@ -151,11 +151,13 @@ function mergeHeaders(...sources: Array<Record<string, string | null | undefined
 	return merged;
 }
 
-function supportsAdaptiveThinking(modelId: string): boolean {
-	return modelId.includes("opus-4-6") || modelId.includes("opus-4.6") ||
-		modelId.includes("opus-4-7") || modelId.includes("opus-4.7") ||
-		modelId.includes("opus-4-8") || modelId.includes("opus-4.8") ||
-		modelId.includes("sonnet-4-6") || modelId.includes("sonnet-4.6");
+function supportsAdaptiveThinking(model: Model<Api>): boolean {
+	const forced = (model.compat as { forceAdaptiveThinking?: boolean } | undefined)?.forceAdaptiveThinking;
+	if (forced !== undefined) return forced;
+	return model.id.includes("opus-4-6") || model.id.includes("opus-4.6") ||
+		model.id.includes("opus-4-7") || model.id.includes("opus-4.7") ||
+		model.id.includes("opus-4-8") || model.id.includes("opus-4.8") ||
+		model.id.includes("sonnet-4-6") || model.id.includes("sonnet-4.6");
 }
 
 function mapThinkingLevelToEffort(model: Model<Api>, level: SimpleStreamOptions["reasoning"]): AnthropicOptions["effort"] {
@@ -207,7 +209,7 @@ function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions |
 		client: client as unknown as AnthropicOptions["client"],
 	};
 	if (!options?.reasoning) return { ...base, thinkingEnabled: false };
-	if (supportsAdaptiveThinking(model.id)) {
+	if (supportsAdaptiveThinking(model)) {
 		return { ...base, thinkingEnabled: true, effort: mapThinkingLevelToEffort(model, options.reasoning) };
 	}
 	const adjusted = adjustMaxTokensForThinking(base.maxTokens || 0, model.maxTokens, options.reasoning, options.thinkingBudgets);
