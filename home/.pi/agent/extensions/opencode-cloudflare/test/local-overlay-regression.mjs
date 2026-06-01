@@ -11,9 +11,9 @@ fs.writeFileSync(overlayPath, `{
   "provider": {
     "anthropic": {
       "models": {
-        "anthropic/claude-opus-4-8": {
-          "id": "claude-opus-4-8",
-          "name": "Claude Opus 4.8",
+        "anthropic/fixture-adaptive-anthropic-model": {
+          "id": "fixture-adaptive-anthropic-model",
+          "name": "Fixture Adaptive Anthropic Model",
           "attachment": true,
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh" },
@@ -68,15 +68,19 @@ try {
 	const { getCatalog } = await import("../catalog.ts");
 	const catalog = getCatalog();
 
-	const opus48 = catalog.models.find((model) => model.id === "claude-opus-4-8");
-	assert.ok(opus48);
-	assert.equal(opus48.name, "Claude Opus 4.8");
-	assert.deepEqual(opus48.thinkingLevelMap, { xhigh: "xhigh" });
-	assert.equal(opus48.cost.cacheWrite, 6.25);
-	assert.equal(opus48.contextWindow, 1000000);
-	assert.equal(opus48.maxTokens, 128000);
-	assert.equal(catalog.routes.get("claude-opus-4-8")?.requestModelId, "claude-opus-4-8");
-	assert.deepEqual(catalog.routes.get("claude-opus-4-8")?.compat, { forceAdaptiveThinking: true });
+	const fixtureAdaptiveModel = catalog.models.find((model) => model.id === "fixture-adaptive-anthropic-model");
+	assert.ok(fixtureAdaptiveModel);
+	assert.equal(fixtureAdaptiveModel.name, "Fixture Adaptive Anthropic Model");
+	assert.deepEqual(fixtureAdaptiveModel.thinkingLevelMap, { xhigh: "xhigh" });
+	assert.equal(fixtureAdaptiveModel.cost.cacheWrite, 6.25);
+	assert.equal(fixtureAdaptiveModel.contextWindow, 1000000);
+	assert.equal(fixtureAdaptiveModel.maxTokens, 128000);
+	assert.equal(catalog.routes.get("fixture-adaptive-anthropic-model")?.requestModelId, "fixture-adaptive-anthropic-model");
+	assert.deepEqual(catalog.routes.get("fixture-adaptive-anthropic-model")?.compat, { forceAdaptiveThinking: true });
+
+	const openaiIds = new Set(catalog.models.map((model) => model.id));
+	assert.ok(openaiIds.has("gpt-4o"), "a local OpenAI overlay augments rather than replaces built-in gateway models");
+	assert.ok(openaiIds.has("gpt-5.5"), "new built-in OpenAI models remain visible with a local overlay");
 
 	const openaiResponsesModel = catalog.models.find((model) => model.id === "custom-openai-responses-model");
 	assert.ok(openaiResponsesModel);

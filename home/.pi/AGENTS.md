@@ -62,6 +62,7 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 - Committing `node_modules/` (gitignored per-extension)
 - Editing `agent/settings.json` outside dotfiles repo (stow overwrites)
 - Adding runtime state files to git (most of `agent/*` is gitignored, only extensions/skills/settings un-ignored)
+- Writing any model ID from a local `opencode-cloudflare` overlay into tests, fixtures, docs, examples, source comments, tracked configuration, or any other version-controlled file. Overlay models are internal/private; use public catalog models or generic placeholders in tracked artifacts.
 
 ## KEY SETTINGS
 
@@ -72,7 +73,7 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
   "defaultModel": "claude-opus-4-6",
   "defaultThinkingLevel": "high",
   "theme": "catppuccin-macchiato",
-  "packages": ["npm:pi-extmgr", "npm:@plannotator/pi-extension", "npm:pi-interview"]
+  "packages": ["npm:pi-extmgr", "npm:@plannotator/pi-extension"]
 }
 ```
 
@@ -88,5 +89,5 @@ Most of `agent/` is gitignored by default. Tracked files are explicitly un-ignor
 
 - `web-tools.json` is Helium browser profile config, not extension settings
 - opencode-cloudflare supports native pi `/login` + importing existing OpenCode auth
+- Treat model IDs supplied through local `opencode-cloudflare` overlays as private information: never expose them in version-controlled content.
 - pi-skill-toggle has a full UI layer (overlay, render, view-model)
-- pi-mcp is forked from pi-mcp-adapter with added OAuth support
