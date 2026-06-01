@@ -23,6 +23,20 @@ fs.writeFileSync(overlayPath, `{
         }
       }
     },
+    "openai": {
+      "models": {
+        "custom-openai-responses-model": {
+          "id": "custom-openai-responses-model",
+          "name": "Custom OpenAI Responses Model",
+          "attachment": true,
+          "reasoning": true,
+          "thinkingLevelMap": { "off": "none", "minimal": null, "xhigh": "xhigh" },
+          "options": { "text": { "verbosity": "medium" } },
+          "limit": { "context": 1000000, "output": 128000 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] }
+        }
+      }
+    },
     "google": {
       "models": {
         "custom-google-model": {
@@ -63,6 +77,15 @@ try {
 	assert.equal(opus48.maxTokens, 128000);
 	assert.equal(catalog.routes.get("claude-opus-4-8")?.requestModelId, "claude-opus-4-8");
 	assert.deepEqual(catalog.routes.get("claude-opus-4-8")?.compat, { forceAdaptiveThinking: true });
+
+	const openaiResponsesModel = catalog.models.find((model) => model.id === "custom-openai-responses-model");
+	assert.ok(openaiResponsesModel);
+	assert.deepEqual(openaiResponsesModel.thinkingLevelMap, { off: "none", minimal: null, xhigh: "xhigh" });
+	assert.equal(openaiResponsesModel.contextWindow, 1000000);
+	assert.equal(openaiResponsesModel.maxTokens, 128000);
+	assert.equal(catalog.routes.get("custom-openai-responses-model")?.backend, "openai");
+	assert.equal(catalog.routes.get("custom-openai-responses-model")?.api, "openai-responses");
+	assert.equal(catalog.routes.get("custom-openai-responses-model")?.responseVerbosity, "medium");
 
 	const googleModel = catalog.models.find((model) => model.id === "custom-google-model");
 	assert.ok(googleModel);

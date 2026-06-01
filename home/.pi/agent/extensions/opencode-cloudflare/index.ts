@@ -92,7 +92,7 @@ export default async function (pi: ExtensionAPI) {
 
 	pi.registerProvider(PROVIDER_ID, {
 		baseUrl: GATEWAY_ORIGIN,
-		apiKey: TOKEN_ENV_OVERRIDE,
+		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
 		api: CUSTOM_API,
 		models: catalog.models,
 		oauth: {
