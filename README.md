@@ -92,6 +92,8 @@ dot update
 - Pulls latest dotfiles changes (auto-detects jj vs git)
 - Updates Homebrew packages
 - Re-stows configuration files
+- Runs `pi update` to update pi and its configured packages
+- Launches pi with `/skill:sync-pocock-skills` to sync the checked-in Matt Pocock skills interactively
 
 #### `dot doctor` - Health Check
 ```bash
