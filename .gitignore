@@ -29,6 +29,7 @@ home/.config/jj/repos/
 # pi agent runtime/state (keep settings + customization resources tracked)
 home/.pi/agent/*
 home/.pi/todos/*
+home/.pi/.pi/todos/*
 .pi/todos/*
 
 # pi MCP adapter runtime/secrets

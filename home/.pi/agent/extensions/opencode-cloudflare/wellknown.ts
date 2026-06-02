@@ -47,6 +47,8 @@ export interface GatewayRouteConfig {
 	models: Record<string, GatewayModelConfig>;
 	whitelist?: string[];
 	blacklist?: string[];
+	/** True only when the gateway itself supplied models before local overlays are merged. */
+	hasGatewayModels: boolean;
 }
 
 export interface GatewayWellKnownResponse {
@@ -232,13 +234,15 @@ function getRouteProviderConfig(raw: GatewayWellKnownResponse["config"], backend
 function resolveRouteConfig(raw: GatewayWellKnownResponse | undefined, backend: Backend): GatewayRouteConfig {
 	const providerConfig = getRouteProviderConfig(raw?.config, backend);
 	const options = providerConfig?.options;
+	const gatewayModels = providerConfig?.models || {};
 
 	return {
 		baseUrl: options?.baseURL || options?.baseUrl || DEFAULT_ROUTE_URLS[backend],
 		headers: normalizeHeaders(options?.headers, backend),
-		models: providerConfig?.models || {},
+		models: gatewayModels,
 		whitelist: providerConfig?.whitelist,
 		blacklist: providerConfig?.blacklist,
+		hasGatewayModels: Object.keys(gatewayModels).length > 0,
 	};
 }
 

@@ -4,10 +4,11 @@
   "type": "module",
   "packageManager": "npm@11.11.0",
   "workspaces": [
-    "agent/extensions/*"
+    "agent/extensions/*",
+    "flue/*"
   ],
   "scripts": {
-    "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-web-tools-extension",
+    "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-web-tools-extension && npm run test --workspace=pi-flue-understand-anything && npm run check --workspace=pi-flue-understand-anything",
     "test:web-tools": "npm run test --workspace=pi-web-tools-extension"
   },
   "dependencies": {

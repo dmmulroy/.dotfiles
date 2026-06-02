@@ -205,11 +205,14 @@ function buildBuiltInModels(
   backend: Exclude<Backend, "workers-ai">,
   gatewayModels: Record<string, GatewayModelConfig>,
   blacklist?: string[],
+  hasGatewayModels: boolean = false,
 ): Model<Api>[] {
   const provider = backend === "google" ? "google" : backend;
   let builtIns = getModels(provider as "anthropic" | "openai" | "google") as Model<Api>[];
 
-  if (backend === "openai" && Object.keys(gatewayModels).length > 0) {
+  // Gateway-provided OpenAI model entries are an allowlist. Machine-local overlays
+  // are additions and must not accidentally hide every built-in OpenAI model.
+  if (backend === "openai" && hasGatewayModels) {
     const allowlist = new Set(Object.keys(gatewayModels).map((id) => stripRoutePrefix(id, backend)));
     builtIns = builtIns.filter((model) => allowlist.has(model.id));
   }
@@ -296,7 +299,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
       continue;
     }
 
-    const builtIns = buildBuiltInModels(backend, route.models, route.blacklist);
+    const builtIns = buildBuiltInModels(backend, route.models, route.blacklist, route.hasGatewayModels);
     const seenModelIds = new Set<string>();
     for (const model of builtIns) {
       seenModelIds.add(model.id);
