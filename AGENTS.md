@@ -66,7 +66,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 
 ```bash
 dot init              # Full setup (brew, stow, bun, ssh, font, fish)
-dot update            # Pull + brew upgrade + restow
+dot update            # Pull + brew upgrade + restow + pi update + Pocock skills sync
 dot doctor            # Health check
 dot stow              # Resymlink only
 dot package add X     # Add + install package
