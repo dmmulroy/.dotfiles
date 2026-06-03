@@ -10,6 +10,11 @@
       "auth": "oauth",
       "lifecycle": "lazy"
     },
+    "executor": {
+      "url": "https://executor.mulroy.ai/mcp",
+      "auth": "oauth",
+      "lifecycle": "lazy"
+    },
     "uidotsh": {
       "url": "https://ui.sh/mcp?agent=pi",
       "auth": "bearer",
