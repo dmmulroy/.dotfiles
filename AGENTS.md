@@ -70,7 +70,6 @@ dot update            # Pull + brew upgrade + restow + pi update + Pocock skills
 dot doctor            # Health check
 dot stow              # Resymlink only
 dot package add X     # Add + install package
-dot summary           # AI commit summary (opencode)
 dot benchmark-shell   # Fish startup perf
 dot gen-ssh-key       # Generate ed25519 key by email domain
 ```

@@ -9,7 +9,7 @@ This repository contains my personal development environment configuration, mana
 ### Key Features
 
 - 🚀 **One-command setup** - Complete development environment in minutes
-- 🤖 **AI Integration** - OpenCode for commit summaries and assistance
+- 🤖 **AI Integration** - OpenCode for AI assistance
 - 📦 **Resilient Package Management** - Continues installation even if packages fail
 - 🔍 **Health Monitoring** - Comprehensive environment diagnostics
 - 🛠️ **Modular Design** - Separate work and personal configurations
@@ -119,40 +119,6 @@ Shows which packages are installed vs. missing from your Brewfiles.
 dot retry-failed
 ```
 Attempts to reinstall packages that failed during initial setup.
-
-### AI-Powered Features
-
-#### `dot summary` - Commit Analysis
-Uses OpenCode to generate intelligent summaries of recent git commits.
-
-```bash
-# Summarize last 3 commits (default)
-dot summary
-
-# Summarize specific number of commits
-dot summary -n 5
-
-# Include file diffs for detailed analysis
-dot summary -d
-
-# Verbose mode with commit details
-dot summary -v
-
-# Combine options
-dot summary -n 10 -d -v
-```
-
-**Example Output:**
-```
-=> Summary of Recent Changes
-
-Development Focus: Recent work centers on improving the diagnostic navigation
-system in Neovim, updating deprecated API calls to use modern vim.diagnostic.jump()
-functions. This includes better error handling and user experience improvements.
-
-Technical Patterns: The commits show incremental configuration refinements
-with a focus on tooling updates and environment optimization...
-```
 
 ### Performance & Development Tools
 
@@ -395,13 +361,6 @@ dot doctor
 dot stow
 ```
 
-**OpenCode configuration:**
-```bash
-# If summary command fails, configure a provider
-opencode
-# Then use /connect to set up a provider
-```
-
 **OpenCode installation issues:**
 ```bash
 # Install via Homebrew (recommended)
@@ -471,19 +430,6 @@ dot completions
 # Completions include dynamic suggestions for:
 # - Package names when using package remove/update
 # - All commands, subcommands, and options
-```
-
-### AI-Powered Workflows
-
-```bash
-# Review recent work
-dot summary -v
-
-# Detailed analysis for release notes
-dot summary -n 10 -d
-
-# Quick daily standup summary
-dot summary -n 5
 ```
 
 ## License
