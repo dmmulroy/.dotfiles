@@ -120,8 +120,7 @@ TOOL_REGISTRY=(
     "Stow dotfiles     ;; -    ;; fn:_stow_dotfiles                             ;; true  ;; -         ;; false"
     "Bun               ;; bun  ;; curl -fsSL https://bun.sh/install | bash      ;; true  ;; -         ;; true"
     "Vite+             ;; vp   ;; curl -fsSL https://vite.plus | bash           ;; true  ;; -         ;; true"
-    "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; false ;; -         ;; true"
-    "OpenCode          ;; -    ;; fn:_install_opencode                          ;; false ;; -         ;; false"
+    "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; true  ;; -         ;; true"
     "SSH key           ;; -    ;; fn:_generate_ssh_key                          ;; false ;; SKIP_SSH  ;; false"
     "MonoLisa font     ;; -    ;; fn:_install_font                              ;; false ;; SKIP_FONT ;; false"
     "Fish shell        ;; -    ;; fn:_setup_fish_shell                          ;; false ;; -         ;; false"
@@ -355,193 +354,6 @@ _stow_dotfiles() {
         print_success "Dotfiles stowed successfully"
     else
         print_error "Failed to stow dotfiles"
-        return 1
-    fi
-}
-
-# Helper to determine OpenCode installation method
-get_opencode_install_method() {
-    local opencode_path
-    opencode_path=$(command -v opencode 2>/dev/null) || { echo "not_installed"; return; }
-    
-    case "$opencode_path" in
-        "${HOME}/.opencode"*) echo "native" ;;
-        "/opt/homebrew"*|"/usr/local/Cellar"*) echo "brew" ;;
-        *".bun"*) echo "bun" ;;
-        *"node_modules"*|*"/npm/"*) echo "npm" ;;
-        *) echo "unknown" ;;
-    esac
-}
-
-# Helper to check for multiple OpenCode installations
-check_opencode_conflicts() {
-    local found_paths=()
-    
-    # Check native installation
-    if [[ -x "${HOME}/.opencode/bin/opencode" ]]; then
-        found_paths+=("${HOME}/.opencode/bin/opencode (native)")
-    fi
-    
-    # Check homebrew installation
-    if command -v brew >/dev/null 2>&1; then
-        local brew_path
-        brew_path=$(brew --prefix 2>/dev/null)/bin/opencode
-        if [[ -x "$brew_path" ]]; then
-            found_paths+=("$brew_path (brew)")
-        fi
-    fi
-    
-    # Check bun global installation
-    local bun_path="${HOME}/.bun/bin/opencode"
-    if [[ -x "$bun_path" ]]; then
-        found_paths+=("$bun_path (bun)")
-    fi
-    
-    # Check npm global installation (common locations)
-    local npm_paths=(
-        "/usr/local/bin/opencode"
-        "${HOME}/.npm-global/bin/opencode"
-        "${HOME}/.local/bin/opencode"
-    )
-    for npm_path in "${npm_paths[@]}"; do
-        if [[ -x "$npm_path" && "$npm_path" != "${HOME}/.opencode"* ]]; then
-            found_paths+=("$npm_path (npm)")
-        fi
-    done
-    
-    if [[ ${#found_paths[@]} -gt 1 ]]; then
-        echo "${found_paths[*]}"
-        return 0
-    fi
-    return 1
-}
-
-_install_opencode() {
-    
-    # Save current shell options for restoration
-    local _saved_opts="$-"
-    
-    # Check current installation status
-    local install_method
-    install_method=$(get_opencode_install_method)
-    
-    case "$install_method" in
-        native)
-            print_success "OpenCode is already installed via native installer (recommended)"
-            return 0
-            ;;
-        brew|bun|npm)
-            print_warning "OpenCode is installed via $install_method"
-            print_info "Native installer is recommended for faster updates"
-            
-            if confirm "Migrate to native installer?" "y"; then
-                print_info "Migrating OpenCode to native installer..."
-                
-                # Temporarily disable exit on error
-                set +e
-                
-                # Remove old installation
-                case "$install_method" in
-                    brew)
-                        print_info "Removing Homebrew installation..."
-                        brew uninstall opencode 2>/dev/null
-                        ;;
-                    bun)
-                        print_info "Removing bun installation..."
-                        bun remove -g opencode-ai 2>/dev/null
-                        ;;
-                    npm)
-                        print_info "Removing npm installation..."
-                        npm uninstall -g opencode-ai 2>/dev/null
-                        ;;
-                esac
-                
-                # Install via native installer
-                print_info "Installing via native installer..."
-                if curl -fsSL https://opencode.ai/install | bash; then
-                    print_success "OpenCode migrated to native installer successfully"
-                    print_info "You may need to restart your shell"
-                    set -"$_saved_opts" 2>/dev/null || true
-                    return 0
-                else
-                    print_error "Installation failed, reinstalling via $install_method..."
-                    # Reinstall via original method
-                    case "$install_method" in
-                        brew) brew install opencode ;;
-                        bun) bun install -g opencode-ai ;;
-                        npm) npm install -g opencode-ai ;;
-                    esac
-                    set -"$_saved_opts" 2>/dev/null || true
-                    return 1
-                fi
-            else
-                print_info "Keeping existing $install_method installation"
-                return 0
-            fi
-            ;;
-        unknown)
-            print_success "OpenCode is already installed"
-            return 0
-            ;;
-    esac
-    
-    # Fresh installation - use native installer (fastest updates)
-    print_info "Installing OpenCode CLI..."
-    
-    # Temporarily disable exit on error for installation attempts
-    set +e
-    
-    # Try native installer first (recommended - gets updates faster than brew)
-    print_info "Running native installer..."
-    if curl -fsSL https://opencode.ai/install | bash; then
-        print_success "OpenCode installed successfully via native installer"
-        print_info "You may need to restart your shell or add ~/.opencode/bin to your PATH"
-        set -"$_saved_opts" 2>/dev/null || true
-        return 0
-    else
-        print_warning "Native installer failed, trying Homebrew..."
-    fi
-    
-    # Fallback to Homebrew
-    if command_exists brew; then
-        print_info "Installing via Homebrew..."
-        if brew install opencode; then
-            print_success "OpenCode installed successfully via Homebrew"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_warning "Homebrew installation failed, trying bun..."
-        fi
-    fi
-    
-    # Fallback to bun (faster than npm)
-    if command_exists bun; then
-        print_info "Installing via Bun..."
-        if bun install -g opencode-ai; then
-            print_success "OpenCode installed successfully via Bun"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_warning "Bun installation failed, trying npm..."
-        fi
-    fi
-    
-    # Fallback to npm
-    if command_exists npm; then
-        print_info "Installing via npm..."
-        if npm install -g opencode-ai; then
-            print_success "OpenCode installed successfully via npm"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_error "Failed to install OpenCode via npm"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 1
-        fi
-    else
-        print_error "All installation methods failed"
-        print_info "Try manually: curl -fsSL https://opencode.ai/install | bash"
-        set -"$_saved_opts" 2>/dev/null || true
         return 1
     fi
 }
@@ -936,62 +748,6 @@ cmd_doctor() {
     else
         print_warning "jj (Jujutsu) not installed"
         print_info "Install with: brew install jj"
-    fi
-    
-    # Check OpenCode
-    if command_exists opencode; then
-        print_success "OpenCode installed"
-        
-        # Check installation method using helper function
-        local install_method
-        install_method=$(get_opencode_install_method)
-        
-        case "$install_method" in
-            native)
-                print_success "OpenCode installed via native installer (recommended)"
-                ;;
-            brew)
-                print_warning "OpenCode installed via Homebrew"
-                print_info "Native installer gets updates faster: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            bun)
-                print_warning "OpenCode installed via Bun"
-                print_info "Native installer recommended: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            npm)
-                print_warning "OpenCode installed via npm"
-                print_info "Native installer recommended: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            *)
-                print_warning "OpenCode installed via unknown method"
-                print_info "Consider reinstalling via: curl -fsSL https://opencode.ai/install | bash"
-                ;;
-        esac
-        
-        # Check for multiple installations (potential conflicts)
-        local conflicts
-        if conflicts=$(check_opencode_conflicts); then
-            print_warning "Multiple OpenCode installations detected:"
-            for path in $conflicts; do
-                print_info "  - $path"
-            done
-            print_info "This may cause version conflicts. Consider removing duplicate installations."
-        fi
-        
-        # Check if we can get version (indicates it's working)
-        if opencode --version >/dev/null 2>&1; then
-            print_success "OpenCode is functional"
-        else
-            print_warning "OpenCode may need configuration"
-            print_info "Run 'opencode' and use /connect to configure a provider"
-        fi
-    else
-        print_warning "OpenCode not installed"
-        print_info "Install with: curl -fsSL https://opencode.ai/install | bash"
-        print_info "Or run 'dot init' to install automatically"
     fi
     
     # Check symlinks
@@ -2231,7 +1987,7 @@ cmd_help() {
     echo "    - Package installation is resilient to failures"
     echo "    - Failed packages are logged and can be retried later"
     echo "    - SHA verification is disabled for better reliability"
-    echo "    - OpenCode CLI installed via native installer (with brew/bun/npm fallback)"
+    echo "    - pi CLI installed via the Vite+ tool registry"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
     echo ""

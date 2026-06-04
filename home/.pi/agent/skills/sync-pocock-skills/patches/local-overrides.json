@@ -7,6 +7,9 @@
       "improve-codebase-architecture": {
         "disable-model-invocation": true
       },
+      "handoff": {
+        "disable-model-invocation": true
+      },
       "prototype": {
         "disable-model-invocation": true
       },
