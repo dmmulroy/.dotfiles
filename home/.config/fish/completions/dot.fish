@@ -11,7 +11,6 @@ complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and c
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
-complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using OpenCode"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
@@ -53,12 +52,6 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "all" -d "List all packages"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
-
-# Summary command options
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "Include diff in analysis"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "v" -l "verbose" -d "Show detailed commit info"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Show summary help"
 
 # Benchmark-shell command options
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"

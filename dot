@@ -1200,7 +1200,6 @@ complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and c
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
-complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using OpenCode"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
@@ -1242,12 +1241,6 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "all" -d "List all packages"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
-
-# Summary command options
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "Include diff in analysis"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "v" -l "verbose" -d "Show detailed commit info"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Show summary help"
 
 # Benchmark-shell command options
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
@@ -1512,206 +1505,6 @@ printf '%.3f', \$end - \$start;
     print_info "To profile Fish startup in detail, run: fish --profile-startup /tmp/fish-startup.profile -ic exit"
     print_info "Then inspect the slowest commands: sort -nr /tmp/fish-startup.profile | head -20"
     print_info "Fish config location: ~/.config/fish/config.fish"
-}
-
-cmd_summary() {
-    print_header "Summarizing recent changes"
-    
-    # Save current shell options for restoration
-    local _saved_opts="$-"
-    
-    # Check if OpenCode is available
-    if ! command_exists opencode; then
-        print_error "OpenCode is not installed"
-        print_info "Install it with: brew install opencode"
-        print_info "Or run 'dot init' to install automatically"
-        return 1
-    fi
-    
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir >/dev/null 2>&1; then
-        print_error "Not in a git repository"
-        return 1
-    fi
-    
-    # Parse options
-    local num_commits=3
-    local include_diff=false
-    local verbose=false
-    
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -n|--number)
-                num_commits="$2"
-                shift 2
-                ;;
-            -d|--diff)
-                include_diff=true
-                shift
-                ;;
-            -v|--verbose)
-                verbose=true
-                shift
-                ;;
-            -h|--help)
-                cat << EOF
-${BOLD}USAGE:${RESET}
-    ${SCRIPT_NAME} summary [OPTIONS]
-
-${BOLD}OPTIONS:${RESET}
-    -n, --number NUM    Number of commits to summarize (default: 3)
-    -d, --diff          Include diff in analysis for more detailed summary
-    -v, --verbose       Show detailed commit info before summary
-    -h, --help          Show this help
-
-${BOLD}EXAMPLES:${RESET}
-    ${SCRIPT_NAME} summary              # Summarize last 3 commits
-    ${SCRIPT_NAME} summary -n 5         # Summarize last 5 commits  
-    ${SCRIPT_NAME} summary -d           # Include diffs for detailed analysis
-    ${SCRIPT_NAME} summary -v -n 2      # Verbose mode, 2 commits
-
-EOF
-                return 0
-                ;;
-            *)
-                print_error "Unknown option: $1"
-                print_info "Run '${SCRIPT_NAME} summary --help' for usage"
-                return 1
-                ;;
-        esac
-    done
-    
-    # Validate number of commits
-    if ! [[ "$num_commits" =~ ^[0-9]+$ ]] || [[ "$num_commits" -lt 1 ]] || [[ "$num_commits" -gt 20 ]]; then
-        print_error "Number of commits must be between 1 and 20"
-        return 1
-    fi
-    
-    print_info "Analyzing last $num_commits commit(s)..."
-    
-    # Get commit information
-    local git_log_format="%H|%an|%ae|%ad|%s"
-    local commits_info
-    commits_info=$(git log --format="$git_log_format" --date=short -n "$num_commits")
-    
-    if [[ -z "$commits_info" ]]; then
-        print_warning "No commits found"
-        return 0
-    fi
-    
-    # Show verbose info if requested
-    if [[ "$verbose" == true ]]; then
-        print_info "Recent commits:"
-        echo "$commits_info" | while IFS='|' read -r hash author _ date subject; do
-            local short_hash="${hash:0:8}"
-            echo "  $short_hash - $subject ($author, $date)"
-        done
-        echo ""
-    fi
-    
-    # Build prompt for OpenCode
-    local ai_prompt="You are a technical writer. Provide ONLY a concise 2-3 paragraph summary of these Git commits. Do NOT ask questions or provide additional commentary. Focus on:
-1. What changes were made (features, fixes, improvements)
-2. Overall patterns or themes in the development
-3. Any notable technical decisions or architectural changes
-
-Here are the commits (most recent first):
-
-"
-    
-    # Add commit details to prompt
-    local commit_count=0
-    local temp_commits_file
-    temp_commits_file=$(mktemp -t DOT_commits_XXXXXX)
-    echo "$commits_info" > "$temp_commits_file"
-    
-    # Process commits with better error handling
-    set +e  # Temporarily disable exit on error for this section
-    while IFS='|' read -r hash author _ date subject; do
-        ((++commit_count))
-        local short_hash="${hash:0:8}"
-        ai_prompt+="Commit $commit_count ($short_hash, $date):
-Subject: $subject
-Author: $author
-"
-        
-        # Add diff if requested
-        if [[ "$include_diff" == true ]]; then
-            local diff_output
-            diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null || true)
-            if [[ -n "$diff_output" ]]; then
-                ai_prompt+="Files changed:
-$diff_output
-
-"
-            fi
-        fi
-        
-        ai_prompt+="
-"
-    done < "$temp_commits_file"
-    
-    # Clean up temp file
-    rm -f "$temp_commits_file"
-    
-    # Add instructions
-    ai_prompt+="
-
-
-INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do not ask questions or provide additional commentary."
-    
-    # Create temporary file for the prompt
-    local temp_file
-    temp_file=$(mktemp -t DOT_prompt_XXXXXX)
-    trap 'rm -f "$temp_file"' RETURN
-    echo "$ai_prompt" > "$temp_file"
-
-    print_info "Generating summary with OpenCode..."
-    
-    # Call OpenCode with explicit error handling
-    local opencode_output=""
-    local opencode_error=""
-    local exit_code=0
-    
-    # Temporarily disable set -e to capture the exit code properly
-    set +e
-    opencode_output=$(opencode run < "$temp_file" 2>&1)
-    exit_code=$?
-    # Restore original shell options
-    set -"$_saved_opts"
-    
-    if [[ $exit_code -eq 0 && -n "$opencode_output" ]]; then
-        print_header "Summary of Recent Changes"
-        echo ""
-        echo "$opencode_output"
-        echo ""
-    else
-        print_error "Failed to generate summary with OpenCode (exit code: $exit_code)"
-        if [[ -n "$opencode_output" ]]; then
-            opencode_error="$opencode_output"
-        else
-            opencode_error="No output received from OpenCode"
-        fi
-    fi
-    
-    # Handle errors if any occurred
-    if [[ -n "${opencode_error:-}" ]]; then
-        
-        # Check if it's an authentication issue
-        if echo "$opencode_output" | grep -q -i "auth\|login\|api\|connect"; then
-            print_info "OpenCode needs configuration. Run: opencode and use /connect"
-        elif echo "$opencode_output" | grep -q -i "network\|connection"; then
-            print_info "Network connection issue. Check your internet connection"
-        else
-            print_info "OpenCode error: $opencode_output"
-            print_info "Try running: opencode --version to verify installation"
-        fi
-        
-        return 1
-    fi
-
-    # Show git log reference
-    print_info "For detailed commit history, run: git log --oneline -n $num_commits"
 }
 
 cmd_retry_failed() {
@@ -2391,7 +2184,6 @@ cmd_help() {
     echo "    package             Package management commands (add, remove, list)"
     echo "    check-packages      Check which packages are installed/missing"
     echo "    retry-failed        Retry failed package installations"
-    echo "    summary             Summarize recent git commits using OpenCode"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
@@ -2420,8 +2212,6 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} package remove docker     # Remove docker from bundles"
     echo "    ${SCRIPT_NAME} check-packages            # See package installation status"
     echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
-    echo "    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI"
-    echo "    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits"
     echo "    ${SCRIPT_NAME} benchmark-shell           # Benchmark Fish shell startup time"
     echo "    ${SCRIPT_NAME} benchmark-shell -r 20 -v  # Run 20 benchmarks with verbose output"
     echo "    ${SCRIPT_NAME} gen-ssh-key               # Generate SSH key (prompts for email)"
@@ -2497,9 +2287,6 @@ main() {
             ;;
         retry-failed)
             cmd_retry_failed "$@"
-            ;;
-        summary)
-            cmd_summary "$@"
             ;;
         benchmark-shell)
             cmd_benchmark_shell "$@"
