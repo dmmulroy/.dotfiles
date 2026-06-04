@@ -9,7 +9,7 @@ This repository contains my personal development environment configuration, mana
 ### Key Features
 
 - 🚀 **One-command setup** - Complete development environment in minutes
-- 🤖 **AI Integration** - OpenCode for AI assistance
+- 🤖 **AI Integration** - pi for AI assistance
 - 📦 **Resilient Package Management** - Continues installation even if packages fail
 - 🔍 **Health Monitoring** - Comprehensive environment diagnostics
 - 🛠️ **Modular Design** - Separate work and personal configurations
@@ -78,7 +78,7 @@ dot init --skip-ssh --skip-font
 2. Installs packages from Brewfiles
 3. Creates symlinks with GNU Stow
 4. Installs Bun runtime
-5. Installs OpenCode CLI via Homebrew (with native installer/bun/npm fallback)
+5. Installs pi via the Vite+ tool registry
 6. Generates SSH key for GitHub (optional)
 7. Installs MonoLisa font (optional)
 8. Sets up Fish shell with plugins
@@ -102,7 +102,7 @@ dot doctor
 Comprehensive diagnostics including:
 - ✅ Homebrew installation
 - ✅ Essential tools (git, nvim, tmux, node, etc.)
-- ✅ OpenCode installation method and functionality
+- ✅ pi installation and core development tools
 - ✅ Fish shell configuration
 - ✅ PATH configuration
 - ⚠️ Broken symlinks detection
@@ -361,19 +361,11 @@ dot doctor
 dot stow
 ```
 
-**OpenCode installation issues:**
+**pi installation issues:**
 ```bash
-# Install via Homebrew (recommended)
-brew install opencode
-
-# Or via native installer
-curl -fsSL https://opencode.ai/install | bash
-
-# Or reinstall via Bun
-bun install -g opencode-ai
-
-# Or via npm
-npm install -g opencode-ai
+# Ensure Vite+ is installed, then install pi from the tool registry
+curl -fsSL https://vite.plus | bash
+vp install -g @mariozechner/pi-coding-agent
 ```
 
 ### Getting Help
@@ -440,5 +432,5 @@ This repository is for personal use. Feel free to fork and adapt for your own ne
 
 - [GNU Stow](https://www.gnu.org/software/stow/) for symlink management
 - [Homebrew](https://brew.sh/) for package management
-- [OpenCode](https://opencode.ai) for AI assistance
+- pi for AI assistance
 - The dotfiles community for inspiration and best practices
