@@ -5,11 +5,6 @@
       "auth": "oauth",
       "lifecycle": "lazy"
     },
-    "cloudflare-api": {
-      "url": "https://mcp.cloudflare.com/mcp",
-      "auth": "oauth",
-      "lifecycle": "lazy"
-    },
     "executor": {
       "url": "https://executor.mulroy.ai/mcp",
       "auth": "oauth",
