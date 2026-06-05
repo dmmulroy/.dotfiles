@@ -1,0 +1,15 @@
+{
+    "enabledPlugins": {
+        "gopls-lsp@claude-plugins-official": true,
+        "atlassian@claude-plugins-official": true
+    },
+    "effortLevel": "high",
+    "mcpServers": {
+        "cloudflare-api": {
+            "url": "https://mcp.cloudflare.com/mcp"
+        },
+        "datadog": {
+            "url": "https://claude.ai/directory/connectors/68268024-1a91-4316-a9e1-14ecb814cb18"
+        }
+    }
+}
