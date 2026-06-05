@@ -6,13 +6,13 @@ vim.opt.rnu = true
 vim.opt.showmode = false
 
 -- Set tabs to 2 spaces
-vim.opt.tabstop = 2
-vim.opt.softtabstop = 2
+vim.opt.tabstop = 4
+vim.opt.softtabstop = 4
 vim.opt.expandtab = true
 
 -- Enable auto indenting and set it to spaces
 vim.opt.smartindent = true
-vim.opt.shiftwidth = 2
+vim.opt.shiftwidth = 4
 
 -- Enable smart indenting (see https://stackoverflow.com/questions/1204149/smart-wrap-in-vim)
 vim.opt.breakindent = true
@@ -77,7 +77,7 @@ vim.opt.foldtext = ""
 vim.opt.scrolloff = 8
 
 -- Place a column line
-vim.opt.colorcolumn = "80"
+vim.opt.colorcolumn = "100"
 
 vim.opt.guicursor = {
 	"n-v-c:block", -- Normal, visual, command-line: block cursor

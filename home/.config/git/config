@@ -49,5 +49,5 @@
 	name = "Ricardo Ferreira"
 	signingKey = "~/.ssh/gh.pub"
 
-[includeIf "gitdir:~/Code/work/"]
+[includeIf "gitdir:~/work/"]
 	path = "~/.config/git/work_config"

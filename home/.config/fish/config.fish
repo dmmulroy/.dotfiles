@@ -14,3 +14,5 @@ export PATH="$HOME/.dotfiles:$PATH"
 
 alias lg='lazygit'
 alias ld='lazydocker'
+
+zoxide init fish | source
