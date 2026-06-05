@@ -7,3 +7,4 @@ scaffold-exercises
 migrate-to-shoehorn
 setup-pre-commit
 sync-matt-pocock-skills
+git-guardrails-claude-code
