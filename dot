@@ -120,8 +120,7 @@ TOOL_REGISTRY=(
     "Stow dotfiles     ;; -    ;; fn:_stow_dotfiles                             ;; true  ;; -         ;; false"
     "Bun               ;; bun  ;; curl -fsSL https://bun.sh/install | bash      ;; true  ;; -         ;; true"
     "Vite+             ;; vp   ;; curl -fsSL https://vite.plus | bash           ;; true  ;; -         ;; true"
-    "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; false ;; -         ;; true"
-    "OpenCode          ;; -    ;; fn:_install_opencode                          ;; false ;; -         ;; false"
+    "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; true  ;; -         ;; true"
     "SSH key           ;; -    ;; fn:_generate_ssh_key                          ;; false ;; SKIP_SSH  ;; false"
     "MonoLisa font     ;; -    ;; fn:_install_font                              ;; false ;; SKIP_FONT ;; false"
     "Fish shell        ;; -    ;; fn:_setup_fish_shell                          ;; false ;; -         ;; false"
@@ -355,193 +354,6 @@ _stow_dotfiles() {
         print_success "Dotfiles stowed successfully"
     else
         print_error "Failed to stow dotfiles"
-        return 1
-    fi
-}
-
-# Helper to determine OpenCode installation method
-get_opencode_install_method() {
-    local opencode_path
-    opencode_path=$(command -v opencode 2>/dev/null) || { echo "not_installed"; return; }
-    
-    case "$opencode_path" in
-        "${HOME}/.opencode"*) echo "native" ;;
-        "/opt/homebrew"*|"/usr/local/Cellar"*) echo "brew" ;;
-        *".bun"*) echo "bun" ;;
-        *"node_modules"*|*"/npm/"*) echo "npm" ;;
-        *) echo "unknown" ;;
-    esac
-}
-
-# Helper to check for multiple OpenCode installations
-check_opencode_conflicts() {
-    local found_paths=()
-    
-    # Check native installation
-    if [[ -x "${HOME}/.opencode/bin/opencode" ]]; then
-        found_paths+=("${HOME}/.opencode/bin/opencode (native)")
-    fi
-    
-    # Check homebrew installation
-    if command -v brew >/dev/null 2>&1; then
-        local brew_path
-        brew_path=$(brew --prefix 2>/dev/null)/bin/opencode
-        if [[ -x "$brew_path" ]]; then
-            found_paths+=("$brew_path (brew)")
-        fi
-    fi
-    
-    # Check bun global installation
-    local bun_path="${HOME}/.bun/bin/opencode"
-    if [[ -x "$bun_path" ]]; then
-        found_paths+=("$bun_path (bun)")
-    fi
-    
-    # Check npm global installation (common locations)
-    local npm_paths=(
-        "/usr/local/bin/opencode"
-        "${HOME}/.npm-global/bin/opencode"
-        "${HOME}/.local/bin/opencode"
-    )
-    for npm_path in "${npm_paths[@]}"; do
-        if [[ -x "$npm_path" && "$npm_path" != "${HOME}/.opencode"* ]]; then
-            found_paths+=("$npm_path (npm)")
-        fi
-    done
-    
-    if [[ ${#found_paths[@]} -gt 1 ]]; then
-        echo "${found_paths[*]}"
-        return 0
-    fi
-    return 1
-}
-
-_install_opencode() {
-    
-    # Save current shell options for restoration
-    local _saved_opts="$-"
-    
-    # Check current installation status
-    local install_method
-    install_method=$(get_opencode_install_method)
-    
-    case "$install_method" in
-        native)
-            print_success "OpenCode is already installed via native installer (recommended)"
-            return 0
-            ;;
-        brew|bun|npm)
-            print_warning "OpenCode is installed via $install_method"
-            print_info "Native installer is recommended for faster updates"
-            
-            if confirm "Migrate to native installer?" "y"; then
-                print_info "Migrating OpenCode to native installer..."
-                
-                # Temporarily disable exit on error
-                set +e
-                
-                # Remove old installation
-                case "$install_method" in
-                    brew)
-                        print_info "Removing Homebrew installation..."
-                        brew uninstall opencode 2>/dev/null
-                        ;;
-                    bun)
-                        print_info "Removing bun installation..."
-                        bun remove -g opencode-ai 2>/dev/null
-                        ;;
-                    npm)
-                        print_info "Removing npm installation..."
-                        npm uninstall -g opencode-ai 2>/dev/null
-                        ;;
-                esac
-                
-                # Install via native installer
-                print_info "Installing via native installer..."
-                if curl -fsSL https://opencode.ai/install | bash; then
-                    print_success "OpenCode migrated to native installer successfully"
-                    print_info "You may need to restart your shell"
-                    set -"$_saved_opts" 2>/dev/null || true
-                    return 0
-                else
-                    print_error "Installation failed, reinstalling via $install_method..."
-                    # Reinstall via original method
-                    case "$install_method" in
-                        brew) brew install opencode ;;
-                        bun) bun install -g opencode-ai ;;
-                        npm) npm install -g opencode-ai ;;
-                    esac
-                    set -"$_saved_opts" 2>/dev/null || true
-                    return 1
-                fi
-            else
-                print_info "Keeping existing $install_method installation"
-                return 0
-            fi
-            ;;
-        unknown)
-            print_success "OpenCode is already installed"
-            return 0
-            ;;
-    esac
-    
-    # Fresh installation - use native installer (fastest updates)
-    print_info "Installing OpenCode CLI..."
-    
-    # Temporarily disable exit on error for installation attempts
-    set +e
-    
-    # Try native installer first (recommended - gets updates faster than brew)
-    print_info "Running native installer..."
-    if curl -fsSL https://opencode.ai/install | bash; then
-        print_success "OpenCode installed successfully via native installer"
-        print_info "You may need to restart your shell or add ~/.opencode/bin to your PATH"
-        set -"$_saved_opts" 2>/dev/null || true
-        return 0
-    else
-        print_warning "Native installer failed, trying Homebrew..."
-    fi
-    
-    # Fallback to Homebrew
-    if command_exists brew; then
-        print_info "Installing via Homebrew..."
-        if brew install opencode; then
-            print_success "OpenCode installed successfully via Homebrew"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_warning "Homebrew installation failed, trying bun..."
-        fi
-    fi
-    
-    # Fallback to bun (faster than npm)
-    if command_exists bun; then
-        print_info "Installing via Bun..."
-        if bun install -g opencode-ai; then
-            print_success "OpenCode installed successfully via Bun"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_warning "Bun installation failed, trying npm..."
-        fi
-    fi
-    
-    # Fallback to npm
-    if command_exists npm; then
-        print_info "Installing via npm..."
-        if npm install -g opencode-ai; then
-            print_success "OpenCode installed successfully via npm"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 0
-        else
-            print_error "Failed to install OpenCode via npm"
-            set -"$_saved_opts" 2>/dev/null || true
-            return 1
-        fi
-    else
-        print_error "All installation methods failed"
-        print_info "Try manually: curl -fsSL https://opencode.ai/install | bash"
-        set -"$_saved_opts" 2>/dev/null || true
         return 1
     fi
 }
@@ -845,9 +657,37 @@ cmd_update() {
         print_success "Packages updated"
     fi
     
-    # Re-stow dotfiles
+    # Re-stow dotfiles before pi uses checked-out skills and configuration
     if confirm "Re-stow dotfiles?" "y"; then
         _stow_dotfiles
+    fi
+
+    # Update pi and its configured packages, then launch the manual skills sync workflow
+    if command_exists pi; then
+        print_info "Updating pi and configured packages..."
+        if (cd "$DOTFILES_DIR" && pi update); then
+            print_success "pi and configured packages updated"
+        else
+            print_error "Failed to update pi and configured packages"
+            return 1
+        fi
+
+        local sync_skill="${HOME_DIR}/.pi/agent/skills/sync-pocock-skills/SKILL.md"
+        if [[ -f "$sync_skill" ]]; then
+            print_info "Running headless pi skills sync..."
+            # sync-pocock-skills is manual-only; /skill: invokes its full workflow.
+            # Print mode executes headlessly, streams its result here, and exits when complete.
+            if (cd "$DOTFILES_DIR" && pi -p --no-skills --skill "$sync_skill" "/skill:sync-pocock-skills"); then
+                print_success "Matt Pocock skills sync complete"
+            else
+                print_error "Matt Pocock skills sync failed"
+                return 1
+            fi
+        else
+            print_warning "sync-pocock-skills is not installed; skipping skills sync"
+        fi
+    else
+        print_warning "pi is not installed; skipping pi update and skills sync"
     fi
 }
 
@@ -908,62 +748,6 @@ cmd_doctor() {
     else
         print_warning "jj (Jujutsu) not installed"
         print_info "Install with: brew install jj"
-    fi
-    
-    # Check OpenCode
-    if command_exists opencode; then
-        print_success "OpenCode installed"
-        
-        # Check installation method using helper function
-        local install_method
-        install_method=$(get_opencode_install_method)
-        
-        case "$install_method" in
-            native)
-                print_success "OpenCode installed via native installer (recommended)"
-                ;;
-            brew)
-                print_warning "OpenCode installed via Homebrew"
-                print_info "Native installer gets updates faster: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            bun)
-                print_warning "OpenCode installed via Bun"
-                print_info "Native installer recommended: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            npm)
-                print_warning "OpenCode installed via npm"
-                print_info "Native installer recommended: curl -fsSL https://opencode.ai/install | bash"
-                print_info "Or run 'dot init' to migrate automatically"
-                ;;
-            *)
-                print_warning "OpenCode installed via unknown method"
-                print_info "Consider reinstalling via: curl -fsSL https://opencode.ai/install | bash"
-                ;;
-        esac
-        
-        # Check for multiple installations (potential conflicts)
-        local conflicts
-        if conflicts=$(check_opencode_conflicts); then
-            print_warning "Multiple OpenCode installations detected:"
-            for path in $conflicts; do
-                print_info "  - $path"
-            done
-            print_info "This may cause version conflicts. Consider removing duplicate installations."
-        fi
-        
-        # Check if we can get version (indicates it's working)
-        if opencode --version >/dev/null 2>&1; then
-            print_success "OpenCode is functional"
-        else
-            print_warning "OpenCode may need configuration"
-            print_info "Run 'opencode' and use /connect to configure a provider"
-        fi
-    else
-        print_warning "OpenCode not installed"
-        print_info "Install with: curl -fsSL https://opencode.ai/install | bash"
-        print_info "Or run 'dot init' to install automatically"
     fi
     
     # Check symlinks
@@ -1167,12 +951,11 @@ complete -c dot -f
 
 # Commands
 complete -c dot -n "__fish_use_subcommand" -a "init" -d "Initialize and install dotfiles"
-complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles and packages"
+complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles, packages, pi, and Pocock skills"
 complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and check installation"
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
-complete -c dot -n "__fish_use_subcommand" -a "summary" -d "Summarize recent git commits using OpenCode"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
@@ -1214,12 +997,6 @@ complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcomm
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "all" -d "List all packages"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
 complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
-
-# Summary command options
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "n" -l "number" -d "Number of commits to summarize" -xa "1 2 3 5 10"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "d" -l "diff" -d "Include diff in analysis"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "v" -l "verbose" -d "Show detailed commit info"
-complete -c dot -n "__fish_seen_subcommand_from summary" -s "h" -l "help" -d "Show summary help"
 
 # Benchmark-shell command options
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
@@ -1484,206 +1261,6 @@ printf '%.3f', \$end - \$start;
     print_info "To profile Fish startup in detail, run: fish --profile-startup /tmp/fish-startup.profile -ic exit"
     print_info "Then inspect the slowest commands: sort -nr /tmp/fish-startup.profile | head -20"
     print_info "Fish config location: ~/.config/fish/config.fish"
-}
-
-cmd_summary() {
-    print_header "Summarizing recent changes"
-    
-    # Save current shell options for restoration
-    local _saved_opts="$-"
-    
-    # Check if OpenCode is available
-    if ! command_exists opencode; then
-        print_error "OpenCode is not installed"
-        print_info "Install it with: brew install opencode"
-        print_info "Or run 'dot init' to install automatically"
-        return 1
-    fi
-    
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir >/dev/null 2>&1; then
-        print_error "Not in a git repository"
-        return 1
-    fi
-    
-    # Parse options
-    local num_commits=3
-    local include_diff=false
-    local verbose=false
-    
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -n|--number)
-                num_commits="$2"
-                shift 2
-                ;;
-            -d|--diff)
-                include_diff=true
-                shift
-                ;;
-            -v|--verbose)
-                verbose=true
-                shift
-                ;;
-            -h|--help)
-                cat << EOF
-${BOLD}USAGE:${RESET}
-    ${SCRIPT_NAME} summary [OPTIONS]
-
-${BOLD}OPTIONS:${RESET}
-    -n, --number NUM    Number of commits to summarize (default: 3)
-    -d, --diff          Include diff in analysis for more detailed summary
-    -v, --verbose       Show detailed commit info before summary
-    -h, --help          Show this help
-
-${BOLD}EXAMPLES:${RESET}
-    ${SCRIPT_NAME} summary              # Summarize last 3 commits
-    ${SCRIPT_NAME} summary -n 5         # Summarize last 5 commits  
-    ${SCRIPT_NAME} summary -d           # Include diffs for detailed analysis
-    ${SCRIPT_NAME} summary -v -n 2      # Verbose mode, 2 commits
-
-EOF
-                return 0
-                ;;
-            *)
-                print_error "Unknown option: $1"
-                print_info "Run '${SCRIPT_NAME} summary --help' for usage"
-                return 1
-                ;;
-        esac
-    done
-    
-    # Validate number of commits
-    if ! [[ "$num_commits" =~ ^[0-9]+$ ]] || [[ "$num_commits" -lt 1 ]] || [[ "$num_commits" -gt 20 ]]; then
-        print_error "Number of commits must be between 1 and 20"
-        return 1
-    fi
-    
-    print_info "Analyzing last $num_commits commit(s)..."
-    
-    # Get commit information
-    local git_log_format="%H|%an|%ae|%ad|%s"
-    local commits_info
-    commits_info=$(git log --format="$git_log_format" --date=short -n "$num_commits")
-    
-    if [[ -z "$commits_info" ]]; then
-        print_warning "No commits found"
-        return 0
-    fi
-    
-    # Show verbose info if requested
-    if [[ "$verbose" == true ]]; then
-        print_info "Recent commits:"
-        echo "$commits_info" | while IFS='|' read -r hash author _ date subject; do
-            local short_hash="${hash:0:8}"
-            echo "  $short_hash - $subject ($author, $date)"
-        done
-        echo ""
-    fi
-    
-    # Build prompt for OpenCode
-    local ai_prompt="You are a technical writer. Provide ONLY a concise 2-3 paragraph summary of these Git commits. Do NOT ask questions or provide additional commentary. Focus on:
-1. What changes were made (features, fixes, improvements)
-2. Overall patterns or themes in the development
-3. Any notable technical decisions or architectural changes
-
-Here are the commits (most recent first):
-
-"
-    
-    # Add commit details to prompt
-    local commit_count=0
-    local temp_commits_file
-    temp_commits_file=$(mktemp -t DOT_commits_XXXXXX)
-    echo "$commits_info" > "$temp_commits_file"
-    
-    # Process commits with better error handling
-    set +e  # Temporarily disable exit on error for this section
-    while IFS='|' read -r hash author _ date subject; do
-        ((++commit_count))
-        local short_hash="${hash:0:8}"
-        ai_prompt+="Commit $commit_count ($short_hash, $date):
-Subject: $subject
-Author: $author
-"
-        
-        # Add diff if requested
-        if [[ "$include_diff" == true ]]; then
-            local diff_output
-            diff_output=$(git show --format="" --name-status "$hash" 2>/dev/null || true)
-            if [[ -n "$diff_output" ]]; then
-                ai_prompt+="Files changed:
-$diff_output
-
-"
-            fi
-        fi
-        
-        ai_prompt+="
-"
-    done < "$temp_commits_file"
-    
-    # Clean up temp file
-    rm -f "$temp_commits_file"
-    
-    # Add instructions
-    ai_prompt+="
-
-
-INSTRUCTIONS: Respond with ONLY a concise 2-3 paragraph technical summary. Do not ask questions or provide additional commentary."
-    
-    # Create temporary file for the prompt
-    local temp_file
-    temp_file=$(mktemp -t DOT_prompt_XXXXXX)
-    trap 'rm -f "$temp_file"' RETURN
-    echo "$ai_prompt" > "$temp_file"
-
-    print_info "Generating summary with OpenCode..."
-    
-    # Call OpenCode with explicit error handling
-    local opencode_output=""
-    local opencode_error=""
-    local exit_code=0
-    
-    # Temporarily disable set -e to capture the exit code properly
-    set +e
-    opencode_output=$(opencode run < "$temp_file" 2>&1)
-    exit_code=$?
-    # Restore original shell options
-    set -"$_saved_opts"
-    
-    if [[ $exit_code -eq 0 && -n "$opencode_output" ]]; then
-        print_header "Summary of Recent Changes"
-        echo ""
-        echo "$opencode_output"
-        echo ""
-    else
-        print_error "Failed to generate summary with OpenCode (exit code: $exit_code)"
-        if [[ -n "$opencode_output" ]]; then
-            opencode_error="$opencode_output"
-        else
-            opencode_error="No output received from OpenCode"
-        fi
-    fi
-    
-    # Handle errors if any occurred
-    if [[ -n "${opencode_error:-}" ]]; then
-        
-        # Check if it's an authentication issue
-        if echo "$opencode_output" | grep -q -i "auth\|login\|api\|connect"; then
-            print_info "OpenCode needs configuration. Run: opencode and use /connect"
-        elif echo "$opencode_output" | grep -q -i "network\|connection"; then
-            print_info "Network connection issue. Check your internet connection"
-        else
-            print_info "OpenCode error: $opencode_output"
-            print_info "Try running: opencode --version to verify installation"
-        fi
-        
-        return 1
-    fi
-
-    # Show git log reference
-    print_info "For detailed commit history, run: git log --oneline -n $num_commits"
 }
 
 cmd_retry_failed() {
@@ -2358,12 +1935,11 @@ cmd_help() {
     
     echo -e "${BOLD}COMMANDS:${RESET}"
     echo "    init                Initialize and install dotfiles"
-    echo "    update              Update dotfiles and packages"
+    echo "    update              Update dotfiles, packages, pi, and Pocock skills"
     echo "    doctor              Run diagnostics and check installation"
     echo "    package             Package management commands (add, remove, list)"
     echo "    check-packages      Check which packages are installed/missing"
     echo "    retry-failed        Retry failed package installations"
-    echo "    summary             Summarize recent git commits using OpenCode"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
@@ -2392,8 +1968,6 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} package remove docker     # Remove docker from bundles"
     echo "    ${SCRIPT_NAME} check-packages            # See package installation status"
     echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
-    echo "    ${SCRIPT_NAME} summary                   # Summarize last 3 commits with AI"
-    echo "    ${SCRIPT_NAME} summary -n 5 -d           # Detailed summary of last 5 commits"
     echo "    ${SCRIPT_NAME} benchmark-shell           # Benchmark Fish shell startup time"
     echo "    ${SCRIPT_NAME} benchmark-shell -r 20 -v  # Run 20 benchmarks with verbose output"
     echo "    ${SCRIPT_NAME} gen-ssh-key               # Generate SSH key (prompts for email)"
@@ -2413,7 +1987,7 @@ cmd_help() {
     echo "    - Package installation is resilient to failures"
     echo "    - Failed packages are logged and can be retried later"
     echo "    - SHA verification is disabled for better reliability"
-    echo "    - OpenCode CLI installed via native installer (with brew/bun/npm fallback)"
+    echo "    - pi CLI installed via the Vite+ tool registry"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
     echo ""
@@ -2469,9 +2043,6 @@ main() {
             ;;
         retry-failed)
             cmd_retry_failed "$@"
-            ;;
-        summary)
-            cmd_summary "$@"
             ;;
         benchmark-shell)
             cmd_benchmark_shell "$@"

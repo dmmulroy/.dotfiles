@@ -9,7 +9,7 @@ This repository contains my personal development environment configuration, mana
 ### Key Features
 
 - 🚀 **One-command setup** - Complete development environment in minutes
-- 🤖 **AI Integration** - OpenCode for commit summaries and assistance
+- 🤖 **AI Integration** - pi for AI assistance
 - 📦 **Resilient Package Management** - Continues installation even if packages fail
 - 🔍 **Health Monitoring** - Comprehensive environment diagnostics
 - 🛠️ **Modular Design** - Separate work and personal configurations
@@ -78,7 +78,7 @@ dot init --skip-ssh --skip-font
 2. Installs packages from Brewfiles
 3. Creates symlinks with GNU Stow
 4. Installs Bun runtime
-5. Installs OpenCode CLI via Homebrew (with native installer/bun/npm fallback)
+5. Installs pi via the Vite+ tool registry
 6. Generates SSH key for GitHub (optional)
 7. Installs MonoLisa font (optional)
 8. Sets up Fish shell with plugins
@@ -92,6 +92,8 @@ dot update
 - Pulls latest dotfiles changes (auto-detects jj vs git)
 - Updates Homebrew packages
 - Re-stows configuration files
+- Runs `pi update` to update pi and its configured packages
+- Runs pi headlessly with `/skill:sync-pocock-skills` and waits for the checked-in Matt Pocock skills sync to complete
 
 #### `dot doctor` - Health Check
 ```bash
@@ -100,7 +102,7 @@ dot doctor
 Comprehensive diagnostics including:
 - ✅ Homebrew installation
 - ✅ Essential tools (git, nvim, tmux, node, etc.)
-- ✅ OpenCode installation method and functionality
+- ✅ pi installation and core development tools
 - ✅ Fish shell configuration
 - ✅ PATH configuration
 - ⚠️ Broken symlinks detection
@@ -117,40 +119,6 @@ Shows which packages are installed vs. missing from your Brewfiles.
 dot retry-failed
 ```
 Attempts to reinstall packages that failed during initial setup.
-
-### AI-Powered Features
-
-#### `dot summary` - Commit Analysis
-Uses OpenCode to generate intelligent summaries of recent git commits.
-
-```bash
-# Summarize last 3 commits (default)
-dot summary
-
-# Summarize specific number of commits
-dot summary -n 5
-
-# Include file diffs for detailed analysis
-dot summary -d
-
-# Verbose mode with commit details
-dot summary -v
-
-# Combine options
-dot summary -n 10 -d -v
-```
-
-**Example Output:**
-```
-=> Summary of Recent Changes
-
-Development Focus: Recent work centers on improving the diagnostic navigation
-system in Neovim, updating deprecated API calls to use modern vim.diagnostic.jump()
-functions. This includes better error handling and user experience improvements.
-
-Technical Patterns: The commits show incremental configuration refinements
-with a focus on tooling updates and environment optimization...
-```
 
 ### Performance & Development Tools
 
@@ -393,26 +361,11 @@ dot doctor
 dot stow
 ```
 
-**OpenCode configuration:**
+**pi installation issues:**
 ```bash
-# If summary command fails, configure a provider
-opencode
-# Then use /connect to set up a provider
-```
-
-**OpenCode installation issues:**
-```bash
-# Install via Homebrew (recommended)
-brew install opencode
-
-# Or via native installer
-curl -fsSL https://opencode.ai/install | bash
-
-# Or reinstall via Bun
-bun install -g opencode-ai
-
-# Or via npm
-npm install -g opencode-ai
+# Ensure Vite+ is installed, then install pi from the tool registry
+curl -fsSL https://vite.plus | bash
+vp install -g @mariozechner/pi-coding-agent
 ```
 
 ### Getting Help
@@ -471,19 +424,6 @@ dot completions
 # - All commands, subcommands, and options
 ```
 
-### AI-Powered Workflows
-
-```bash
-# Review recent work
-dot summary -v
-
-# Detailed analysis for release notes
-dot summary -n 10 -d
-
-# Quick daily standup summary
-dot summary -n 5
-```
-
 ## License
 
 This repository is for personal use. Feel free to fork and adapt for your own needs.
@@ -492,5 +432,5 @@ This repository is for personal use. Feel free to fork and adapt for your own ne
 
 - [GNU Stow](https://www.gnu.org/software/stow/) for symlink management
 - [Homebrew](https://brew.sh/) for package management
-- [OpenCode](https://opencode.ai) for AI assistance
+- pi for AI assistance
 - The dotfiles community for inspiration and best practices

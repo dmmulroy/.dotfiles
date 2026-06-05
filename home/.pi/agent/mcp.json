@@ -3,11 +3,17 @@
     "cf-portal": {
       "url": "https://portal.mcp.cfdata.org/mcp",
       "auth": "oauth",
-      "lifecycle": "eager"
+      "lifecycle": "lazy"
     },
-    "cloudflare-api": {
-      "url": "https://mcp.cloudflare.com/mcp",
+    "executor": {
+      "url": "https://executor.mulroy.ai/mcp",
       "auth": "oauth",
+      "lifecycle": "lazy"
+    },
+    "uidotsh": {
+      "url": "https://ui.sh/mcp?agent=pi",
+      "auth": "bearer",
+      "bearerTokenEnv": "UIDOTSH_TOKEN",
       "lifecycle": "lazy"
     }
   }
