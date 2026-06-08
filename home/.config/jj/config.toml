@@ -3,3 +3,7 @@
 [user]
 name = "Ricardo Ferreira"
 email = "ricardsmf@gmail.com"
+
+[ui]
+pager = ["hunk", "pager"]
+diff-formatter = ":git"

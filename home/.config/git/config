@@ -14,7 +14,8 @@
 
 [core]
 	editor = "nvim"
-	fsmonitor = true
+    fsmonitor = true
+    pager= hunk pager
 
 [fetch]
 	prune = true
