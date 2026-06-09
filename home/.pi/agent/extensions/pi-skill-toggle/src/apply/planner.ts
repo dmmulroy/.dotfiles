@@ -2,6 +2,7 @@ import type { FileSystem } from "../ports/fs.ts";
 import type { FrontmatterCodec } from "../frontmatter/parser.ts";
 import type { FrontmatterPatcher } from "../frontmatter/patcher.ts";
 import type { SkillChange, SkillDraft, SkillRecord } from "../types.ts";
+import { hasDuplicateDisableModelInvocation } from "../frontmatter/validation.ts";
 import { classifyInvocationMode } from "../inventory/classifier.ts";
 
 export interface SkillTogglePlanner {
@@ -28,7 +29,8 @@ export class DefaultSkillTogglePlanner implements SkillTogglePlanner {
       if (!doc.hasFrontmatter) continue;
 
       const currentMode = classifyInvocationMode(doc);
-      if (currentMode === draft.desiredMode) continue;
+      const needsNormalization = hasDuplicateDisableModelInvocation(doc);
+      if (currentMode === draft.desiredMode && !needsNormalization) continue;
 
       const patch = this.patcher.patchInvocationMode(doc, draft.desiredMode);
       if (patch.oldText === patch.newText) continue;

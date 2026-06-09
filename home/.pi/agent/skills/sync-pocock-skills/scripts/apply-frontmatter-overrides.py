@@ -76,6 +76,17 @@ def write_if_changed(skill_md: Path, original: str, trailing_newline: bool, line
     return True
 
 
+def frontmatter_key(line: str) -> str | None:
+    if line[:1].isspace() or ":" not in line:
+        return None
+    key = line.split(":", 1)[0].strip()
+    return key or None
+
+
+def find_key_indices(lines: list[str], end: int, key: str) -> list[int]:
+    return [idx for idx in range(1, end) if frontmatter_key(lines[idx]) == key]
+
+
 def apply_overrides(skill_name: str, skill_md: Path, patches_dir: Path) -> bool:
     overrides = load_overrides(skill_name, patches_dir)
     if not overrides:
@@ -85,19 +96,20 @@ def apply_overrides(skill_name: str, skill_md: Path, patches_dir: Path) -> bool:
 
     for key, value in overrides.items():
         desired = f"{key}: {yaml_scalar(value)}"
-        existing_index = None
-        for idx in range(1, end):
-            if lines[idx].startswith(f"{key}:"):
-                existing_index = idx
-                break
+        existing_indices = find_key_indices(lines, end, key)
 
-        if existing_index is not None:
-            lines[existing_index] = desired
+        if existing_indices:
+            # Normalize to a single override entry. Duplicate YAML map keys make
+            # Pi reject the skill before it can be loaded.
+            lines[existing_indices[0]] = desired
+            for idx in reversed(existing_indices[1:]):
+                del lines[idx]
+                end -= 1
             continue
 
         insert_at = end
         for idx in range(1, end):
-            if lines[idx].startswith("description:"):
+            if frontmatter_key(lines[idx]) == "description":
                 insert_at = idx + 1
         lines.insert(insert_at, desired)
         end += 1
@@ -112,7 +124,7 @@ def strip_overrides(skill_name: str, skill_md: Path, patches_dir: Path) -> bool:
 
     original, trailing_newline, lines, end = read_frontmatter(skill_md)
     keys = set(overrides)
-    stripped = [line for idx, line in enumerate(lines) if not (1 <= idx < end and line.split(":", 1)[0] in keys)]
+    stripped = [line for idx, line in enumerate(lines) if not (1 <= idx < end and frontmatter_key(line) in keys)]
     return write_if_changed(skill_md, original, trailing_newline, stripped)
 
 
