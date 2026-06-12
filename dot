@@ -19,12 +19,11 @@ readonly DOTFILES_DIR
 
 # Configuration
 readonly NIX_DIR="${DOTFILES_DIR}/nix"
-readonly NIX_PACKAGES="${NIX_DIR}/packages.nix"      # native CLI tools (environment.systemPackages)
-readonly NIX_HOMEBREW="${NIX_DIR}/homebrew.nix"      # casks + custom-tap brews
+readonly NIX_PACKAGES="${NIX_DIR}/packages.nix" # native CLI tools (environment.systemPackages)
+readonly NIX_HOMEBREW="${NIX_DIR}/homebrew.nix" # casks + custom-tap brews
 readonly HOME_DIR="${DOTFILES_DIR}/home"
-readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
-readonly GITHUB_KEY_PATH="${HOME}/.ssh/key.pub"
-readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
+readonly GITHUB_EMAIL="ricardsmf@gmail.com"
+readonly GITHUB_KEY_PATH="${HOME}/.ssh/gh.pub"
 
 # Progress indicators
 CURRENT_STEP=0
@@ -63,44 +62,44 @@ command_exists() {
 confirm() {
     local prompt="${1:-Continue?}"
     local default="${2:-n}"
-    
+
     if [[ "$default" == "y" ]]; then
         prompt="$prompt [Y/n]: "
     else
         prompt="$prompt [y/N]: "
     fi
-    
+
     read -r -p "$prompt" response
-    
+
     case "$response" in
-        [yY][eE][sS]|[yY]) return 0 ;;
-        [nN][oO]|[nN]) return 1 ;;
-        "")
-            if [[ "$default" == "y" ]]; then
-                return 0
-            else
-                return 1
-            fi
-            ;;
-        *) return 1 ;;
+    [yY][eE][sS] | [yY]) return 0 ;;
+    [nN][oO] | [nN]) return 1 ;;
+    "")
+        if [[ "$default" == "y" ]]; then
+            return 0
+        else
+            return 1
+        fi
+        ;;
+    *) return 1 ;;
     esac
 }
 
 check_dependencies() {
     local deps=("$@")
     local missing=()
-    
+
     for dep in "${deps[@]}"; do
         if ! command_exists "$dep"; then
             missing+=("$dep")
         fi
     done
-    
+
     if [[ ${#missing[@]} -gt 0 ]]; then
         print_error "Missing dependencies: ${missing[*]}"
         return 1
     fi
-    
+
     return 0
 }
 
@@ -125,19 +124,18 @@ TOOL_REGISTRY=(
     "Vite+             ;; vp   ;; curl -fsSL https://vite.plus | bash           ;; true  ;; -         ;; true"
     "pi                ;; pi   ;; vp install -g @mariozechner/pi-coding-agent   ;; true  ;; -         ;; true"
     "SSH key           ;; -    ;; fn:_generate_ssh_key                          ;; false ;; SKIP_SSH  ;; false"
-    "MonoLisa font     ;; -    ;; fn:_install_font                              ;; false ;; SKIP_FONT ;; false"
     "Fish shell        ;; -    ;; fn:_setup_fish_shell                          ;; false ;; -         ;; false"
 )
 
 # Parse a registry entry into variables: r_name, r_check, r_install, r_required, r_skip, r_doctor
 _parse_tool_entry() {
     local entry="$1"
-    r_name="$(    echo "$entry" | awk -F';;' '{print $1}' | xargs)"
-    r_check="$(   echo "$entry" | awk -F';;' '{print $2}' | xargs)"
-    r_install="$( echo "$entry" | awk -F';;' '{print $3}' | xargs)"
+    r_name="$(echo "$entry" | awk -F';;' '{print $1}' | xargs)"
+    r_check="$(echo "$entry" | awk -F';;' '{print $2}' | xargs)"
+    r_install="$(echo "$entry" | awk -F';;' '{print $3}' | xargs)"
     r_required="$(echo "$entry" | awk -F';;' '{print $4}' | xargs)"
-    r_skip="$(    echo "$entry" | awk -F';;' '{print $5}' | xargs)"
-    r_doctor="$(  echo "$entry" | awk -F';;' '{print $6}' | xargs)"
+    r_skip="$(echo "$entry" | awk -F';;' '{print $5}' | xargs)"
+    r_doctor="$(echo "$entry" | awk -F';;' '{print $6}' | xargs)"
 }
 
 # Run all registered init steps
@@ -167,7 +165,7 @@ run_init_steps() {
         if [[ "$r_install" == fn:* ]]; then
             local fn="${r_install#fn:}"
             if "$fn"; then
-                true  # function handles its own messaging
+                true # function handles its own messaging
             elif [[ "$r_required" == "true" ]]; then
                 return 1
             else
@@ -244,20 +242,20 @@ _install_homebrew() {
         print_success "Homebrew is already installed"
         return 0
     fi
-    
+
     print_info "Homebrew is not installed. Installing now..."
-    
+
     # Create temporary log file for installation output
     local log_file
     log_file=$(mktemp)
     local exit_code=0
-    
+
     print_info "Running Homebrew installer (non-interactive mode)..."
-    
+
     # Run installer with non-interactive flag and capture output
-    if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > "$log_file" 2>&1; then
+    if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >"$log_file" 2>&1; then
         print_success "Homebrew installation successful"
-        
+
         # Configure Homebrew environment for the current session
         print_info "Configuring Homebrew environment..."
         if [[ "$(uname -m)" == "arm64" ]]; then
@@ -269,7 +267,7 @@ _install_homebrew() {
     else
         exit_code=$?
         print_error "Homebrew installation failed (exit code: $exit_code)"
-        
+
         # Surface errors from the log
         print_info "Installation output:"
         if [[ -s "$log_file" ]]; then
@@ -280,18 +278,18 @@ _install_homebrew() {
         else
             print_warning "No installation output captured"
         fi
-        
+
         # Common troubleshooting hints
         print_info "Troubleshooting:"
         print_info "  - Check if you have sufficient disk space"
         print_info "  - Ensure you have admin privileges"
         print_info "  - Check network connectivity"
         print_info "  - Try running manually: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        
+
         rm "$log_file"
         return 1
     fi
-    
+
     # Cleanup log file
     rm "$log_file"
 }
@@ -312,84 +310,21 @@ _install_packages() {
 }
 
 _stow_dotfiles() {
-    
+
     if ! command_exists stow; then
         print_error "GNU Stow is not installed"
         print_info "stow is provided by nix; run 'dot init' (or add 'stow' to nix/packages.nix)"
         return 1
     fi
-    
+
     print_info "Stowing files from ${HOME_DIR} to ${HOME}..."
-    
+
     if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
         print_success "Dotfiles stowed successfully"
     else
         print_error "Failed to stow dotfiles"
         return 1
     fi
-}
-
-_generate_ssh_key() {
-    
-    if [[ -f "$GITHUB_KEY_PATH" ]]; then
-        print_success "SSH key already exists at $GITHUB_KEY_PATH"
-        return 0
-    fi
-    
-    print_info "Generating new SSH key..."
-    mkdir -p "${HOME}/.ssh"
-    chmod 700 "${HOME}/.ssh"
-    
-    if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_KEY_PATH"; then
-        print_success "SSH key generated successfully"
-        print_info "Add the public key to GitHub:"
-        echo "  pbcopy < ${GITHUB_KEY_PATH}.pub"
-        echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
-    else
-        print_error "Failed to generate SSH key"
-        return 1
-    fi
-}
-
-_install_font() {
-
-    if [[ ! -f "$GITHUB_KEY_PATH" ]]; then
-        print_warning "GitHub SSH key not found. Skipping font installation"
-        return 0
-    fi
-
-    if ! confirm "Have you added the SSH key to your GitHub account?" "n"; then
-        print_warning "Skipping font installation"
-        return 0
-    fi
-
-    local font_temp_dir
-    font_temp_dir=$(mktemp -d)
-    local font_install_dir="${HOME}/Library/Fonts"
-
-    print_info "Cloning font repository..."
-    if GIT_SSH_COMMAND="ssh -i '$GITHUB_KEY_PATH' -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
-        print_success "Repository cloned successfully"
-
-        mkdir -p "$font_install_dir"
-        print_info "Installing font files..."
-
-        local font_count=0
-        while IFS= read -r -d '' font_file; do
-            cp "$font_file" "$font_install_dir/"
-            ((++font_count))
-        done < <(find "$font_temp_dir" -type f \( -name '*.otf' -o -name '*.ttf' \) -print0)
-
-        if [[ $font_count -gt 0 ]]; then
-            print_success "Installed $font_count font files"
-        else
-            print_warning "No font files found in repository"
-        fi
-    else
-        print_error "Failed to clone font repository"
-    fi
-
-    rm -rf "$font_temp_dir"
 }
 
 cmd_gen_ssh_key() {
@@ -400,8 +335,8 @@ cmd_gen_ssh_key() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -h|--help)
-                cat << EOF
+        -h | --help)
+            cat <<EOF
 ${BOLD}USAGE:${RESET}
     ${SCRIPT_NAME} gen-ssh-key [EMAIL]
 
@@ -427,12 +362,12 @@ ${BOLD}NOTES:${RESET}
     - If a key already exists, you will be prompted to overwrite
 
 EOF
-                return 0
-                ;;
-            *)
-                email="$1"
-                shift
-                ;;
+            return 0
+            ;;
+        *)
+            email="$1"
+            shift
+            ;;
         esac
     done
 
@@ -500,9 +435,9 @@ EOF
     print_info "Adding key to ssh-agent..."
 
     # Start ssh-agent if not running
-    if ! pgrep -u "$USER" ssh-agent > /dev/null 2>&1; then
+    if ! pgrep -u "$USER" ssh-agent >/dev/null 2>&1; then
         print_info "Starting ssh-agent..."
-        eval "$(ssh-agent -s)" > /dev/null
+        eval "$(ssh-agent -s)" >/dev/null
     fi
 
     if ssh-add "$key_path" 2>/dev/null; then
@@ -513,7 +448,7 @@ EOF
 
     # Copy public key to clipboard
     if command_exists pbcopy; then
-        pbcopy < "${key_path}.pub"
+        pbcopy <"${key_path}.pub"
         print_success "Public key copied to clipboard!"
     else
         print_warning "pbcopy not available, skipping clipboard copy"
@@ -543,22 +478,22 @@ EOF
 }
 
 _setup_fish_shell() {
-    
+
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
         return 1
     fi
-    
+
     local fish_path
     fish_path=$(command -v fish)
-    
+
     # Add fish to /etc/shells if needed
     if ! grep -q "$fish_path" /etc/shells; then
         print_info "Adding Fish to /etc/shells..."
         echo "$fish_path" | sudo tee -a /etc/shells >/dev/null
         print_success "Fish added to /etc/shells"
     fi
-    
+
     # Set fish as default shell
     if [[ "$SHELL" != "$fish_path" ]]; then
         print_info "Setting Fish as default shell..."
@@ -572,7 +507,7 @@ _setup_fish_shell() {
     else
         print_success "Fish is already the default shell"
     fi
-    
+
     # Install Fisher plugins
     print_info "Installing Fish plugins..."
     if fish -c "fisher install jhillyerd/plugin-git" 2>/dev/null; then
@@ -591,10 +526,10 @@ cmd_init() {
 
 cmd_update() {
     print_header "Updating dotfiles"
-    
+
     # Pull latest changes
     print_info "Pulling latest changes..."
-    
+
     # Check if jj is managing this repo (colocated mode)
     if [[ -d "${DOTFILES_DIR}/.jj" ]] && command_exists jj; then
         print_info "Detected jj-managed repository"
@@ -610,7 +545,7 @@ cmd_update() {
         print_error "Failed to update repository"
         return 1
     fi
-    
+
     # Update packages: bump the flake lock (nixpkgs + nix-darwin), then switch.
     # nix-darwin drives `brew upgrade` for the declared casks during activation.
     if confirm "Update packages (nix flake update + darwin-rebuild switch)?" "y"; then
@@ -633,7 +568,7 @@ cmd_update() {
             return 1
         fi
     fi
-    
+
     # Re-stow dotfiles before pi uses checked-out skills and configuration
     if confirm "Re-stow dotfiles?" "y"; then
         _stow_dotfiles
@@ -670,9 +605,9 @@ cmd_update() {
 
 cmd_doctor() {
     print_header "Running diagnostics"
-    
+
     local issues=0
-    
+
     # Check Homebrew (still required: nix-darwin drives it for casks)
     if command_exists brew; then
         print_success "Homebrew installed"
@@ -696,7 +631,7 @@ cmd_doctor() {
         print_error "GNU Stow not installed"
         ((++issues))
     fi
-    
+
     # Check Fish
     if command_exists fish; then
         print_success "Fish shell installed"
@@ -709,16 +644,16 @@ cmd_doctor() {
         print_error "Fish shell not installed"
         ((++issues))
     fi
-    
+
     # Check jj (Jujutsu)
     if command_exists jj; then
         print_success "jj (Jujutsu) installed"
-        
+
         # Check if jj config exists
         local jj_config="${HOME}/.config/jj/config.toml"
         if [[ -f "$jj_config" ]]; then
             print_success "jj config found"
-            
+
             # Check if user is configured
             if grep -q "^\[user\]" "$jj_config" && grep -q "email" "$jj_config"; then
                 print_success "jj user configured"
@@ -734,7 +669,7 @@ cmd_doctor() {
         print_warning "jj (Jujutsu) not installed"
         print_info "Install via nix: add 'jujutsu' to ${NIX_PACKAGES##*/} and run '${SCRIPT_NAME} update'"
     fi
-    
+
     # Check symlinks
     local broken_links=0
     while IFS= read -r -d '' link; do
@@ -742,20 +677,20 @@ cmd_doctor() {
             ((++broken_links))
         fi
     done < <(find "${HOME}" -maxdepth 3 -type l -print0 2>/dev/null)
-    
+
     if [[ $broken_links -eq 0 ]]; then
         print_success "No broken symlinks found"
     else
         print_warning "Found $broken_links broken symlinks"
     fi
-    
+
     # Check SSH key
     if [[ -f "$GITHUB_KEY_PATH" ]]; then
         print_success "GitHub SSH key exists"
     else
         print_warning "GitHub SSH key not found"
     fi
-    
+
     # Check key development tools (from registry + extras installed via brew)
     local missing_tools=()
 
@@ -779,18 +714,18 @@ cmd_doctor() {
             missing_tools+=("$tool")
         fi
     done
-    
+
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
         print_warning "Missing development tools: ${missing_tools[*]}"
     fi
-    
+
     # Check if Fish plugins are installed (Fisher)
     if command_exists fish && fish -c "type fisher" >/dev/null 2>&1; then
         print_success "Fisher (Fish plugin manager) is available"
     elif command_exists fish; then
         print_warning "Fisher not installed - Fish plugins may not work"
     fi
-    
+
     # Check if dotfiles directory is in PATH
     if echo "$PATH" | grep -q "$DOTFILES_DIR"; then
         print_success "Dotfiles directory is in PATH"
@@ -802,7 +737,7 @@ cmd_doctor() {
             print_info "Add 'export PATH=\"$DOTFILES_DIR:\$PATH\"' to your shell profile"
         fi
     fi
-    
+
     if [[ $issues -eq 0 ]]; then
         print_header "All critical checks passed! ✨"
         if [[ ${#missing_tools[@]} -gt 0 ]]; then
@@ -815,10 +750,10 @@ cmd_doctor() {
 
 cmd_link() {
     print_header "Creating symlink for dot command"
-    
+
     local target_dir="/usr/local/bin"
     local link_path="${target_dir}/dot"
-    
+
     # Check if we can write to target directory
     if [[ ! -w "$target_dir" ]]; then
         print_info "Need sudo access to create symlink in ${target_dir}"
@@ -827,12 +762,12 @@ cmd_link() {
         mkdir -p "$target_dir"
         print_info "Using ${target_dir} instead"
     fi
-    
+
     # Remove existing link if present
     if [[ -L "$link_path" ]]; then
         rm "$link_path"
     fi
-    
+
     # Create symlink
     if ln -s "${DOTFILES_DIR}/dot" "$link_path"; then
         print_success "Created symlink at ${link_path}"
@@ -845,14 +780,14 @@ cmd_link() {
 
 cmd_unlink() {
     print_header "Removing dot symlink"
-    
+
     local paths=(
         "/usr/local/bin/dot"
         "${HOME}/.local/bin/dot"
-        "/usr/local/bin/dotfiles"  # Legacy name
-        "${HOME}/.local/bin/dotfiles"  # Legacy name
+        "/usr/local/bin/dotfiles"     # Legacy name
+        "${HOME}/.local/bin/dotfiles" # Legacy name
     )
-    
+
     local found=false
     for link_path in "${paths[@]}"; do
         if [[ -L "$link_path" ]]; then
@@ -864,7 +799,7 @@ cmd_unlink() {
             fi
         fi
     done
-    
+
     if [[ "$found" == false ]]; then
         print_warning "No dot symlink found"
     fi
@@ -872,15 +807,15 @@ cmd_unlink() {
 
 cmd_stow() {
     print_header "Stowing dotfiles"
-    
+
     if ! command_exists stow; then
         print_error "GNU Stow is not installed"
         print_info "stow is provided by nix; run 'dot init'"
         return 1
     fi
-    
+
     print_info "Creating symlinks for dotfiles..."
-    
+
     if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
         print_success "Dotfiles stowed successfully"
         print_info "Configuration files are now symlinked to your home directory"
@@ -893,9 +828,9 @@ cmd_stow() {
 
 cmd_edit() {
     print_header "Opening dotfiles in editor"
-    
+
     local editor="${EDITOR:-nvim}"
-    
+
     if command_exists "$editor"; then
         exec "$editor" "$DOTFILES_DIR"
     else
@@ -907,27 +842,27 @@ cmd_edit() {
 
 cmd_completions() {
     print_header "Generating Fish shell completions"
-    
+
     local completions_dir="${HOME_DIR}/.config/fish/completions"
     local completions_file="${completions_dir}/dot.fish"
-    
+
     # Check if Fish is installed
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
         print_info "Fish is provided by nix; run 'dot init'"
         return 1
     fi
-    
+
     # Create completions directory if it doesn't exist
     if [[ ! -d "$completions_dir" ]]; then
         print_info "Creating Fish completions directory..."
         mkdir -p "$completions_dir"
     fi
-    
+
     print_info "Generating completions file..."
-    
+
     # Generate Fish completions
-    cat > "$completions_file" << 'EOF'
+    cat >"$completions_file" <<'EOF'
 # Fish shell completions for dot command
 # Auto-generated by dot completions command
 
@@ -990,7 +925,7 @@ EOF
         print_success "Fish completions generated at ${completions_file}"
         print_info "Completions will be available in new Fish shell sessions"
         print_info "To reload completions in current session, run: source ${completions_file}"
-        
+
         # Check if completions are working
         if command_exists fish; then
             print_info "Testing completions..."
@@ -1008,30 +943,30 @@ EOF
 
 cmd_benchmark_shell() {
     print_header "Benchmarking Fish shell startup performance"
-    
+
     # Check if Fish is installed
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
         print_info "Fish is provided by nix; run 'dot init'"
         return 1
     fi
-    
+
     # Parse options
     local runs=10
     local verbose=false
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -r|--runs)
-                runs="$2"
-                shift 2
-                ;;
-            -v|--verbose)
-                verbose=true
-                shift
-                ;;
-            -h|--help)
-                cat << EOF
+        -r | --runs)
+            runs="$2"
+            shift 2
+            ;;
+        -v | --verbose)
+            verbose=true
+            shift
+            ;;
+        -h | --help)
+            cat <<EOF
 ${BOLD}USAGE:${RESET}
     ${SCRIPT_NAME} benchmark-shell [OPTIONS]
 
@@ -1046,24 +981,24 @@ ${BOLD}EXAMPLES:${RESET}
     ${SCRIPT_NAME} benchmark-shell -v           # Show verbose output
 
 EOF
-                return 0
-                ;;
-            *)
-                print_error "Unknown option: $1"
-                print_info "Run '${SCRIPT_NAME} benchmark-shell --help' for usage"
-                return 1
-                ;;
+            return 0
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            print_info "Run '${SCRIPT_NAME} benchmark-shell --help' for usage"
+            return 1
+            ;;
         esac
     done
-    
+
     # Validate number of runs
     if ! [[ "$runs" =~ ^[0-9]+$ ]] || [[ "$runs" -lt 1 ]] || [[ "$runs" -gt 100 ]]; then
         print_error "Number of runs must be between 1 and 100"
         return 1
     fi
-    
+
     print_info "Running $runs Fish shell startup benchmarks..."
-    
+
     # Create temporary script that exits immediately
     local temp_script
     temp_script=$(mktemp -t DOT_fish_benchmark_XXXXXX.fish)
@@ -1075,18 +1010,18 @@ EOF
     # the trap survives until main returns, nounset expands an out-of-scope
     # temp_script variable and turns a successful benchmark into an error.
     trap 'rm -f "$temp_script"; trap - RETURN' RETURN
-    echo "exit 0" > "$temp_script"
-    
+    echo "exit 0" >"$temp_script"
+
     # Array to store timing results
     local times=()
     local total_time=0
-    
+
     # Run benchmarks using a more sophisticated approach
     for i in $(seq 1 "$runs"); do
         if [[ "$verbose" == true ]]; then
             print_info "Run $i/$runs..."
         fi
-        
+
         # Use python for high-precision timing if available, otherwise use perl
         local elapsed
         if command -v python3 >/dev/null 2>&1; then
@@ -1119,24 +1054,24 @@ printf '%.3f', \$end - \$start;
                 elapsed="0.001"
             fi
         fi
-        
+
         # Ensure elapsed is a valid number
         if [[ -z "$elapsed" ]] || ! [[ "$elapsed" =~ ^[0-9]*\.?[0-9]+$ ]]; then
             elapsed="0.001"
         fi
-        
+
         times+=("$elapsed")
         if command -v bc >/dev/null 2>&1; then
             total_time=$(echo "$total_time + $elapsed" | bc -l)
         else
             total_time=$(echo "$total_time $elapsed" | awk '{print $1 + $2}')
         fi
-        
+
         if [[ "$verbose" == true ]]; then
             printf "  Run %2d: %.3f seconds\n" "$i" "$elapsed"
         fi
     done
-    
+
     # Calculate statistics
     local avg_time
     if command -v bc >/dev/null 2>&1; then
@@ -1144,17 +1079,17 @@ printf '%.3f', \$end - \$start;
     else
         avg_time=$(echo "$total_time $runs" | awk '{printf "%.3f", $1/$2}')
     fi
-    
+
     # Find min and max times
     local min_time="${times[0]}"
     local max_time="${times[0]}"
-    
+
     for time in "${times[@]}"; do
         if command -v bc >/dev/null 2>&1; then
-            if (( $(echo "$time < $min_time" | bc -l) )); then
+            if (($(echo "$time < $min_time" | bc -l))); then
                 min_time="$time"
             fi
-            if (( $(echo "$time > $max_time" | bc -l) )); then
+            if (($(echo "$time > $max_time" | bc -l))); then
                 max_time="$time"
             fi
         else
@@ -1167,7 +1102,7 @@ printf '%.3f', \$end - \$start;
             fi
         fi
     done
-    
+
     # Generate custom report
     print_header "Fish Shell Startup Benchmark Results"
     echo ""
@@ -1176,32 +1111,32 @@ printf '%.3f', \$end - \$start;
     echo "  Runs: $runs"
     echo "  Test: Empty script execution"
     echo ""
-    
+
     echo -e "${BOLD}Performance Results:${RESET}"
     printf "  Average time: ${GREEN}%.3f${RESET} seconds\n" "$avg_time"
     printf "  Fastest time: ${GREEN}%.3f${RESET} seconds\n" "$min_time"
     printf "  Slowest time: ${YELLOW}%.3f${RESET} seconds\n" "$max_time"
-    
+
     if command -v bc >/dev/null 2>&1; then
         local range
         range=$(echo "scale=3; $max_time - $min_time" | bc -l)
         printf "  Time range:   ${CYAN}%.3f${RESET} seconds\n" "$range"
     fi
-    
+
     echo ""
     echo -e "${BOLD}Performance Assessment:${RESET}"
-    
+
     # Performance thresholds (in seconds)
     local excellent=0.050
     local good=0.100
     local fair=0.200
-    
+
     if command -v bc >/dev/null 2>&1; then
-        if (( $(echo "$avg_time <= $excellent" | bc -l) )); then
+        if (($(echo "$avg_time <= $excellent" | bc -l))); then
             print_success "Excellent startup performance! (≤50ms)"
-        elif (( $(echo "$avg_time <= $good" | bc -l) )); then
+        elif (($(echo "$avg_time <= $good" | bc -l))); then
             print_success "Good startup performance (≤100ms)"
-        elif (( $(echo "$avg_time <= $fair" | bc -l) )); then
+        elif (($(echo "$avg_time <= $fair" | bc -l))); then
             print_warning "Fair startup performance (≤200ms)"
         else
             print_warning "Slow startup performance (>200ms)"
@@ -1224,7 +1159,7 @@ printf '%.3f', \$end - \$start;
             print_warning "Slow startup performance (>200ms)"
         fi
     fi
-    
+
     echo ""
     print_info "To profile Fish startup in detail, run: fish --profile-startup /tmp/fish-startup.profile -ic exit"
     print_info "Then inspect the slowest commands: sort -nr /tmp/fish-startup.profile | head -20"
@@ -1251,12 +1186,12 @@ cmd_check_packages() {
         # Map a few nixpkgs attrs to the binary they actually provide.
         local bin="$pkg"
         case "$pkg" in
-            awscli2) bin="aws" ;;
-            gnused) bin="sed" ;;
-            gnupg) bin="gpg" ;;
-            neovim) bin="nvim" ;;
-            jujutsu) bin="jj" ;;
-            ripgrep) bin="rg" ;;
+        awscli2) bin="aws" ;;
+        gnused) bin="sed" ;;
+        gnupg) bin="gpg" ;;
+        neovim) bin="nvim" ;;
+        jujutsu) bin="jj" ;;
+        ripgrep) bin="rg" ;;
         esac
         if command_exists "$bin"; then
             installed=$((${installed:-0} + 1))
@@ -1272,7 +1207,8 @@ cmd_check_packages() {
     installed_brews=$(brew list --formula 2>/dev/null || true)
     local entry name
     while IFS= read -r entry; do
-        name=$(echo "$entry" | tr -d ' "'); name="${name%%#*}"
+        name=$(echo "$entry" | tr -d ' "')
+        name="${name%%#*}"
         [[ -z "$name" ]] && continue
         # Taps (owner/tap) aren't formulas/casks — skip them.
         [[ "$name" == */* ]] && continue
@@ -1298,28 +1234,28 @@ cmd_check_packages() {
 cmd_package() {
     local subcommand="${1:-list}"
     shift || true
-    
+
     case "$subcommand" in
-        add)
-            cmd_package_add "$@"
-            ;;
-        remove)
-            cmd_package_remove "$@"
-            ;;
-        update)
-            cmd_package_update "$@"
-            ;;
-        list)
-            cmd_package_list "$@"
-            ;;
-        -h|--help|help)
-            cmd_package_help
-            ;;
-        *)
-            print_error "Unknown package subcommand: $subcommand"
-            print_info "Run '${SCRIPT_NAME} package help' for usage"
-            return 1
-            ;;
+    add)
+        cmd_package_add "$@"
+        ;;
+    remove)
+        cmd_package_remove "$@"
+        ;;
+    update)
+        cmd_package_update "$@"
+        ;;
+    list)
+        cmd_package_list "$@"
+        ;;
+    -h | --help | help)
+        cmd_package_help
+        ;;
+    *)
+        print_error "Unknown package subcommand: $subcommand"
+        print_info "Run '${SCRIPT_NAME} package help' for usage"
+        return 1
+        ;;
     esac
 }
 
@@ -1335,20 +1271,27 @@ _nix_list_add() {
     tmp=$(mktemp)
     while IFS= read -r line || [[ -n "$line" ]]; do
         if [[ "$inlist" == false && "$line" == *"$marker"* ]]; then
-            inlist=true; echo "$line" >> "$tmp"; continue
+            inlist=true
+            echo "$line" >>"$tmp"
+            continue
         fi
         if [[ "$inlist" == true && "$line" =~ ^[[:space:]]*\] ]]; then
-            [[ "$inserted" == false ]] && echo "$entry" >> "$tmp"
-            inserted=true; inlist=false; echo "$line" >> "$tmp"; continue
+            [[ "$inserted" == false ]] && echo "$entry" >>"$tmp"
+            inserted=true
+            inlist=false
+            echo "$line" >>"$tmp"
+            continue
         fi
         if [[ "$inlist" == true && "$inserted" == false ]]; then
-            trimmed="$(echo "$line" | tr -d ' "')"; trimmed="${trimmed%%#*}"
+            trimmed="$(echo "$line" | tr -d ' "')"
+            trimmed="${trimmed%%#*}"
             if [[ -n "$trimmed" && "$name" < "$trimmed" ]]; then
-                echo "$entry" >> "$tmp"; inserted=true
+                echo "$entry" >>"$tmp"
+                inserted=true
             fi
         fi
-        echo "$line" >> "$tmp"
-    done < "$file"
+        echo "$line" >>"$tmp"
+    done <"$file"
     mv "$tmp" "$file"
 }
 
@@ -1356,7 +1299,7 @@ _nix_list_add() {
 _nix_list_remove() {
     local file="$1" name="$2" tmp
     tmp=$(mktemp)
-    awk -v n="$name" '{ t=$0; gsub(/[ "]/,"",t); sub(/#.*/,"",t); if (t==n) next; print }' "$file" > "$tmp"
+    awk -v n="$name" '{ t=$0; gsub(/[ "]/,"",t); sub(/#.*/,"",t); if (t==n) next; print }' "$file" >"$tmp"
     mv "$tmp" "$file"
 }
 
@@ -1373,22 +1316,27 @@ cmd_package_add() {
     fi
 
     case "$type" in
-        pkg|brew|formula) type="pkg" ;;
-        cask) type="cask" ;;
-        *) print_error "Type must be 'pkg' (nixpkgs) or 'cask' (homebrew)"; return 1 ;;
+    pkg | brew | formula) type="pkg" ;;
+    cask) type="cask" ;;
+    *)
+        print_error "Type must be 'pkg' (nixpkgs) or 'cask' (homebrew)"
+        return 1
+        ;;
     esac
 
     print_header "Adding $type: $name"
 
     if [[ "$type" == "pkg" ]]; then
         if grep -qE "^[[:space:]]+${name}([[:space:]]|\$)" "$NIX_PACKAGES"; then
-            print_warning "'$name' already in $(basename "$NIX_PACKAGES")"; return 0
+            print_warning "'$name' already in $(basename "$NIX_PACKAGES")"
+            return 0
         fi
         _nix_list_add "$NIX_PACKAGES" "with pkgs; [" "    " 0 "$name"
         print_success "Added '$name' to $(basename "$NIX_PACKAGES")"
     else
         if grep -qE "^[[:space:]]+\"${name}\"" "$NIX_HOMEBREW"; then
-            print_warning "'$name' already in $(basename "$NIX_HOMEBREW")"; return 0
+            print_warning "'$name' already in $(basename "$NIX_HOMEBREW")"
+            return 0
         fi
         _nix_list_add "$NIX_HOMEBREW" "casks = [" "      " 1 "$name"
         print_success "Added cask '$name' to $(basename "$NIX_HOMEBREW")"
@@ -1421,8 +1369,14 @@ cmd_package_remove() {
         return 0
     fi
 
-    [[ "$in_pkg" == true ]] && { _nix_list_remove "$NIX_PACKAGES" "$name"; print_success "Removed '$name' from $(basename "$NIX_PACKAGES")"; }
-    [[ "$in_cask" == true ]] && { _nix_list_remove "$NIX_HOMEBREW" "$name"; print_success "Removed '$name' from $(basename "$NIX_HOMEBREW")"; }
+    [[ "$in_pkg" == true ]] && {
+        _nix_list_remove "$NIX_PACKAGES" "$name"
+        print_success "Removed '$name' from $(basename "$NIX_PACKAGES")"
+    }
+    [[ "$in_cask" == true ]] && {
+        _nix_list_remove "$NIX_HOMEBREW" "$name"
+        print_success "Removed '$name' from $(basename "$NIX_HOMEBREW")"
+    }
 
     # Casks: cleanup="none" means a switch won't uninstall a removed cask — note it.
     if [[ "$in_cask" == true ]]; then
@@ -1467,11 +1421,11 @@ cmd_package_list() {
 cmd_package_help() {
     echo -e "${BOLD}${SCRIPT_NAME} package${RESET} - Package management commands"
     echo ""
-    
+
     echo -e "${BOLD}USAGE:${RESET}"
     echo "    ${SCRIPT_NAME} package [SUBCOMMAND] [OPTIONS]"
     echo ""
-    
+
     echo -e "${BOLD}SUBCOMMANDS:${RESET}"
     echo "    add NAME [pkg|cask]   Add to the nix config and apply (default type: pkg)"
     echo "    remove NAME           Remove from the nix config and apply"
@@ -1507,11 +1461,11 @@ cmd_help() {
     echo -e "${BOLD}${SCRIPT_NAME}${RESET} - Dotfiles management tool"
     echo "Version: ${VERSION}"
     echo ""
-    
+
     echo -e "${BOLD}USAGE:${RESET}"
     echo "    ${SCRIPT_NAME} [OPTIONS] COMMAND [ARGS]"
     echo ""
-    
+
     echo -e "${BOLD}COMMANDS:${RESET}"
     echo "    init                Initialize and install dotfiles"
     echo "    update              Update dotfiles, packages, pi, and Pocock skills"
@@ -1528,14 +1482,13 @@ cmd_help() {
     echo "    edit                Open dotfiles in editor"
     echo "    help                Show this help message (default)"
     echo ""
-    
+
     echo -e "${BOLD}OPTIONS:${RESET}"
     echo "    --skip-ssh      Skip SSH key generation"
-    echo "    --skip-font     Skip font installation"
     echo "    --version       Show version information"
     echo "    -h, --help      Show this help message"
     echo ""
-    
+
     echo -e "${BOLD}EXAMPLES:${RESET}"
     echo "    ${SCRIPT_NAME} init                      # Full initialization"
     echo "    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup"
@@ -1554,7 +1507,7 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} completions               # Generate Fish shell completions"
     echo "    ${SCRIPT_NAME} link                      # Install dot command globally in PATH"
     echo ""
-    
+
     echo -e "${BOLD}CONFIGURATION:${RESET}"
     echo "    Dotfiles directory: ${DOTFILES_DIR}"
     echo "    Nix config:         ${NIX_DIR}"
@@ -1576,81 +1529,81 @@ main() {
     # Parse global options
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --skip-ssh)
-                export SKIP_SSH=true
-                shift
-                ;;
-            --skip-font)
-                export SKIP_FONT=true
-                shift
-                ;;
-            --version)
-                echo "${SCRIPT_NAME} version ${VERSION}"
-                exit 0
-                ;;
-            -h|--help)
-                cmd_help
-                exit 0
-                ;;
-            *)
-                break
-                ;;
+        --skip-ssh)
+            export SKIP_SSH=true
+            shift
+            ;;
+        --skip-font)
+            export SKIP_FONT=true
+            shift
+            ;;
+        --version)
+            echo "${SCRIPT_NAME} version ${VERSION}"
+            exit 0
+            ;;
+        -h | --help)
+            cmd_help
+            exit 0
+            ;;
+        *)
+            break
+            ;;
         esac
     done
-    
+
     # Get command
     local cmd="${1:-help}"
     shift || true
-    
+
     # Execute command
     case "$cmd" in
-        init)
-            cmd_init "$@"
-            ;;
-        update)
-            cmd_update "$@"
-            ;;
-        doctor)
-            cmd_doctor "$@"
-            ;;
-        package)
-            cmd_package "$@"
-            ;;
-        check-packages)
-            cmd_check_packages "$@"
-            ;;
-        retry-failed)
-            cmd_retry_failed "$@"
-            ;;
-        benchmark-shell)
-            cmd_benchmark_shell "$@"
-            ;;
-        gen-ssh-key)
-            cmd_gen_ssh_key "$@"
-            ;;
-        stow)
-            cmd_stow "$@"
-            ;;
-        completions)
-            cmd_completions "$@"
-            ;;
-        link)
-            cmd_link "$@"
-            ;;
-        unlink)
-            cmd_unlink "$@"
-            ;;
-        edit)
-            cmd_edit "$@"
-            ;;
-        help)
-            cmd_help
-            ;;
-        *)
-            print_error "Unknown command: $cmd"
-            echo "Run '${SCRIPT_NAME} help' for usage information"
-            exit 1
-            ;;
+    init)
+        cmd_init "$@"
+        ;;
+    update)
+        cmd_update "$@"
+        ;;
+    doctor)
+        cmd_doctor "$@"
+        ;;
+    package)
+        cmd_package "$@"
+        ;;
+    check-packages)
+        cmd_check_packages "$@"
+        ;;
+    retry-failed)
+        cmd_retry_failed "$@"
+        ;;
+    benchmark-shell)
+        cmd_benchmark_shell "$@"
+        ;;
+    gen-ssh-key)
+        cmd_gen_ssh_key "$@"
+        ;;
+    stow)
+        cmd_stow "$@"
+        ;;
+    completions)
+        cmd_completions "$@"
+        ;;
+    link)
+        cmd_link "$@"
+        ;;
+    unlink)
+        cmd_unlink "$@"
+        ;;
+    edit)
+        cmd_edit "$@"
+        ;;
+    help)
+        cmd_help
+        ;;
+    *)
+        print_error "Unknown command: $cmd"
+        echo "Run '${SCRIPT_NAME} help' for usage information"
+        exit 1
+        ;;
     esac
 }
 

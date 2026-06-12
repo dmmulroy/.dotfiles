@@ -27,31 +27,15 @@ complete -c dot -n "__fish_use_subcommand" -l "version" -d "Show version informa
 complete -c dot -n "__fish_use_subcommand" -s "h" -l "help" -d "Show help message"
 
 # Package subcommands
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "add" -d "Add package to bundle and install it"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "remove" -d "Remove package from bundle and optionally uninstall"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "update" -d "Update packages"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "list" -d "List packages in bundle files"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "add" -d "Add a package to the nix config and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "remove" -d "Remove a package from the nix config and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "update" -d "Update flake inputs and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "list" -d "List packages declared in the nix config"
 complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "help" -d "Show package help"
 
-# Package add completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from brew cask" -a "brew" -d "Brew formula"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from brew cask" -a "cask" -d "Brew cask"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -a "base" -d "Add to base bundle"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -a "work" -d "Add to work bundle"
-
-# Package remove/update completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "base" -d "Remove from base bundle only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "work" -d "Remove from work bundle only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "auto" -d "Remove from any bundle"
-
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "all" -d "Update all packages"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "base" -d "Update base bundle packages only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "work" -d "Update work bundle packages only"
-
-# Package list completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "all" -d "List all packages"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
+# Package add type completions
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from pkg cask" -a "pkg" -d "nixpkgs attribute (environment.systemPackages)"
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from pkg cask" -a "cask" -d "Homebrew cask"
 
 # Benchmark-shell command options
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
@@ -61,13 +45,12 @@ complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "h" -l "help
 # Gen-ssh-key command options
 complete -c dot -n "__fish_seen_subcommand_from gen-ssh-key" -s "h" -l "help" -d "Show gen-ssh-key help"
 
-# Dynamic completions for installed packages (when removing or updating)
-function __dot_installed_packages
-    if command -q brew
-        brew list --formula 2>/dev/null | head -20
-        brew list --cask 2>/dev/null | head -20
-    end
+# Dynamic completions for declared packages (when removing)
+function __dot_declared_packages
+    set -l dir (dirname (status -f))/../../../..
+    set -l nixdir "$HOME/.dotfiles/nix"
+    grep -hE '^    [a-zA-Z0-9]' "$nixdir/packages.nix" 2>/dev/null | string trim
+    grep -hE '^[[:space:]]+"' "$nixdir/homebrew.nix" 2>/dev/null | string trim | string trim -c '"' | string replace -r '#.*' ''
 end
 
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_installed_packages)"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -xa "(__dot_installed_packages)"
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_declared_packages)"
