@@ -327,6 +327,69 @@ _stow_dotfiles() {
     fi
 }
 
+_generate_ssh_key() {
+
+    if [[ -f "$GITHUB_KEY_PATH" ]]; then
+        print_success "SSH key already exists at $GITHUB_KEY_PATH"
+        return 0
+    fi
+
+    print_info "Generating new SSH key..."
+    mkdir -p "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
+
+    if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_KEY_PATH"; then
+        print_success "SSH key generated successfully"
+        print_info "Add the public key to GitHub:"
+        echo "  pbcopy < ${GITHUB_KEY_PATH}.pub"
+        echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
+    else
+        print_error "Failed to generate SSH key"
+        return 1
+    fi
+}
+
+_install_font() {
+
+    if [[ ! -f "$GITHUB_KEY_PATH" ]]; then
+        print_warning "GitHub SSH key not found. Skipping font installation"
+        return 0
+    fi
+
+    if ! confirm "Have you added the SSH key to your GitHub account?" "n"; then
+        print_warning "Skipping font installation"
+        return 0
+    fi
+
+    local font_temp_dir
+    font_temp_dir=$(mktemp -d)
+    local font_install_dir="${HOME}/Library/Fonts"
+
+    print_info "Cloning font repository..."
+    if GIT_SSH_COMMAND="ssh -i '$GITHUB_KEY_PATH' -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
+        print_success "Repository cloned successfully"
+
+        mkdir -p "$font_install_dir"
+        print_info "Installing font files..."
+
+        local font_count=0
+        while IFS= read -r -d '' font_file; do
+            cp "$font_file" "$font_install_dir/"
+            ((++font_count))
+        done < <(find "$font_temp_dir" -type f \( -name '*.otf' -o -name '*.ttf' \) -print0)
+
+        if [[ $font_count -gt 0 ]]; then
+            print_success "Installed $font_count font files"
+        else
+            print_warning "No font files found in repository"
+        fi
+    else
+        print_error "Failed to clone font repository"
+    fi
+
+    rm -rf "$font_temp_dir"
+}
+
 cmd_gen_ssh_key() {
     print_header "Generating SSH key for GitHub"
 
