@@ -18,9 +18,8 @@
   nix.enable = false;
 
   # Register the nix-provided fish in /etc/shells so it can be the login shell.
-  # The actual `chsh` is a manual post-switch step (see plan).
-  programs.fish.enable = true;
   environment.shells = [ pkgs.fish ];
+  programs.fish.enable = true;
 
   # Used for backwards compatibility — do not change after first switch.
   system.stateVersion = 5;

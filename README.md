@@ -2,6 +2,9 @@
 
 A comprehensive, automated dotfiles management system for macOS development environments. Features a powerful CLI tool for setup, maintenance, and AI-powered development insights.
 
+> [!NOTE]
+> This repository is forked from [Dillon Mulroy's dotfiles](https://github.com/dmmulroy/.dotfiles). Nearly all of the original design and the `dot` CLI are his work — this is my adaptation on top of his foundation. Huge thanks to [@dmmulroy](https://github.com/dmmulroy).
+
 ## Overview
 
 This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management and **nix-darwin** for package management — CLI tools come from nixpkgs while GUI casks are managed declaratively through nix-darwin's Homebrew module — and includes configurations for Fish shell, Neovim, Tmux, Git, and other essential development tools.
@@ -433,6 +436,7 @@ This repository is for personal use. Feel free to fork and adapt for your own ne
 
 ## Acknowledgments
 
+- **[Dillon Mulroy](https://github.com/dmmulroy)** — this repository is forked from his [dotfiles](https://github.com/dmmulroy/.dotfiles), which form the basis for nearly everything here, including the `dot` CLI. This project would not exist without his work.
 - [GNU Stow](https://www.gnu.org/software/stow/) for symlink management
 - [nix-darwin](https://github.com/nix-darwin/nix-darwin) + [nixpkgs](https://github.com/NixOS/nixpkgs) for package management
 - [Homebrew](https://brew.sh/) for GUI casks (driven by nix-darwin)
