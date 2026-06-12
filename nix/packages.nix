@@ -26,6 +26,7 @@
     just
     lazygit
     llvm
+    llvm.dev # provides llvm-config (separate dev output)
     neovim
     python314
     ripgrep
