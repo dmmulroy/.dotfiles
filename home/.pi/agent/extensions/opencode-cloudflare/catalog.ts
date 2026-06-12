@@ -4,6 +4,7 @@ import { DEFAULT_ROUTE_URLS, type Backend } from "./constants.ts";
 import { getDefaultGatewayConfig, getGatewayConfig, stripRoutePrefix, type GatewayModelConfig } from "./wellknown.ts";
 
 export type ResponseVerbosity = "low" | "medium" | "high";
+export type ReasoningContext = "current_turn" | "all_turns";
 
 export interface RouteDescriptor {
   backend: Backend;
@@ -12,6 +13,7 @@ export interface RouteDescriptor {
   headers: Record<string, string>;
   requestModelId?: string;
   responseVerbosity?: ResponseVerbosity;
+  reasoningContext?: ReasoningContext;
   compat?: Model<Api>["compat"];
 }
 
@@ -191,6 +193,13 @@ function getResponseVerbosity(config: GatewayModelConfig | undefined): ResponseV
   return verbosity === "low" || verbosity === "medium" || verbosity === "high" ? verbosity : undefined;
 }
 
+function getReasoningContext(config: GatewayModelConfig | undefined): ReasoningContext | undefined {
+  const reasoning = config?.options?.reasoning;
+  if (!reasoning || typeof reasoning !== "object" || Array.isArray(reasoning)) return undefined;
+  const context = (reasoning as Record<string, unknown>).context;
+  return context === "current_turn" || context === "all_turns" ? context : undefined;
+}
+
 function applyGatewayModelLimit(model: Model<Api>, gatewayModels: Record<string, GatewayModelConfig>, backend: Backend): Model<Api> {
   const gatewayConfig = resolveGatewayModelConfig(model.id, gatewayModels, backend);
   if (!gatewayConfig?.limit) return model;
@@ -310,6 +319,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         baseUrl: route.baseUrl,
         headers: route.headers,
         responseVerbosity: getResponseVerbosity(resolveGatewayModelConfig(model.id, route.models, backend)),
+        reasoningContext: getReasoningContext(resolveGatewayModelConfig(model.id, route.models, backend)),
         compat: model.compat,
       });
     }
@@ -326,6 +336,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         headers: route.headers,
         requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
         responseVerbosity: getResponseVerbosity(config),
+        reasoningContext: getReasoningContext(config),
         compat: config.compat,
       });
     }

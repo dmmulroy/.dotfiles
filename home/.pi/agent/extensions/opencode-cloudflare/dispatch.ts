@@ -13,7 +13,7 @@ import {
 	type SimpleStreamOptions,
 	type AnthropicOptions,
 } from "@earendil-works/pi-ai";
-import { getCatalog, refreshCatalog, type ResponseVerbosity, type RouteDescriptor } from "./catalog.ts";
+import { getCatalog, refreshCatalog, type ReasoningContext, type ResponseVerbosity, type RouteDescriptor } from "./catalog.ts";
 import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
@@ -420,26 +420,39 @@ function streamGoogleViaGateway(
 	return stream;
 }
 
-function applyResponseVerbosity(
+function applyOpenAIResponsesPayloadOptions(
 	payload: unknown,
-	verbosity: ResponseVerbosity,
+	options: { responseVerbosity?: ResponseVerbosity; reasoningContext?: ReasoningContext },
 ): unknown {
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-	const body = payload as Record<string, unknown>;
-	const existingText = body.text;
-	const text = existingText && typeof existingText === "object" && !Array.isArray(existingText)
-		? existingText as Record<string, unknown>
-		: {};
-	return { ...body, text: { ...text, verbosity } };
+	let body = payload as Record<string, unknown>;
+
+	if (options.responseVerbosity) {
+		const existingText = body.text;
+		const text = existingText && typeof existingText === "object" && !Array.isArray(existingText)
+			? existingText as Record<string, unknown>
+			: {};
+		body = { ...body, text: { ...text, verbosity: options.responseVerbosity } };
+	}
+
+	if (options.reasoningContext) {
+		const existingReasoning = body.reasoning;
+		const reasoning = existingReasoning && typeof existingReasoning === "object" && !Array.isArray(existingReasoning)
+			? existingReasoning as Record<string, unknown>
+			: {};
+		body = { ...body, reasoning: { ...reasoning, context: options.reasoningContext } };
+	}
+
+	return body;
 }
 
 function applyRoutePayloadOptions(options: SimpleStreamOptions, route: RouteDescriptor): SimpleStreamOptions {
-	if (route.api !== "openai-responses" || !route.responseVerbosity) return options;
+	if (route.api !== "openai-responses" || (!route.responseVerbosity && !route.reasoningContext)) return options;
 	const onPayload = options.onPayload;
 	return {
 		...options,
 		onPayload: async (payload, model) => {
-			const configuredPayload = applyResponseVerbosity(payload, route.responseVerbosity!);
+			const configuredPayload = applyOpenAIResponsesPayloadOptions(payload, route);
 			return (await onPayload?.(configuredPayload, model)) ?? configuredPayload;
 		},
 	};
