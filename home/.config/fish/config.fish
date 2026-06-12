@@ -16,3 +16,5 @@ alias lg='lazygit'
 alias ld='lazydocker'
 
 zoxide init fish | source
+
+eval "$(/opt/homebrew/bin/brew shellenv fish)"
