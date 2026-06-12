@@ -14,7 +14,10 @@ fs.writeFileSync(overlayPath, JSON.stringify({
 					name: "Custom OpenAI Responses Model",
 					reasoning: true,
 					thinkingLevelMap: { off: "none", minimal: null, xhigh: "xhigh" },
-					options: { text: { verbosity: "medium" } },
+					options: {
+						text: { verbosity: "medium" },
+						reasoning: { context: "all_turns" },
+					},
 					limit: { context: 1000000, output: 128000 },
 				},
 			},
@@ -83,13 +86,15 @@ try {
 
 	assert.equal(observedPayloads.length, 1);
 	assert.equal(observedPayloads[0].text.verbosity, "medium");
+	assert.equal(observedPayloads[0].reasoning.context, "all_turns");
 	assert.equal(capturedRequests.length, 1);
 	const request = capturedRequests[0];
 	assert.equal(request.url, "https://opencode.cloudflare.dev/openai/responses");
 	assert.equal(request.headers.get("authorization"), `Bearer ${gatewayToken}`);
 	assert.equal(request.headers.get("cf-access-token"), gatewayToken);
 	assert.equal(request.body.text.verbosity, "medium");
-	assert.deepEqual(request.body.reasoning, { effort: "high", summary: "auto" });
+	assert.deepEqual(request.body.reasoning, { effort: "high", summary: "auto", context: "all_turns" });
+	assert.deepEqual(request.body.include, ["reasoning.encrypted_content"]);
 
 	console.log("openai responses options regression checks passed");
 } finally {
