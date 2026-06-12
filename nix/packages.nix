@@ -1,14 +1,14 @@
 { pkgs, ... }:
 
 {
-  # CLI formulas migrated from packages/bundle → native nixpkgs.
-  # Sorted by nixpkgs attribute name. `dot package add brew <x>` inserts here.
-  # Name remaps from brew: awscli→awscli2, gnu-sed→gnused, jj→jujutsu,
-  # tree-sitter-cli→tree-sitter.
+  # CLI tools, native nixpkgs. Sorted by attribute name; `dot package add <x>`
+  # (type pkg) inserts here. Rust toolchain = cargo + rustc + clippy + rustfmt.
   environment.systemPackages = with pkgs; [
     ast-grep
     awscli2
     btop
+    cargo
+    clippy
     cloc
     cmake
     direnv
@@ -25,8 +25,12 @@
     jujutsu
     just
     lazygit
+    llvm
     neovim
+    python314
     ripgrep
+    rustc
+    rustfmt
     shellcheck
     starship
     stow

@@ -8,10 +8,10 @@
     enable = true;
 
     onActivation = {
-      # "none" for the first switch as a safety margin — tighten to "zap"
-      # (uninstall anything not listed here) once you've confirmed the switch
-      # didn't want to remove anything you rely on.
-      cleanup = "none";
+      # Fully declarative: uninstall (and zap) any cask/brew not listed here.
+      # Any intentional brew formula must be declared in `brews` below or
+      # migrated to nixpkgs (nix/packages.nix), or it will be removed on switch.
+      cleanup = "zap";
       autoUpdate = true;
       upgrade = true;
     };
