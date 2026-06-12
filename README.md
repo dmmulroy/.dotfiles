@@ -4,7 +4,7 @@ A comprehensive, automated dotfiles management system for macOS development envi
 
 ## Overview
 
-This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management, Homebrew for package installation, and includes configurations for Fish shell, Neovim, Tmux, Git, and other essential development tools.
+This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management and **nix-darwin** for package management — CLI tools come from nixpkgs while GUI casks are managed declaratively through nix-darwin's Homebrew module — and includes configurations for Fish shell, Neovim, Tmux, Git, and other essential development tools.
 
 ### Key Features
 
@@ -43,9 +43,12 @@ After installation, the `dot` command will be available globally for ongoing man
 │   │   ├── tmux/      # Tmux configuration
 │   │   └── ...
 │   └── .ideavimrc     # IntelliJ IDEA Vim config
-├── packages/
-│   ├── bundle         # Base Brewfile
-│   └── bundle.work    # Work-specific packages
+├── flake.nix          # nix-darwin flake
+├── nix/
+│   ├── darwin.nix     # System module
+│   ├── packages.nix   # CLI tools (nixpkgs → environment.systemPackages)
+│   ├── homebrew.nix   # GUI casks + custom-tap brews (homebrew module)
+│   └── packages.work.nix # Optional work-only packages
 ├── CLAUDE.md          # Instructions for AI assistants
 └── README.md          # This file
 ```
@@ -74,14 +77,15 @@ dot init --skip-ssh --skip-font
 ```
 
 **What it does:**
-1. Installs Homebrew (if not present)
-2. Installs packages from Brewfiles
-3. Creates symlinks with GNU Stow
-4. Installs Bun runtime
-5. Installs pi via the Vite+ tool registry
-6. Generates SSH key for GitHub (optional)
-7. Installs MonoLisa font (optional)
-8. Sets up Fish shell with plugins
+1. Installs Homebrew (if not present — nix-darwin drives it for casks)
+2. Installs Nix (Determinate Systems installer, if not present)
+3. Applies the nix-darwin configuration (`darwin-rebuild switch`) — installs CLI tools from nixpkgs and GUI casks via the Homebrew module
+4. Creates symlinks with GNU Stow
+5. Installs Bun runtime
+6. Installs pi via the Vite+ tool registry
+7. Generates SSH key for GitHub (optional)
+8. Installs MonoLisa font (optional)
+9. Sets up Fish shell with plugins
 
 ### Maintenance Commands
 
@@ -90,7 +94,7 @@ dot init --skip-ssh --skip-font
 dot update
 ```
 - Pulls latest dotfiles changes (auto-detects jj vs git)
-- Updates Homebrew packages
+- Bumps flake inputs (`nix flake update`) and applies them (`darwin-rebuild switch`); nix-darwin upgrades the declared casks via brew
 - Re-stows configuration files
 - Runs `pi update` to update pi and its configured packages
 - Runs pi headlessly with `/skill:sync-pocock-skills` and waits for the checked-in Matt Pocock skills sync to complete
@@ -100,7 +104,7 @@ dot update
 dot doctor
 ```
 Comprehensive diagnostics including:
-- ✅ Homebrew installation
+- ✅ Homebrew + nix-darwin installation
 - ✅ Essential tools (git, nvim, tmux, node, etc.)
 - ✅ pi installation and core development tools
 - ✅ Fish shell configuration
@@ -112,13 +116,13 @@ Comprehensive diagnostics including:
 ```bash
 dot check-packages
 ```
-Shows which packages are installed vs. missing from your Brewfiles.
+Shows which declared packages (nixpkgs + Homebrew casks/brews) are present vs. missing.
 
 #### `dot retry-failed` - Retry Failed Installations
 ```bash
 dot retry-failed
 ```
-Attempts to reinstall packages that failed during initial setup.
+Obsolete under nix-darwin: a failed `darwin-rebuild switch` rolls back atomically, so there's no partial state to retry. Re-run `dot update`.
 
 ### Performance & Development Tools
 
@@ -201,51 +205,48 @@ Makes the `dot` command available from any directory by creating a symlink in `/
 
 ### Package Management
 
-The system provides comprehensive package management through the `dot package` command and uses two Brewfiles for different contexts:
+The system manages packages through the `dot package` command, which edits the nix configuration and applies it with `darwin-rebuild switch`:
 
 #### Package Commands
 
 ```bash
-# List packages
-dot package list              # List all packages
-dot package list base         # List base packages only
-dot package list work         # List work packages only
+# List declared packages (nixpkgs + Homebrew)
+dot package list
 
-# Add packages
-dot package add git           # Add git formula to base bundle
-dot package add docker cask   # Add docker cask to base bundle  
-dot package add kubectl brew work  # Add kubectl to work bundle
+# Add a CLI tool (nixpkgs attribute) — edits nix/packages.nix
+dot package add ripgrep
+dot package add jujutsu
 
-# Update packages
-dot package update            # Update all installed packages
-dot package update git        # Update specific package
-dot package update all base   # Update only base bundle packages
-dot package update all work   # Update only work bundle packages
+# Add a GUI app (Homebrew cask) — edits nix/homebrew.nix
+dot package add slack cask
 
-# Remove packages
-dot package remove git        # Remove git from any bundle
-dot package remove docker base  # Remove docker from base bundle only
+# Update everything: bump flake.lock, then darwin-rebuild switch
+dot package update
+
+# Remove a package (from either nix file) and apply
+dot package remove ripgrep
 ```
 
 #### Package Files
 
-**`packages/bundle`** - Base packages for all machines:
-- Development tools: neovim, tmux, fish, git
+**`nix/packages.nix`** — CLI tools via nixpkgs (`environment.systemPackages`):
+- Development tools: neovim, fish, jujutsu
 - CLI utilities: ripgrep, fd, fzf, starship
-- Applications: Arc browser, Raycast, OrbStack
-- AI tools: aider
+- Toolchains: zig, wasmtime, wasm-tools
 
-**`packages/bundle.work`** - Work-specific additions:
-- AWS/Kubernetes tools
-- Enterprise development tools
+**`nix/homebrew.nix`** — GUI casks + custom-tap brews managed by nix-darwin's Homebrew module:
+- Casks: raycast, cleanshot, orbstack, kitty, zed, yaak, claude-code
+- Custom taps/brews: jj-starship, hunk
 
-#### Package Features
+**`nix/packages.work.nix`** — optional work-only packages (import on work machines).
 
-- **Auto-detection**: Package type (brew vs cask) automatically detected
-- **Sorted maintenance**: Packages kept alphabetically sorted within each type
-- **Installation integration**: Adding packages installs them immediately
-- **Update flexibility**: Can update all packages, specific packages, or by bundle
-- **Cleanup included**: Update command includes Homebrew refresh and optional cleanup
+#### Package Notes
+
+- **`pkg` adds the nixpkgs attribute name** (e.g. `awscli2`, `jujutsu`), not the brew name
+- **Sorted maintenance**: entries kept alphabetically sorted within each list
+- **Atomic**: `darwin-rebuild switch` applies the whole config or rolls back
+- **Reproducible**: versions pinned via `flake.lock`; `dot update` bumps them
+- **Cask removal** won't uninstall the app while `onActivation.cleanup = "none"` in `nix/homebrew.nix`
 
 ### Key Configurations
 
@@ -303,23 +304,25 @@ dot package remove docker base  # Remove docker from base bundle only
 
 **Method 1: Using package commands (recommended):**
 ```bash
-# Add package using the package command
-dot package add new-tool             # Adds to base bundle
-dot package add new-app cask         # Adds cask to base bundle
-dot package add work-tool brew work  # Adds to work bundle
+dot package add new-tool       # nixpkgs attr → nix/packages.nix
+dot package add new-app cask   # Homebrew cask → nix/homebrew.nix
 ```
 
 **Method 2: Manual editing:**
-Edit `packages/bundle` or `packages/bundle.work`:
-```ruby
-# Add to packages/bundle
-brew "new-tool"
-cask "new-app"
+Edit `nix/packages.nix` (CLI tools) or `nix/homebrew.nix` (casks):
+```nix
+# nix/packages.nix — add the nixpkgs attribute, sorted
+environment.systemPackages = with pkgs; [
+  new-tool
+];
+
+# nix/homebrew.nix — add the cask name
+casks = [ "new-app" ];
 ```
 
-Then run:
+Then apply:
 ```bash
-dot init  # or brew bundle --file=./packages/bundle
+dot package update  # or: sudo darwin-rebuild switch --flake ~/.dotfiles#$(scutil --get LocalHostName)
 ```
 
 #### Modifying Configurations
@@ -373,7 +376,7 @@ vp install -g @mariozechner/pi-coding-agent
 - Run `dot help` for command overview
 - Run `dot <command> --help` for specific command help
 - Check `dot doctor` for environment issues
-- Review logs in failed package files: `packages/failed_packages_*.txt`
+- For a failed `darwin-rebuild switch`, read the build error it prints; the previous generation stays active (`darwin-rebuild --list-generations`, `darwin-rebuild rollback`)
 
 ## Development
 
@@ -403,14 +406,14 @@ dot stow
 ### Selective Installation
 
 ```bash
-# Install only base packages, skip optional components
+# Install everything, skip optional components
 dot init --skip-ssh --skip-font
 
 # Check what's missing
 dot check-packages
 
-# Install work packages later
-brew bundle --file=./packages/bundle.work
+# Apply work packages: import nix/packages.work.nix from nix/darwin.nix, then
+dot package update
 ```
 
 ### Shell Completions
@@ -431,6 +434,7 @@ This repository is for personal use. Feel free to fork and adapt for your own ne
 ## Acknowledgments
 
 - [GNU Stow](https://www.gnu.org/software/stow/) for symlink management
-- [Homebrew](https://brew.sh/) for package management
+- [nix-darwin](https://github.com/nix-darwin/nix-darwin) + [nixpkgs](https://github.com/NixOS/nixpkgs) for package management
+- [Homebrew](https://brew.sh/) for GUI casks (driven by nix-darwin)
 - pi for AI assistance
 - The dotfiles community for inspiration and best practices

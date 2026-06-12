@@ -3,7 +3,12 @@
 **Generated:** 2026-05-09T00:00:00Z
 **Commit:** 871ce6f
 
-macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
+macOS dev env via GNU Stow + nix-darwin. Fish + Neovim + Tmux + Git + pi.
+
+Packages: CLI tools are native nixpkgs (`environment.systemPackages`); GUI casks +
+custom-tap brews are managed by nix-darwin's `homebrew` module. Nix is installed via
+Determinate (so `nix.enable = false` in the darwin config). `dot` orchestrates
+`darwin-rebuild switch`; GNU Stow still handles dotfile symlinks.
 
 ## STRUCTURE
 
@@ -21,9 +26,12 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 ├── home/.pi/           # Pi agent workspace (AGENTS.md)
 │   ├── agent/extensions/ # 6 TypeScript extensions
 │   └── agent/skills/   # 15 agent skills
-├── packages/
-│   ├── bundle          # Base Brewfile (32 formulas, 13 casks)
-│   └── bundle.work     # Work additions (formulas only)
+├── flake.nix           # nix-darwin flake; darwinConfigurations."PT-RICARDOFERREIRA"
+├── nix/
+│   ├── darwin.nix      # system module (imports + nixpkgs config + primaryUser)
+│   ├── packages.nix    # CLI tools → environment.systemPackages (nixpkgs)
+│   ├── homebrew.nix    # casks + custom-tap brews (homebrew module)
+│   └── packages.work.nix # optional work-only systemPackages
 └── docs/
 ```
 
@@ -31,7 +39,8 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 
 | Task | Location |
 |------|----------|
-| Add package | `dot package add <name>` or edit `packages/bundle` |
+| Add CLI tool | `dot package add <nixpkgs-attr>` or edit `nix/packages.nix` |
+| Add GUI app/cask | `dot package add <cask> cask` or edit `nix/homebrew.nix` |
 | Shell alias/abbr | `home/.config/fish/conf.d/aliases.fish` |
 | Shell function | `home/.config/fish/functions/` |
 | Git alias | `home/.config/git/config` [alias] section |
@@ -57,7 +66,8 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 ## ANTI-PATTERNS
 
 - Edit `~/.config/*` directly (changes lost on stow)
-- Casks in `bundle.work` (use base bundle)
+- `dot package add brew X` expecting the brew name — `pkg` adds the **nixpkgs attr** (e.g. `awscli2`, `jujutsu`)
+- Removing a cask won't uninstall the app while `onActivation.cleanup = "none"`
 - Hardcode paths (use `$DOTFILES_DIR`, `$HOME`)
 - Nested git repos in stowed dirs (creates symlink issues)
 - node_modules in stowed dirs (pi extensions exception — gitignored)
@@ -65,11 +75,11 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 ## COMMANDS
 
 ```bash
-dot init              # Full setup (brew, stow, bun, ssh, font, fish)
-dot update            # Pull + brew upgrade + restow + pi update + Pocock skills sync
-dot doctor            # Health check
+dot init              # Full setup (brew, nix, darwin-rebuild, stow, bun, ssh, font, fish)
+dot update            # Pull + nix flake update + darwin-rebuild switch + restow + pi update + Pocock skills sync
+dot doctor            # Health check (checks brew, nix-darwin, stow, fish, jj)
 dot stow              # Resymlink only
-dot package add X     # Add + install package
+dot package add X [pkg|cask]  # Edit nix config + darwin-rebuild switch (pkg = nixpkgs attr, default)
 dot benchmark-shell   # Fish startup perf
 dot gen-ssh-key       # Generate ed25519 key by email domain
 ```
@@ -97,7 +107,9 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 
 ## NOTES
 
-- `dot update` handles WARP VPN brew API issues automatically
+- `dot update` handles WARP VPN brew API issues automatically (still relevant for cask downloads)
+- fisher is vendored at `home/.config/fish/functions/fisher.fish` (not in nixpkgs; brew copy wasn't visible to the nix fish)
+- `home/.config/fish/conf.d/0-nix.fish` prepends the nix bin dir early so prompt-init conf.d files (starship/zoxide) find nix tools
 - Tmux theme must load BEFORE continuum (status-right conflict)
 - Starship `command_timeout = 2000` because Vite+ node shims are slow
 - `secrets.fish` is gitignored — contains env tokens for work services

@@ -18,7 +18,9 @@ DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOTFILES_DIR
 
 # Configuration
-readonly PACKAGES_DIR="${DOTFILES_DIR}/packages"
+readonly NIX_DIR="${DOTFILES_DIR}/nix"
+readonly NIX_PACKAGES="${NIX_DIR}/packages.nix"      # native CLI tools (environment.systemPackages)
+readonly NIX_HOMEBREW="${NIX_DIR}/homebrew.nix"      # casks + custom-tap brews
 readonly HOME_DIR="${DOTFILES_DIR}/home"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_KEY_PATH="${HOME}/.ssh/key.pub"
@@ -116,7 +118,8 @@ check_dependencies() {
 # Order matters: steps run top-to-bottom in cmd_init.
 TOOL_REGISTRY=(
     "Homebrew          ;; brew ;; fn:_install_homebrew                          ;; true  ;; -         ;; true"
-    "Brewfile packages ;; -    ;; fn:_install_packages                          ;; true  ;; -         ;; false"
+    "Nix               ;; nix  ;; fn:_install_nix                               ;; true  ;; -         ;; true"
+    "nix-darwin pkgs   ;; -    ;; fn:_install_packages                          ;; true  ;; -         ;; false"
     "Stow dotfiles     ;; -    ;; fn:_stow_dotfiles                             ;; true  ;; -         ;; false"
     "Bun               ;; bun  ;; curl -fsSL https://bun.sh/install | bash      ;; true  ;; -         ;; true"
     "Vite+             ;; vp   ;; curl -fsSL https://vite.plus | bash           ;; true  ;; -         ;; true"
@@ -189,9 +192,52 @@ run_init_steps() {
     done
 }
 
+# ─── Nix helpers ──────────────────────────────────────────────────────────────
+
+# Host attribute to select in the flake's darwinConfigurations.
+_flake_host() {
+    scutil --get LocalHostName 2>/dev/null || hostname -s
+}
+
+# Apply the nix-darwin configuration. Flakes only see git-tracked files, so we
+# stage the nix sources first (staging, not committing). Uses darwin-rebuild if
+# present, otherwise bootstraps via `nix run nix-darwin`. Activation needs root.
+_darwin_switch() {
+    local host
+    host="$(_flake_host)"
+    git -C "$DOTFILES_DIR" add "$NIX_DIR" "${DOTFILES_DIR}/flake.nix" "${DOTFILES_DIR}/flake.lock" >/dev/null 2>&1 || true
+
+    if command_exists darwin-rebuild; then
+        sudo darwin-rebuild switch --flake "${DOTFILES_DIR}#${host}"
+    else
+        print_info "darwin-rebuild not found; bootstrapping nix-darwin..."
+        sudo nix run nix-darwin -- switch --flake "${DOTFILES_DIR}#${host}"
+    fi
+}
+
 # ─── Installation Functions ───────────────────────────────────────────────────
 # Custom installers called via "fn:" entries. These handle their own idempotency
 # and messaging (except the step header, which the registry loop prints).
+
+# Install the Nix package manager (Determinate Systems installer) if missing.
+_install_nix() {
+    if command_exists nix; then
+        print_success "Nix is already installed"
+        return 0
+    fi
+    print_info "Installing Nix (Determinate Systems)..."
+    if curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --determinate; then
+        print_success "Nix installed"
+        # Make nix available in the current session
+        if [[ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
+            # shellcheck disable=SC1091
+            . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+        fi
+    else
+        print_error "Nix installation failed"
+        return 1
+    fi
+}
 
 _install_homebrew() {
     if command_exists brew; then
@@ -251,92 +297,17 @@ _install_homebrew() {
 }
 
 _install_packages() {
-    
-    if [[ ! -f "${PACKAGES_DIR}/bundle" ]]; then
-        print_error "Base Brewfile not found at ${PACKAGES_DIR}/bundle"
+    if [[ ! -f "${DOTFILES_DIR}/flake.nix" ]]; then
+        print_error "flake.nix not found at ${DOTFILES_DIR}"
         return 1
     fi
-    
-    print_info "Installing base packages..."
-    
-    # Try to install all packages at once first
-    if brew bundle --file="${PACKAGES_DIR}/bundle"; then
-        print_success "All base packages installed successfully"
+
+    print_info "Applying nix-darwin configuration (installs CLI packages + casks)..."
+    if _darwin_switch; then
+        print_success "nix-darwin configuration applied"
     else
-        print_warning "Some packages failed to install, trying individually..."
-        
-        # Parse Brewfile and try to install packages one by one
-        local failed_packages=()
-        local installed_count=0
-        
-        while IFS= read -r line; do
-            # Skip comments and empty lines
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            # Extract package type and name
-            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                print_info "Installing brew package: $package"
-                if brew install "$package" 2>/dev/null; then
-                    ((++installed_count))
-                else
-                    print_warning "Failed to install: $package"
-                    failed_packages+=("brew:$package")
-                fi
-            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                print_info "Installing cask: $package"
-                if brew install --cask "$package" 2>/dev/null; then
-                    ((++installed_count))
-                else
-                    print_warning "Failed to install: $package"
-                    failed_packages+=("cask:$package")
-                fi
-            fi
-        done < "${PACKAGES_DIR}/bundle"
-        
-        if [[ ${#failed_packages[@]} -gt 0 ]]; then
-            print_warning "Failed to install ${#failed_packages[@]} packages:"
-            printf "  - %s\n" "${failed_packages[@]}"
-            
-            # Save failed packages to a file for reference
-            local failed_file
-            failed_file="${PACKAGES_DIR}/failed_packages_$(date +%Y%m%d_%H%M%S).txt"
-            printf "%s\n" "${failed_packages[@]}" > "$failed_file"
-            print_info "Failed packages saved to: $failed_file"
-        fi
-        
-        print_success "Successfully installed $installed_count packages"
-    fi
-    
-    # Work packages
-    if [[ -f "${PACKAGES_DIR}/bundle.work" ]] && confirm "Install work-specific packages?" "n"; then
-        print_info "Installing work packages..."
-        if brew bundle --file="${PACKAGES_DIR}/bundle.work" --no-lock; then
-            print_success "Work packages installed successfully"
-        else
-            print_warning "Some work packages failed to install"
-            
-            # Try individual installation for work packages too
-            local work_failed=()
-            while IFS= read -r line; do
-                [[ "$line" =~ ^[[:space:]]*# ]] && continue
-                [[ -z "${line// }" ]] && continue
-                
-                if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                    local package="${BASH_REMATCH[1]}"
-                    print_info "Installing work package: $package"
-                    if ! brew install "$package" 2>/dev/null; then
-                        work_failed+=("$package")
-                    fi
-                fi
-            done < "${PACKAGES_DIR}/bundle.work"
-            
-            if [[ ${#work_failed[@]} -gt 0 ]]; then
-                print_warning "Failed work packages: ${work_failed[*]}"
-            fi
-        fi
+        print_error "darwin-rebuild switch failed"
+        return 1
     fi
 }
 
@@ -344,7 +315,7 @@ _stow_dotfiles() {
     
     if ! command_exists stow; then
         print_error "GNU Stow is not installed"
-        print_info "Please install stow via Homebrew: brew install stow"
+        print_info "stow is provided by nix; run 'dot init' (or add 'stow' to nix/packages.nix)"
         return 1
     fi
     
@@ -640,11 +611,11 @@ cmd_update() {
         return 1
     fi
     
-    # Update packages
-    if confirm "Update Homebrew packages?" "y"; then
-        print_info "Updating Homebrew..."
-        # WARP adds latency that triggers brew's curl speed-limit abort
-        # Pre-download API files to work around this
+    # Update packages: bump the flake lock (nixpkgs + nix-darwin), then switch.
+    # nix-darwin drives `brew upgrade` for the declared casks during activation.
+    if confirm "Update packages (nix flake update + darwin-rebuild switch)?" "y"; then
+        # WARP adds latency that triggers brew's curl speed-limit abort during
+        # the cask-upgrade phase; pre-download the API files to work around it.
         if pgrep -q "Cloudflare WARP"; then
             print_info "Cloudflare WARP detected, pre-downloading Homebrew API..."
             local api_cache="$HOME/Library/Caches/Homebrew/api"
@@ -652,9 +623,15 @@ cmd_update() {
             curl -fsSL -o "$api_cache/formula.jws.json" "https://formulae.brew.sh/api/formula.jws.json" 2>/dev/null
             curl -fsSL -o "$api_cache/cask.jws.json" "https://formulae.brew.sh/api/cask.jws.json" 2>/dev/null
         fi
-        brew update
-        brew upgrade
-        print_success "Packages updated"
+        print_info "Updating flake inputs..."
+        nix flake update --flake "$DOTFILES_DIR"
+        print_info "Applying configuration..."
+        if _darwin_switch; then
+            print_success "Packages updated"
+        else
+            print_error "darwin-rebuild switch failed"
+            return 1
+        fi
     fi
     
     # Re-stow dotfiles before pi uses checked-out skills and configuration
@@ -696,14 +673,22 @@ cmd_doctor() {
     
     local issues=0
     
-    # Check Homebrew
+    # Check Homebrew (still required: nix-darwin drives it for casks)
     if command_exists brew; then
         print_success "Homebrew installed"
     else
         print_error "Homebrew not installed"
         ((++issues))
     fi
-    
+
+    # Check nix-darwin
+    if command_exists darwin-rebuild; then
+        print_success "nix-darwin (darwin-rebuild) installed"
+    else
+        print_error "nix-darwin not installed (run '${SCRIPT_NAME} init')"
+        ((++issues))
+    fi
+
     # Check Stow
     if command_exists stow; then
         print_success "GNU Stow installed"
@@ -747,7 +732,7 @@ cmd_doctor() {
         fi
     else
         print_warning "jj (Jujutsu) not installed"
-        print_info "Install with: brew install jj"
+        print_info "Install via nix: add 'jujutsu' to ${NIX_PACKAGES##*/} and run '${SCRIPT_NAME} update'"
     fi
     
     # Check symlinks
@@ -890,7 +875,7 @@ cmd_stow() {
     
     if ! command_exists stow; then
         print_error "GNU Stow is not installed"
-        print_info "Install it first: brew install stow"
+        print_info "stow is provided by nix; run 'dot init'"
         return 1
     fi
     
@@ -929,7 +914,7 @@ cmd_completions() {
     # Check if Fish is installed
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
-        print_info "Install Fish shell first: brew install fish"
+        print_info "Fish is provided by nix; run 'dot init'"
         return 1
     fi
     
@@ -972,31 +957,15 @@ complete -c dot -n "__fish_use_subcommand" -l "version" -d "Show version informa
 complete -c dot -n "__fish_use_subcommand" -s "h" -l "help" -d "Show help message"
 
 # Package subcommands
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "add" -d "Add package to bundle and install it"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "remove" -d "Remove package from bundle and optionally uninstall"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "update" -d "Update packages"
-complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "list" -d "List packages in bundle files"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "add" -d "Add a package to the nix config and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "remove" -d "Remove a package from the nix config and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "update" -d "Update flake inputs and apply"
+complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "list" -d "List packages declared in the nix config"
 complete -c dot -n "__fish_seen_subcommand_from package" -n "not __fish_seen_subcommand_from add remove update list help" -a "help" -d "Show package help"
 
-# Package add completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from brew cask" -a "brew" -d "Brew formula"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from brew cask" -a "cask" -d "Brew cask"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -a "base" -d "Add to base bundle"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -a "work" -d "Add to work bundle"
-
-# Package remove/update completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "base" -d "Remove from base bundle only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "work" -d "Remove from work bundle only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -a "auto" -d "Remove from any bundle"
-
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "all" -d "Update all packages"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "base" -d "Update base bundle packages only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -a "work" -d "Update work bundle packages only"
-
-# Package list completions
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "all" -d "List all packages"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "base" -d "List base packages only"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from list" -a "work" -d "List work packages only"
+# Package add type completions
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from pkg cask" -a "pkg" -d "nixpkgs attribute (environment.systemPackages)"
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from add" -n "not __fish_seen_subcommand_from pkg cask" -a "cask" -d "Homebrew cask"
 
 # Benchmark-shell command options
 complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "r" -l "runs" -d "Number of benchmark runs" -xa "5 10 15 20 25 30"
@@ -1006,16 +975,15 @@ complete -c dot -n "__fish_seen_subcommand_from benchmark-shell" -s "h" -l "help
 # Gen-ssh-key command options
 complete -c dot -n "__fish_seen_subcommand_from gen-ssh-key" -s "h" -l "help" -d "Show gen-ssh-key help"
 
-# Dynamic completions for installed packages (when removing or updating)
-function __dot_installed_packages
-    if command -q brew
-        brew list --formula 2>/dev/null | head -20
-        brew list --cask 2>/dev/null | head -20
-    end
+# Dynamic completions for declared packages (when removing)
+function __dot_declared_packages
+    set -l dir (dirname (status -f))/../../../..
+    set -l nixdir "$HOME/.dotfiles/nix"
+    grep -hE '^    [a-zA-Z0-9]' "$nixdir/packages.nix" 2>/dev/null | string trim
+    grep -hE '^[[:space:]]+"' "$nixdir/homebrew.nix" 2>/dev/null | string trim | string trim -c '"' | string replace -r '#.*' ''
 end
 
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_installed_packages)"
-complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from update" -xa "(__dot_installed_packages)"
+complete -c dot -n "__fish_seen_subcommand_from package; and __fish_seen_subcommand_from remove" -xa "(__dot_declared_packages)"
 EOF
 
     if [[ -f "$completions_file" ]]; then
@@ -1044,7 +1012,7 @@ cmd_benchmark_shell() {
     # Check if Fish is installed
     if ! command_exists fish; then
         print_error "Fish shell is not installed"
-        print_info "Install Fish shell first: brew install fish"
+        print_info "Fish is provided by nix; run 'dot init'"
         return 1
     fi
     
@@ -1264,147 +1232,66 @@ printf '%.3f', \$end - \$start;
 }
 
 cmd_retry_failed() {
-    print_header "Retrying failed package installations"
-    
-    # Find the most recent failed packages file
-    local failed_file
-    failed_file=$(find "${PACKAGES_DIR}" -name "failed_packages_*.txt" -type f 2>/dev/null | sort -r | head -1)
-    
-    if [[ -z "$failed_file" || ! -f "$failed_file" ]]; then
-        print_info "No failed packages file found"
-        return 0
-    fi
-    
-    print_info "Found failed packages file: $failed_file"
-    print_info "Attempting to retry installation..."
-    
-    local retry_count=0
-    local success_count=0
-    
-    while IFS= read -r package_info; do
-        ((++retry_count))
-        
-        if [[ "$package_info" =~ ^brew:(.+)$ ]]; then
-            local package="${BASH_REMATCH[1]}"
-            print_info "Retrying brew package: $package"
-            if brew install "$package" 2>/dev/null; then
-                print_success "Successfully installed: $package"
-                ((++success_count))
-            else
-                print_warning "Still failing: $package"
-            fi
-        elif [[ "$package_info" =~ ^cask:(.+)$ ]]; then
-            local package="${BASH_REMATCH[1]}"
-            print_info "Retrying cask: $package"
-            if brew install --cask "$package" 2>/dev/null; then
-                print_success "Successfully installed: $package"
-                ((++success_count))
-            else
-                print_warning "Still failing: $package"
-            fi
-        fi
-    done < "$failed_file"
-    
-    print_info "Retry complete: $success_count/$retry_count packages installed"
-    
-    if [[ $success_count -eq $retry_count ]]; then
-        print_success "All failed packages now installed!"
-        rm "$failed_file"
-    fi
+    print_header "Retry failed installations"
+    print_warning "Obsolete: package installs are now atomic via nix-darwin."
+    print_info "A failed 'darwin-rebuild switch' rolls back with no partial state to retry."
+    print_info "Re-run '${SCRIPT_NAME} update' or 'darwin-rebuild switch' to reapply."
 }
 
 cmd_check_packages() {
-    print_header "Checking installed packages"
-    
-    local missing_brew=()
-    local missing_cask=()
-    local installed_brew=()
-    local installed_cask=()
-    
-    # Get lists of installed packages once to avoid repeated calls
-    local installed_formulas
-    local installed_casks
-    installed_formulas=$(brew list --formula 2>/dev/null || true)
+    print_header "Checking declared packages"
+
+    local missing=()
+
+    # nixpkgs CLI tools: each should resolve on PATH (from the nix profile).
+    print_info "Checking nixpkgs packages ($(basename "$NIX_PACKAGES"))..."
+    local pkg
+    while IFS= read -r pkg; do
+        [[ -z "$pkg" ]] && continue
+        # Map a few nixpkgs attrs to the binary they actually provide.
+        local bin="$pkg"
+        case "$pkg" in
+            awscli2) bin="aws" ;;
+            gnused) bin="sed" ;;
+            gnupg) bin="gpg" ;;
+            neovim) bin="nvim" ;;
+            jujutsu) bin="jj" ;;
+            ripgrep) bin="rg" ;;
+        esac
+        if command_exists "$bin"; then
+            installed=$((${installed:-0} + 1))
+        else
+            missing+=("$pkg (nixpkgs)")
+        fi
+    done < <(grep -E '^    [a-zA-Z0-9]' "$NIX_PACKAGES" 2>/dev/null | tr -d ' ')
+
+    # Homebrew casks/brews declared in homebrew.nix.
+    print_info "Checking Homebrew casks/brews ($(basename "$NIX_HOMEBREW"))..."
+    local installed_casks installed_brews
     installed_casks=$(brew list --cask 2>/dev/null || true)
-    
-    # Check base packages
-    if [[ -f "${PACKAGES_DIR}/bundle" ]]; then
-        print_info "Checking base packages..."
-        
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            if [[ "$line" =~ ^brew[[:space:]] ]]; then
-                local package
-                package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
-                if [[ -n "$package" ]]; then
-                    if echo "$installed_formulas" | grep -q "^${package}$"; then
-                        installed_brew+=("$package")
-                    else
-                        missing_brew+=("$package")
-                    fi
-                fi
-            elif [[ "$line" =~ ^cask[[:space:]] ]]; then
-                local package
-                package=$(echo "$line" | sed -n 's/^cask "\([^"]*\)".*/\1/p')
-                if [[ -n "$package" ]]; then
-                    if echo "$installed_casks" | grep -q "^${package}$"; then
-                        installed_cask+=("$package")
-                    else
-                        missing_cask+=("$package")
-                    fi
-                fi
-            fi
-        done < "${PACKAGES_DIR}/bundle"
-    fi
-    
-    # Check work packages
-    if [[ -f "${PACKAGES_DIR}/bundle.work" ]]; then
-        print_info "Checking work packages..."
-        
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            if [[ "$line" =~ ^brew[[:space:]] ]]; then
-                local package
-                package=$(echo "$line" | sed -n 's/^brew "\([^"]*\)".*/\1/p')
-                if [[ -n "$package" ]]; then
-                    if echo "$installed_formulas" | grep -q "^${package}$"; then
-                        installed_brew+=("$package (work)")
-                    else
-                        missing_brew+=("$package (work)")
-                    fi
-                fi
-            fi
-        done < "${PACKAGES_DIR}/bundle.work"
-    fi
-    
-    # Report results
+    installed_brews=$(brew list --formula 2>/dev/null || true)
+    local entry name
+    while IFS= read -r entry; do
+        name=$(echo "$entry" | tr -d ' "'); name="${name%%#*}"
+        [[ -z "$name" ]] && continue
+        # Taps (owner/tap) aren't formulas/casks — skip them.
+        [[ "$name" == */* ]] && continue
+        # brew lists casks/brews by their full (possibly @-versioned) name.
+        if echo "$installed_casks" | grep -qx "$name" || echo "$installed_brews" | grep -qx "$name"; then
+            :
+        else
+            missing+=("$name (homebrew)")
+        fi
+    done < <(grep -E '^[[:space:]]+"' "$NIX_HOMEBREW" 2>/dev/null)
+
     print_header "Package Status Report"
-    
-    echo -e "\n${BOLD}Installed Packages:${RESET}"
-    print_success "Brew formulas: ${#installed_brew[@]}"
-    print_success "Casks: ${#installed_cask[@]}"
-    
-    if [[ ${#missing_brew[@]} -gt 0 || ${#missing_cask[@]} -gt 0 ]]; then
-        echo -e "\n${BOLD}Missing Packages:${RESET}"
-        
-        if [[ ${#missing_brew[@]} -gt 0 ]]; then
-            print_warning "Missing brew formulas (${#missing_brew[@]}):"
-            printf "  - %s\n" "${missing_brew[@]}"
-        fi
-        
-        if [[ ${#missing_cask[@]} -gt 0 ]]; then
-            print_warning "Missing casks (${#missing_cask[@]}):"
-            printf "  - %s\n" "${missing_cask[@]}"
-        fi
-        
-        echo ""
-        print_info "Run '${SCRIPT_NAME} init' to install missing packages"
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        print_success "All declared packages are present"
     else
-        print_success "All packages are installed!"
+        print_warning "Not found (${#missing[@]}):"
+        printf "  - %s\n" "${missing[@]}"
+        echo ""
+        print_info "Run '${SCRIPT_NAME} init' or 'darwin-rebuild switch' to apply the configuration"
     fi
 }
 
@@ -1436,443 +1323,145 @@ cmd_package() {
     esac
 }
 
-cmd_package_add() {
-    local package_name="$1"
-    local package_type="${2:-auto}"
-    local bundle_file="${3:-base}"
-    
-    if [[ -z "$package_name" ]]; then
-        print_error "Package name required"
-        print_info "Usage: ${SCRIPT_NAME} package add <package-name> [brew|cask] [base|work]"
-        return 1
-    fi
-    
-    # Determine bundle file
-    local target_bundle
-    if [[ "$bundle_file" == "work" ]]; then
-        target_bundle="${PACKAGES_DIR}/bundle.work"
-    else
-        target_bundle="${PACKAGES_DIR}/bundle"
-    fi
-    
-    # Auto-detect package type if not specified
-    if [[ "$package_type" == "auto" ]]; then
-        print_info "Detecting package type..."
-        # Use brew info --json for more precise package detection
-        if brew info --json=v2 --formula "$package_name" >/dev/null 2>&1; then
-            package_type="brew"
-        elif brew info --json=v2 --cask "$package_name" >/dev/null 2>&1; then
-            package_type="cask"
-        else
-            print_warning "Package '$package_name' not found in either formulas or casks"
-            print_info "Defaulting to brew formula. Use 'brew' or 'cask' to specify explicitly"
-            package_type="brew"
-        fi
-    fi
-    
-    # Validate package type
-    if [[ "$package_type" != "brew" && "$package_type" != "cask" ]]; then
-        print_error "Package type must be 'brew' or 'cask'"
-        return 1
-    fi
-    
-    # Check if package already exists in bundle
-    local package_line="${package_type} \"${package_name}\""
-    if grep -q "^${package_line}$" "$target_bundle" 2>/dev/null; then
-        print_warning "Package '$package_name' already exists in $(basename "$target_bundle")"
-        return 0
-    fi
-    
-    print_header "Adding $package_type package: $package_name"
-    
-    # Install the package first
-    print_info "Installing package..."
-    if [[ "$package_type" == "cask" ]]; then
-        if brew install --cask "$package_name"; then
-            print_success "Package installed successfully"
-        else
-            print_error "Failed to install package"
-            return 1
-        fi
-    else
-        if brew install "$package_name"; then
-            print_success "Package installed successfully"
-        else
-            print_error "Failed to install package"
-            return 1
-        fi
-    fi
-    
-    # Add to bundle file
-    print_info "Adding to bundle file..."
-    if [[ ! -f "$target_bundle" ]]; then
-        print_warning "Bundle file doesn't exist, creating: $target_bundle"
-        mkdir -p "$(dirname "$target_bundle")"
-        touch "$target_bundle"
-    fi
-    
-    # Find the right place to insert the package (keep them sorted)
-    local temp_file
-    temp_file=$(mktemp)
-    local inserted=false
-    
+# ─── nix list editing helpers ───────────────────────────────────────────────
+# Insert <name> into a nix list, kept sorted. <marker> is a substring that
+# identifies the list's opening line; the list ends at the next "]".
+#   quote=1 wraps the entry in quotes (casks/brews); quote=0 is a bare attr.
+_nix_list_add() {
+    local file="$1" marker="$2" indent="$3" quote="$4" name="$5"
+    local entry
+    if [[ "$quote" == 1 ]]; then entry="${indent}\"${name}\""; else entry="${indent}${name}"; fi
+    local tmp inserted=false inlist=false line trimmed
+    tmp=$(mktemp)
     while IFS= read -r line || [[ -n "$line" ]]; do
-        # If this is a package line of the same type and comes after our package alphabetically
-        if [[ "$line" =~ ^${package_type}[[:space:]]+\"([^\"]+)\" ]] && [[ "$inserted" == false ]]; then
-            local existing_package="${BASH_REMATCH[1]}"
-            if [[ "$package_name" < "$existing_package" ]]; then
-                echo "$package_line" >> "$temp_file"
-                inserted=true
+        if [[ "$inlist" == false && "$line" == *"$marker"* ]]; then
+            inlist=true; echo "$line" >> "$tmp"; continue
+        fi
+        if [[ "$inlist" == true && "$line" =~ ^[[:space:]]*\] ]]; then
+            [[ "$inserted" == false ]] && echo "$entry" >> "$tmp"
+            inserted=true; inlist=false; echo "$line" >> "$tmp"; continue
+        fi
+        if [[ "$inlist" == true && "$inserted" == false ]]; then
+            trimmed="$(echo "$line" | tr -d ' "')"; trimmed="${trimmed%%#*}"
+            if [[ -n "$trimmed" && "$name" < "$trimmed" ]]; then
+                echo "$entry" >> "$tmp"; inserted=true
             fi
         fi
-        echo "$line" >> "$temp_file"
-    done < "$target_bundle"
-    
-    # If we haven't inserted yet, add at the end
-    if [[ "$inserted" == false ]]; then
-        echo "$package_line" >> "$temp_file"
+        echo "$line" >> "$tmp"
+    done < "$file"
+    mv "$tmp" "$file"
+}
+
+# Remove any list line whose content (sans spaces/quotes/comment) equals <name>.
+_nix_list_remove() {
+    local file="$1" name="$2" tmp
+    tmp=$(mktemp)
+    awk -v n="$name" '{ t=$0; gsub(/[ "]/,"",t); sub(/#.*/,"",t); if (t==n) next; print }' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+cmd_package_add() {
+    local name="$1"
+    local type="${2:-pkg}"
+
+    if [[ -z "$name" ]]; then
+        print_error "Package name required"
+        print_info "Usage: ${SCRIPT_NAME} package add <name> [pkg|cask]"
+        print_info "  pkg  = nixpkgs attribute → ${NIX_PACKAGES##*/} (default)"
+        print_info "  cask = Homebrew cask     → ${NIX_HOMEBREW##*/}"
+        return 1
     fi
-    
-    # Replace the original file
-    mv "$temp_file" "$target_bundle"
-    
-    print_success "Added '$package_name' to $(basename "$target_bundle")"
-    print_info "Package will be included in future installations"
+
+    case "$type" in
+        pkg|brew|formula) type="pkg" ;;
+        cask) type="cask" ;;
+        *) print_error "Type must be 'pkg' (nixpkgs) or 'cask' (homebrew)"; return 1 ;;
+    esac
+
+    print_header "Adding $type: $name"
+
+    if [[ "$type" == "pkg" ]]; then
+        if grep -qE "^[[:space:]]+${name}([[:space:]]|\$)" "$NIX_PACKAGES"; then
+            print_warning "'$name' already in $(basename "$NIX_PACKAGES")"; return 0
+        fi
+        _nix_list_add "$NIX_PACKAGES" "with pkgs; [" "    " 0 "$name"
+        print_success "Added '$name' to $(basename "$NIX_PACKAGES")"
+    else
+        if grep -qE "^[[:space:]]+\"${name}\"" "$NIX_HOMEBREW"; then
+            print_warning "'$name' already in $(basename "$NIX_HOMEBREW")"; return 0
+        fi
+        _nix_list_add "$NIX_HOMEBREW" "casks = [" "      " 1 "$name"
+        print_success "Added cask '$name' to $(basename "$NIX_HOMEBREW")"
+    fi
+
+    if confirm "Apply now (darwin-rebuild switch)?" "y"; then
+        _darwin_switch
+    else
+        print_info "Run '${SCRIPT_NAME} package update' or 'darwin-rebuild switch' to apply"
+    fi
 }
 
 cmd_package_remove() {
-    local package_name="$1"
-    local bundle_file="${2:-auto}"
-    # Escape regex metacharacters in package name
-    local escaped_package
-    # shellcheck disable=SC2016 # Single quotes intentional - \& is sed backreference
-    escaped_package=$(printf '%s' "$package_name" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
+    local name="$1"
 
-    if [[ -z "$package_name" ]]; then
+    if [[ -z "$name" ]]; then
         print_error "Package name required"
-        print_info "Usage: ${SCRIPT_NAME} package remove <package-name> [base|work|auto]"
+        print_info "Usage: ${SCRIPT_NAME} package remove <name>"
         return 1
     fi
-    
-    print_header "Removing package: $package_name"
-    
-    # Determine which bundle files to check
-    local bundle_files=()
-    if [[ "$bundle_file" == "work" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle.work")
-    elif [[ "$bundle_file" == "base" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle")
-    else
-        # Auto mode - check both
-        bundle_files=("${PACKAGES_DIR}/bundle" "${PACKAGES_DIR}/bundle.work")
-    fi
-    
-    local found=false
-    local package_type=""
-    
-    # Find and remove from bundle files
-    for target_bundle in "${bundle_files[@]}"; do
-        if [[ ! -f "$target_bundle" ]]; then
-            continue
-        fi
-        
-        # Check if package exists
-        if grep -q "^\\(brew\\|cask\\)[[:space:]]*\"${escaped_package}\"" "$target_bundle"; then
-            found=true
 
-            # Determine package type
-            if grep -q "^brew[[:space:]]*\"${escaped_package}\"" "$target_bundle"; then
-                package_type="formula"
-            else
-                package_type="cask"
-            fi
+    print_header "Removing package: $name"
 
-            # Remove from bundle file
-            print_info "Removing from $(basename "$target_bundle")..."
-            local temp_file
-            temp_file=$(mktemp)
-            grep -v "^\\(brew\\|cask\\)[[:space:]]*\"${escaped_package}\"" "$target_bundle" > "$temp_file"
-            mv "$temp_file" "$target_bundle"
-            
-            print_success "Removed '$package_name' from $(basename "$target_bundle")"
-        fi
-    done
-    
-    if [[ "$found" == false ]]; then
-        print_warning "Package '$package_name' not found in any bundle files"
+    local in_pkg=false in_cask=false
+    grep -qE "^[[:space:]]+${name}([[:space:]]|\$)" "$NIX_PACKAGES" && in_pkg=true
+    grep -qE "^[[:space:]]+\"${name}\"" "$NIX_HOMEBREW" && in_cask=true
+
+    if [[ "$in_pkg" == false && "$in_cask" == false ]]; then
+        print_warning "'$name' not found in $(basename "$NIX_PACKAGES") or $(basename "$NIX_HOMEBREW")"
         return 0
     fi
-    
-    # Ask if user wants to uninstall the actual package
-    if confirm "Uninstall '$package_name' from system?" "n"; then
-        print_info "Uninstalling package..."
-        if [[ "$package_type" == "cask" ]]; then
-            if brew uninstall --cask "$package_name"; then
-                print_success "Package uninstalled successfully"
-            else
-                print_warning "Failed to uninstall package (it may have dependencies)"
-            fi
-        else
-            if brew uninstall "$package_name"; then
-                print_success "Package uninstalled successfully"
-            else
-                print_warning "Failed to uninstall package (it may have dependencies)"
-            fi
-        fi
+
+    [[ "$in_pkg" == true ]] && { _nix_list_remove "$NIX_PACKAGES" "$name"; print_success "Removed '$name' from $(basename "$NIX_PACKAGES")"; }
+    [[ "$in_cask" == true ]] && { _nix_list_remove "$NIX_HOMEBREW" "$name"; print_success "Removed '$name' from $(basename "$NIX_HOMEBREW")"; }
+
+    # Casks: cleanup="none" means a switch won't uninstall a removed cask — note it.
+    if [[ "$in_cask" == true ]]; then
+        print_info "Note: homebrew cleanup is 'none'; run 'brew uninstall --cask $name' to remove the app, or set onActivation.cleanup = \"zap\"."
+    fi
+
+    if confirm "Apply now (darwin-rebuild switch)?" "y"; then
+        _darwin_switch
     else
-        print_info "Package removed from bundle but left installed on system"
+        print_info "Run '${SCRIPT_NAME} package update' or 'darwin-rebuild switch' to apply"
     fi
 }
 
 cmd_package_update() {
-    local package_name="${1:-all}"
-    local bundle_file="${2:-all}"
-    
     print_header "Updating packages"
-    
-    # If updating a specific package
-    if [[ "$package_name" != "all" ]]; then
-        print_info "Updating specific package: $package_name"
-        
-        # Check if package is installed
-        local is_formula=false
-        local is_cask=false
-        
-        if brew list --formula | grep -q "^${package_name}$"; then
-            is_formula=true
-        elif brew list --cask | grep -q "^${package_name}$"; then
-            is_cask=true  # Used in conditional logic below
-        else
-            print_error "Package '$package_name' is not installed"
-            return 1
-        fi
-        
-        # Update the specific package
-        if [[ "$is_formula" == true ]]; then
-            print_info "Updating brew formula: $package_name"
-            if brew upgrade "$package_name"; then
-                print_success "Updated $package_name successfully"
-            else
-                print_warning "Failed to update $package_name (may already be latest version)"
-            fi
-        elif [[ "$is_cask" == true ]]; then
-            print_info "Updating cask: $package_name"
-            if brew upgrade --cask "$package_name"; then
-                print_success "Updated $package_name successfully"
-            else
-                print_warning "Failed to update $package_name (may already be latest version or not upgradeable)"
-            fi
-        fi
-        return 0
-    fi
-    
-    # Update all packages (default behavior)
-    print_info "Updating Homebrew and all packages..."
-    
-    # Update Homebrew first
-    print_info "Updating Homebrew..."
-    if brew update; then
-        print_success "Homebrew updated successfully"
-    else
-        print_error "Failed to update Homebrew"
+    print_info "Updating flake inputs (nixpkgs + nix-darwin)..."
+    if ! nix flake update --flake "$DOTFILES_DIR"; then
+        print_error "nix flake update failed"
         return 1
     fi
-    
-    # Determine which packages to update based on bundle filter
-    local bundle_files=()
-    local bundle_names=()
-    
-    if [[ "$bundle_file" == "work" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle.work")
-        bundle_names=("work")
-    elif [[ "$bundle_file" == "base" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle")
-        bundle_names=("base")
+    print_info "Applying configuration..."
+    if _darwin_switch; then
+        print_success "Packages updated"
     else
-        # All mode - update everything installed, not just bundle packages
-        print_info "Upgrading all installed packages..."
-        
-        # Upgrade all formulas
-        print_info "Upgrading brew formulas..."
-        if brew upgrade; then
-            print_success "Brew formulas updated"
-        else
-            print_warning "Some brew formulas failed to update"
-        fi
-        
-        # Upgrade all casks
-        print_info "Upgrading casks..."
-        if brew upgrade --cask; then
-            print_success "Casks updated"
-        else
-            print_warning "Some casks failed to update"
-        fi
-        
-        # Cleanup
-        if confirm "Clean up old versions?" "y"; then
-            print_info "Cleaning up old package versions..."
-            brew cleanup
-            print_success "Cleanup completed"
-        fi
-        
-        return 0
-    fi
-    
-    # Update packages from specific bundle(s)
-    local updated_packages=()
-    local failed_packages=()
-    
-    for i in "${!bundle_files[@]}"; do
-        local target_bundle="${bundle_files[$i]}"
-        local bundle_name="${bundle_names[$i]}"
-        
-        if [[ ! -f "$target_bundle" ]]; then
-            print_warning "Bundle file not found: $(basename "$target_bundle")"
-            continue
-        fi
-        
-        print_info "Updating packages from ${bundle_name} bundle..."
-        
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            
-            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                
-                # Check if package is installed
-                if brew list --formula | grep -q "^${package}$"; then
-                    print_info "Updating brew formula: $package"
-                    if brew upgrade "$package" 2>/dev/null; then
-                        updated_packages+=("$package (formula)")
-                    else
-                        # Package might already be up to date
-                        print_info "$package is already up to date"
-                    fi
-                else
-                    print_warning "Package $package not installed, skipping"
-                fi
-                
-            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
-                local package="${BASH_REMATCH[1]}"
-                
-                # Check if cask is installed
-                if brew list --cask | grep -q "^${package}$"; then
-                    print_info "Updating cask: $package"
-                    if brew upgrade --cask "$package" 2>/dev/null; then
-                        updated_packages+=("$package (cask)")
-                    else
-                        # Cask might already be up to date or not upgradeable
-                        print_info "$package is already up to date or not upgradeable"
-                    fi
-                else
-                    print_warning "Cask $package not installed, skipping"
-                fi
-            fi
-        done < "$target_bundle"
-    done
-    
-    # Report results
-    if [[ ${#updated_packages[@]} -gt 0 ]]; then
-        print_success "Updated ${#updated_packages[@]} packages:"
-        printf "  - %s\n" "${updated_packages[@]}"
-    else
-        print_info "All packages are already up to date"
-    fi
-    
-    if [[ ${#failed_packages[@]} -gt 0 ]]; then
-        print_warning "Failed to update ${#failed_packages[@]} packages:"
-        printf "  - %s\n" "${failed_packages[@]}"
-    fi
-    
-    # Cleanup
-    if confirm "Clean up old versions?" "y"; then
-        print_info "Cleaning up old package versions..."
-        brew cleanup
-        print_success "Cleanup completed"
+        print_error "darwin-rebuild switch failed"
+        return 1
     fi
 }
 
 cmd_package_list() {
-    local bundle_file="${1:-all}"
-
     print_header "Listing packages"
 
-    # Cache brew list output once to avoid SIGPIPE issues with pipefail
-    local installed_formulas
-    local installed_casks
-    installed_formulas=$(brew list --formula 2>/dev/null || true)
-    installed_casks=$(brew list --cask 2>/dev/null || true)
+    echo -e "\n${BOLD}nixpkgs — environment.systemPackages ($(basename "$NIX_PACKAGES")):${RESET}"
+    # List items are 4-space-indented bare attrs inside the `with pkgs; [ ]` block.
+    grep -E '^    [a-zA-Z0-9]' "$NIX_PACKAGES" 2>/dev/null | sed 's/^[[:space:]]*/  - /' || print_info "  none"
 
-    # Determine which bundle files to list
-    local bundle_files=()
-    local bundle_names=()
-
-    if [[ "$bundle_file" == "work" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle.work")
-        bundle_names=("work")
-    elif [[ "$bundle_file" == "base" ]]; then
-        bundle_files=("${PACKAGES_DIR}/bundle")
-        bundle_names=("base")
-    else
-        # All mode
-        bundle_files=("${PACKAGES_DIR}/bundle" "${PACKAGES_DIR}/bundle.work")
-        bundle_names=("base" "work")
-    fi
-
-    for i in "${!bundle_files[@]}"; do
-        local target_bundle="${bundle_files[$i]}"
-        local bundle_name="${bundle_names[$i]}"
-
-        if [[ ! -f "$target_bundle" ]]; then
-            if [[ "$bundle_file" != "all" ]]; then
-                print_warning "Bundle file not found: $(basename "$target_bundle")"
-            fi
-            continue
-        fi
-
-        echo -e "\n${BOLD}${bundle_name^} packages ($(basename "$target_bundle")):${RESET}"
-
-        local brew_packages=()
-        local cask_packages=()
-
-        while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-
-            if [[ "$line" =~ ^brew[[:space:]]+\"([^\"]+)\" ]]; then
-                brew_packages+=("${BASH_REMATCH[1]}")
-            elif [[ "$line" =~ ^cask[[:space:]]+\"([^\"]+)\" ]]; then
-                cask_packages+=("${BASH_REMATCH[1]}")
-            fi
-        done < "$target_bundle"
-
-        if [[ ${#brew_packages[@]} -gt 0 ]]; then
-            echo -e "  ${BOLD}Brew formulas (${#brew_packages[@]}):${RESET}"
-            for package in "${brew_packages[@]}"; do
-                if echo "$installed_formulas" | grep -q "^${package}$"; then
-                    print_success "    $package"
-                else
-                    print_error "    $package (not installed)"
-                fi
-            done
-        fi
-
-        if [[ ${#cask_packages[@]} -gt 0 ]]; then
-            echo -e "  ${BOLD}Casks (${#cask_packages[@]}):${RESET}"
-            for package in "${cask_packages[@]}"; do
-                if echo "$installed_casks" | grep -q "^${package}$"; then
-                    print_success "    $package"
-                else
-                    print_error "    $package (not installed)"
-                fi
-            done
-        fi
-
-        if [[ ${#brew_packages[@]} -eq 0 && ${#cask_packages[@]} -eq 0 ]]; then
-            print_info "  No packages found"
-        fi
-    done
+    echo -e "\n${BOLD}Homebrew — taps/brews/casks ($(basename "$NIX_HOMEBREW")):${RESET}"
+    # Quoted entries inside the homebrew lists.
+    grep -E '^[[:space:]]+"' "$NIX_HOMEBREW" 2>/dev/null | tr -d '"' | sed 's/^[[:space:]]*/  - /' | sed 's/#.*//' || print_info "  none"
 }
 
 cmd_package_help() {
@@ -1884,43 +1473,33 @@ cmd_package_help() {
     echo ""
     
     echo -e "${BOLD}SUBCOMMANDS:${RESET}"
-    echo "    add NAME [TYPE] [BUNDLE]   Add package to bundle and install it"
-    echo "    remove NAME [BUNDLE]       Remove package from bundle and optionally uninstall"
-    echo "    update [NAME] [BUNDLE]     Update packages (all packages by default)"
-    echo "    list [BUNDLE]              List packages in bundle files (default)"
-    echo "    help                       Show this help message"
+    echo "    add NAME [pkg|cask]   Add to the nix config and apply (default type: pkg)"
+    echo "    remove NAME           Remove from the nix config and apply"
+    echo "    update                Update flake inputs (nixpkgs + nix-darwin) and apply"
+    echo "    list                  List packages declared in the nix config"
+    echo "    help                  Show this help message"
     echo ""
-    
+
     echo -e "${BOLD}PARAMETERS:${RESET}"
-    echo "    NAME                       Package name (required for add/remove, optional for update)"
-    echo "    TYPE                       Package type: 'brew' or 'cask' (auto-detected if not specified)"
-    echo "    BUNDLE                     Bundle file: 'base', 'work', or 'all' (default varies by command)"
+    echo "    NAME                  pkg: a nixpkgs attribute (e.g. ripgrep, jujutsu, awscli2)"
+    echo "                          cask: a Homebrew cask name (e.g. raycast, zed)"
+    echo "    pkg                   nixpkgs attribute → ${NIX_PACKAGES##*/} (default)"
+    echo "    cask                  Homebrew cask    → ${NIX_HOMEBREW##*/}"
     echo ""
-    
+
     echo -e "${BOLD}EXAMPLES:${RESET}"
-    echo "    ${SCRIPT_NAME} package list               # List all packages"
-    echo "    ${SCRIPT_NAME} package list base          # List base packages only"
-    echo "    ${SCRIPT_NAME} package list work          # List work packages only"
-    echo "    ${SCRIPT_NAME} package add git            # Add git formula to base bundle"
-    echo "    ${SCRIPT_NAME} package add docker cask    # Add docker cask to base bundle"
-    echo "    ${SCRIPT_NAME} package add kubectl brew work  # Add kubectl to work bundle"
-    echo "    ${SCRIPT_NAME} package remove git         # Remove git from any bundle"
-    echo "    ${SCRIPT_NAME} package remove docker base # Remove docker from base bundle only"
-    echo "    ${SCRIPT_NAME} package update             # Update all installed packages"
-    echo "    ${SCRIPT_NAME} package update git         # Update specific package"
-    echo "    ${SCRIPT_NAME} package update all base    # Update only base bundle packages"
-    echo "    ${SCRIPT_NAME} package update all work    # Update only work bundle packages"
+    echo "    ${SCRIPT_NAME} package list                # List declared packages"
+    echo "    ${SCRIPT_NAME} package add ripgrep         # Add nixpkgs 'ripgrep' to packages.nix"
+    echo "    ${SCRIPT_NAME} package add slack cask      # Add 'slack' cask to homebrew.nix"
+    echo "    ${SCRIPT_NAME} package remove ripgrep      # Remove 'ripgrep' from the nix config"
+    echo "    ${SCRIPT_NAME} package update              # Bump flake.lock + darwin-rebuild switch"
     echo ""
-    
+
     echo -e "${BOLD}NOTES:${RESET}"
-    echo "    - Package type is auto-detected if not specified"
-    echo "    - Packages are kept sorted alphabetically within each type"
-    echo "    - Adding a package installs it immediately and adds to bundle"
-    echo "    - Removing a package removes from bundle and optionally uninstalls"
-    echo "    - Updating without arguments updates all installed packages"
-    echo "    - Update command includes Homebrew refresh and optional cleanup"
-    echo "    - Work bundle (bundle.work) is for work-specific packages"
-    echo "    - Base bundle (bundle) is for general-purpose packages"
+    echo "    - 'pkg' adds the nixpkgs attribute name (not the brew name)"
+    echo "    - Entries are kept sorted alphabetically within each list"
+    echo "    - Adding/removing edits the nix file, then runs 'darwin-rebuild switch'"
+    echo "    - Cask removal won't uninstall the app while onActivation.cleanup = \"none\""
     echo ""
 }
 
@@ -1962,12 +1541,11 @@ cmd_help() {
     echo "    ${SCRIPT_NAME} init --skip-ssh           # Initialize without SSH setup"
     echo "    ${SCRIPT_NAME} update                    # Update everything"
     echo "    ${SCRIPT_NAME} doctor                    # Check installation health"
-    echo "    ${SCRIPT_NAME} package list              # List all packages"
-    echo "    ${SCRIPT_NAME} package add git           # Add git package to base bundle"
-    echo "    ${SCRIPT_NAME} package update            # Update all packages"
-    echo "    ${SCRIPT_NAME} package remove docker     # Remove docker from bundles"
-    echo "    ${SCRIPT_NAME} check-packages            # See package installation status"
-    echo "    ${SCRIPT_NAME} retry-failed              # Retry any failed installations"
+    echo "    ${SCRIPT_NAME} package list              # List declared packages"
+    echo "    ${SCRIPT_NAME} package add ripgrep       # Add nixpkgs 'ripgrep' and apply"
+    echo "    ${SCRIPT_NAME} package update            # Bump flake.lock and apply"
+    echo "    ${SCRIPT_NAME} package remove ripgrep    # Remove 'ripgrep' and apply"
+    echo "    ${SCRIPT_NAME} check-packages            # Verify declared packages are present"
     echo "    ${SCRIPT_NAME} benchmark-shell           # Benchmark Fish shell startup time"
     echo "    ${SCRIPT_NAME} benchmark-shell -r 20 -v  # Run 20 benchmarks with verbose output"
     echo "    ${SCRIPT_NAME} gen-ssh-key               # Generate SSH key (prompts for email)"
@@ -1979,14 +1557,14 @@ cmd_help() {
     
     echo -e "${BOLD}CONFIGURATION:${RESET}"
     echo "    Dotfiles directory: ${DOTFILES_DIR}"
-    echo "    Packages directory: ${PACKAGES_DIR}"
+    echo "    Nix config:         ${NIX_DIR}"
     echo "    Home directory:     ${HOME_DIR}"
     echo ""
-    
+
     echo -e "${BOLD}NOTES:${RESET}"
-    echo "    - Package installation is resilient to failures"
-    echo "    - Failed packages are logged and can be retried later"
-    echo "    - SHA verification is disabled for better reliability"
+    echo "    - CLI packages come from nixpkgs (environment.systemPackages)"
+    echo "    - GUI casks + custom-tap brews are managed by nix-darwin's homebrew module"
+    echo "    - 'update' bumps flake.lock then runs 'darwin-rebuild switch' (atomic, rollback-able)"
     echo "    - pi CLI installed via the Vite+ tool registry"
     echo "    - Doctor command checks all critical development tools"
     echo "    - Summary command uses AI to analyze and summarize git commits"
