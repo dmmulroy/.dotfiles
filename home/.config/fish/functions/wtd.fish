@@ -9,6 +9,9 @@ function wtd -d "Create a detached worktree for a remote branch" -a branch direc
     set directory (string replace -a / - -- "$branch")
   end
 
+  set -l worktree_dir (__wt.dir)
+  or return 1
+
   git fetch origin "$branch"
-  and git worktree add --detach "$WT_DIR/$directory" "origin/$branch"
+  and git worktree add --detach "$worktree_dir/$directory" "origin/$branch"
 end
