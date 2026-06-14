@@ -48,6 +48,7 @@ Rules:
 - Extract only questions that require user input.
 - Keep questions in the original order.
 - Each extracted question must be understandable on its own without requiring the user to reread earlier messages.
+- Concisely preserve any context that the user may need to answer the question without needing to reread earlier messages.
 - Prefer preserving the original wording with light cleanup over aggressive paraphrasing.
 - Preserve all details that could affect the answer, including the subject, options, constraints, file/component names, and requested output format.
 - Resolve ambiguous references like "it", "that", "this", or "the above" when nearby text makes the referent clear.
@@ -187,8 +188,8 @@ async function selectExtractionModel(
   modelRegistry: {
     find: (provider: string, modelId: string) => Model<Api> | undefined;
     getApiKeyAndHeaders: (model: Model<Api>) => Promise<
-      | { ok: true; apiKey?: string; headers?: Record<string, string> }
-      | { ok: false; error: string }
+      | { ok: true; apiKey?: string; headers?: Record<string, string>; }
+      | { ok: false; error: string; }
     >;
   },
   preferences: readonly ExtractionModelPreference[],
