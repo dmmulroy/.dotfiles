@@ -9,5 +9,8 @@ function wt -d "Create a worktree and matching branch" -a branch base
     set base main
   end
 
-  git worktree add -b "$branch" "$WT_DIR/$branch" "$base"
+  set -l worktree_dir (__wt.dir)
+  or return 1
+
+  git worktree add -b "$branch" "$worktree_dir/$branch" "$base"
 end
