@@ -1,0 +1,913 @@
+#!/usr/bin/env bash
+# agent-repos - Manage git subtrees vendored for coding-agent reference.
+
+set -euo pipefail
+
+MANIFEST=".agent-repos"
+DEFAULT_BRANCH="main"
+DEFAULT_REPOS_DIR="repos"
+START_MARKER="<!-- agent-repos:start -->"
+END_MARKER="<!-- agent-repos:end -->"
+
+usage() {
+    cat <<'EOF'
+Usage: agent-repos <command> [options]
+
+Commands:
+  init [options]
+      Initialize the current git project for agent-readable vendored repos.
+
+  add <github-url> [options]
+      Add a repository as a squashed git subtree under repos/<name>.
+      Alias: clone
+
+  update <name|prefix> [options]
+      Pull the latest changes for one vendored subtree.
+      Use --all to update every repo tracked in .agent-repos.
+      Alias: pull
+
+  list
+      List vendored repositories in the current git project.
+      Alias: ls
+
+  instructions [options]
+      Add or refresh the root agent instructions block for vendored repos.
+      Aliases: agent-md, agents
+
+  completions [fish] [options]
+      Print shell completions, or install a self-updating fish completion shim.
+      Alias: completion
+
+Options for init:
+  -f, --file FILE       Agent file to update, relative to project root
+                         (default: existing AGENTS.md/AGENT.md, else AGENT.md)
+      --no-instructions Do not update the root agent instructions file
+      --no-detect       Do not detect existing directories under repos/
+      --no-gitignore    Do not add .agent-repos and repos/ to .gitignore
+      --no-gitkeep      Do not create repos/.gitkeep
+      --install-fish-completions
+                         Install the self-updating fish completion shim
+
+Options for add:
+  -n, --name NAME       Logical name (default: repo name from URL)
+  -p, --prefix PATH     Subtree path (default: repos/<name>)
+  -b, --branch BRANCH   Branch/ref to add (default: remote HEAD, fallback main)
+      --no-squash       Do not pass --squash to git subtree
+
+Options for update:
+  -a, --all             Update all repos tracked in .agent-repos
+  -u, --url URL         Override stored URL
+  -p, --prefix PATH     Override stored prefix
+  -b, --branch BRANCH   Override stored branch/ref
+      --no-squash       Do not pass --squash to git subtree
+
+Options for instructions:
+  -f, --file FILE       Agent file to update, relative to project root
+                         (default: existing AGENTS.md/AGENT.md, else AGENT.md)
+
+Options for completions:
+  -i, --install         Install fish completions instead of printing them
+      --path FILE       Install path (default: ~/.config/fish/completions/agent-repos.fish)
+
+Examples:
+  agent-repos init
+  agent-repos add https://github.com/OWNER/REPO.git
+  agent-repos add https://github.com/OWNER/REPO.git --branch main --prefix repos/repo
+  agent-repos list
+  agent-repos update effect
+  agent-repos update --all
+  agent-repos instructions
+  agent-repos instructions --file AGENTS.md
+  agent-repos completions fish
+  agent-repos completions fish --install
+
+This creates/updates a .agent-repos manifest so update/list can remember each
+subtree's URL, prefix, branch, and squash setting.
+EOF
+}
+
+die() {
+    echo "agent-repos: $*" >&2
+    exit 1
+}
+
+project_root() {
+    git rev-parse --show-toplevel 2>/dev/null || die "not inside a git repository"
+}
+
+manifest_path() {
+    local root="$1"
+    printf '%s/%s\n' "$root" "$MANIFEST"
+}
+
+ensure_manifest() {
+    local root="$1"
+    local path
+    path=$(manifest_path "$root")
+
+    if [[ ! -f "$path" ]]; then
+        cat >"$path" <<'EOF'
+# agent-repos manifest
+# name	prefix	url	branch	squash
+EOF
+    fi
+}
+
+manifest_rows() {
+    local root="$1"
+    local path
+    path=$(manifest_path "$root")
+
+    [[ -f "$path" ]] || return 0
+    awk -F '\t' 'NF >= 4 && $1 !~ /^#/ && $1 != "" { print }' "$path"
+}
+
+manifest_get() {
+    local root="$1"
+    local key="$2"
+    local path
+    path=$(manifest_path "$root")
+
+    [[ -f "$path" ]] || return 1
+    awk -F '\t' -v key="$key" 'NF >= 4 && $1 !~ /^#/ && ($1 == key || $2 == key) { print; found = 1; exit } END { exit found ? 0 : 1 }' "$path"
+}
+
+manifest_upsert() {
+    local root="$1"
+    local name="$2"
+    local prefix="$3"
+    local url="$4"
+    local branch="$5"
+    local squash="$6"
+    local path tmp
+
+    ensure_manifest "$root"
+    path=$(manifest_path "$root")
+    tmp=$(mktemp)
+
+    awk -F '\t' \
+        -v OFS='\t' \
+        -v name="$name" \
+        -v prefix="$prefix" \
+        -v url="$url" \
+        -v branch="$branch" \
+        -v squash="$squash" '
+            $1 == name && $1 !~ /^#/ {
+                print name, prefix, url, branch, squash
+                found = 1
+                next
+            }
+            { print }
+            END {
+                if (!found) {
+                    print name, prefix, url, branch, squash
+                }
+            }
+        ' "$path" >"$tmp"
+
+    mv "$tmp" "$path"
+}
+
+strip_trailing_slashes() {
+    local value="$1"
+    while [[ "$value" == */ ]]; do
+        value="${value%/}"
+    done
+    printf '%s\n' "$value"
+}
+
+default_branch_for_url() {
+    local url="$1"
+    local branch
+
+    branch=$(git ls-remote --symref "$url" HEAD 2>/dev/null | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }') || true
+    if [[ -n "$branch" ]]; then
+        printf '%s\n' "$branch"
+    else
+        printf '%s\n' "$DEFAULT_BRANCH"
+    fi
+}
+
+name_from_url() {
+    local url base
+    url=$(strip_trailing_slashes "$1")
+    base="${url##*/}"
+    base="${base%.git}"
+    [[ -n "$base" ]] || die "could not infer repo name from URL: $1"
+    printf '%s\n' "$base"
+}
+
+run_subtree_add() {
+    local prefix="$1"
+    local url="$2"
+    local branch="$3"
+    local squash="$4"
+    local cmd=(git subtree add "--prefix=$prefix" "$url" "$branch")
+
+    if [[ "$squash" == "true" ]]; then
+        cmd+=(--squash)
+    fi
+
+    printf '+ '
+    printf '%q ' "${cmd[@]}"
+    printf '\n'
+    "${cmd[@]}"
+}
+
+run_subtree_pull() {
+    local prefix="$1"
+    local url="$2"
+    local branch="$3"
+    local squash="$4"
+    local cmd=(git subtree pull "--prefix=$prefix" "$url" "$branch")
+
+    if [[ "$squash" == "true" ]]; then
+        cmd+=(--squash)
+    fi
+
+    printf '+ '
+    printf '%q ' "${cmd[@]}"
+    printf '\n'
+    "${cmd[@]}"
+}
+
+ensure_gitignore_entry() {
+    local file="$1"
+    local entry="$2"
+
+    if [[ ! -f "$file" ]]; then
+        : >"$file"
+    fi
+
+    if ! grep -Fxq "$entry" "$file"; then
+        if [[ -s "$file" && $(tail -c 1 "$file" 2>/dev/null) != "" ]]; then
+            printf '\n' >>"$file"
+        fi
+        printf '%s\n' "$entry" >>"$file"
+    fi
+}
+
+update_gitignore() {
+    local root="$1"
+    local file="$root/.gitignore"
+
+    ensure_gitignore_entry "$file" ".agent-repos"
+    ensure_gitignore_entry "$file" "repos/"
+}
+
+normalize_repo_url() {
+    local url="$1"
+
+    url="${url#git+}"
+    url="${url%.git}"
+    if [[ "$url" =~ ^git@github\.com:(.+)$ ]]; then
+        url="https://github.com/${BASH_REMATCH[1]}"
+    fi
+    printf '%s\n' "$url"
+}
+
+infer_repo_url_from_dir() {
+    local dir="$1"
+    local url=""
+
+    if [[ -d "$dir/.git" || -f "$dir/.git" ]]; then
+        url=$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)
+        if [[ -n "$url" ]]; then
+            normalize_repo_url "$url"
+            return 0
+        fi
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        url=$(python3 - "$dir" <<'PY' 2>/dev/null || true
+import json
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+repo_re = re.compile(r"(?:git\+)?(?:(https://github\.com/)|git@github\.com:)([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[#/].*)?$")
+
+
+def clean(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    match = repo_re.search(value)
+    if not match:
+        return None
+    owner, repo = match.group(2), match.group(3)
+    if owner == "user-attachments":
+        return None
+    return f"https://github.com/{owner}/{repo}"
+
+package_json = root / "package.json"
+if package_json.exists():
+    try:
+        data = json.loads(package_json.read_text())
+    except Exception:
+        data = {}
+
+    candidates = []
+    repository = data.get("repository")
+    if isinstance(repository, dict):
+        candidates.append(repository.get("url"))
+    else:
+        candidates.append(repository)
+    bugs = data.get("bugs")
+    if isinstance(bugs, dict):
+        candidates.append(bugs.get("url"))
+    candidates.append(data.get("homepage"))
+
+    for candidate in candidates:
+        result = clean(candidate)
+        if result:
+            print(result)
+            raise SystemExit(0)
+
+for name in ("README.md", "AGENTS.md", "AGENT.md", "LLMS.md"):
+    path = root / name
+    if not path.exists():
+        continue
+    try:
+        text = path.read_text(errors="ignore")
+    except Exception:
+        continue
+    for raw in re.findall(r"(?:git\+)?(?:https://github\.com/|git@github\.com:)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?", text):
+        result = clean(raw)
+        if result:
+            print(result)
+            raise SystemExit(0)
+PY
+)
+        if [[ -n "$url" ]]; then
+            normalize_repo_url "$url"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+detect_existing_repos() {
+    local root="$1"
+    local repos_dir="$root/$DEFAULT_REPOS_DIR"
+    local dir name prefix url branch squash detected="false"
+
+    [[ -d "$repos_dir" ]] || return 0
+
+    for dir in "$repos_dir"/*; do
+        [[ -d "$dir" ]] || continue
+        name="${dir##*/}"
+        prefix="${dir#$root/}"
+
+        if manifest_get "$root" "$name" >/dev/null || manifest_get "$root" "$prefix" >/dev/null; then
+            continue
+        fi
+
+        url=$(infer_repo_url_from_dir "$dir" || true)
+        if [[ -z "$url" ]]; then
+            url="UNKNOWN"
+        fi
+        branch="$DEFAULT_BRANCH"
+        squash="true"
+
+        manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
+        detected="true"
+        if [[ "$url" == "UNKNOWN" ]]; then
+            echo "Detected $prefix (URL unknown; update once with: agent-repos update $name --url <github-url>)"
+        else
+            echo "Detected $prefix -> $url"
+        fi
+    done
+
+    [[ "$detected" == "true" ]] || return 0
+}
+
+cmd_init() {
+    local root requested_file="" update_instructions="true" detect_repos="true" update_ignore="true" create_gitkeep="true" install_completions="false"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--file)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                requested_file="$2"
+                shift 2
+                ;;
+            --no-instructions)
+                update_instructions="false"
+                shift
+                ;;
+            --no-detect)
+                detect_repos="false"
+                shift
+                ;;
+            --no-gitignore)
+                update_ignore="false"
+                shift
+                ;;
+            --no-gitkeep)
+                create_gitkeep="false"
+                shift
+                ;;
+            --install-fish-completions)
+                install_completions="true"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                die "unknown init option: $1"
+                ;;
+        esac
+    done
+
+    root=$(project_root)
+    cd "$root"
+
+    ensure_manifest "$root"
+    if [[ "$update_ignore" == "true" ]]; then
+        update_gitignore "$root"
+    fi
+    mkdir -p "$DEFAULT_REPOS_DIR"
+    if [[ "$detect_repos" == "true" ]]; then
+        detect_existing_repos "$root"
+    fi
+    if [[ "$create_gitkeep" == "true" ]]; then
+        : >"$DEFAULT_REPOS_DIR/.gitkeep"
+    fi
+
+    if [[ "$update_instructions" == "true" ]]; then
+        if [[ -n "$requested_file" ]]; then
+            cmd_instructions --file "$requested_file"
+        else
+            cmd_instructions
+        fi
+    fi
+
+    if [[ "$install_completions" == "true" ]]; then
+        install_fish_completion "${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/agent-repos.fish"
+    fi
+
+    echo "Initialized agent-repos in ${root}"
+    echo "Next: agent-repos add https://github.com/OWNER/REPO.git"
+}
+
+cmd_add() {
+    local root url name="" prefix="" branch="" squash="true"
+
+    [[ $# -ge 1 ]] || die "Usage: agent-repos add <github-url> [--name NAME] [--branch BRANCH] [--prefix PATH]"
+    url="$1"
+    shift
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -n|--name)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                name="$2"
+                shift 2
+                ;;
+            -p|--prefix)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                prefix="$2"
+                shift 2
+                ;;
+            -b|--branch)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                branch="$2"
+                shift 2
+                ;;
+            --no-squash)
+                squash="false"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                die "unknown add option: $1"
+                ;;
+        esac
+    done
+
+    root=$(project_root)
+    cd "$root"
+
+    [[ -n "$name" ]] || name=$(name_from_url "$url")
+    [[ -n "$prefix" ]] || prefix="$DEFAULT_REPOS_DIR/$name"
+    [[ -n "$branch" ]] || branch=$(default_branch_for_url "$url")
+    [[ ! -e "$prefix" ]] || die "prefix already exists: $prefix"
+
+    run_subtree_add "$prefix" "$url" "$branch" "$squash"
+    manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
+
+    echo "Tracked $name at $prefix in $MANIFEST"
+    echo "Run: agent-repos instructions"
+}
+
+update_one() {
+    local root="$1"
+    local key="$2"
+    local override_url="$3"
+    local override_prefix="$4"
+    local override_branch="$5"
+    local override_squash="$6"
+    local row name prefix url branch squash
+
+    if row=$(manifest_get "$root" "$key"); then
+        IFS=$'\t' read -r name prefix url branch squash <<<"$row"
+    else
+        name="$key"
+        prefix="$override_prefix"
+        url="$override_url"
+        branch="$override_branch"
+        squash="$override_squash"
+        [[ -n "$prefix" && -n "$url" ]] || die "'$key' is not in $MANIFEST; pass --prefix and --url or add it first"
+        [[ -n "$branch" ]] || branch=$(default_branch_for_url "$url")
+    fi
+
+    [[ -n "$override_url" ]] && url="$override_url"
+    [[ -n "$override_prefix" ]] && prefix="$override_prefix"
+    [[ -n "$override_branch" ]] && branch="$override_branch"
+    [[ "$url" != "UNKNOWN" ]] || die "URL for '$name' is unknown; rerun with: agent-repos update $name --url <github-url>"
+    [[ -n "$branch" ]] || branch=$(default_branch_for_url "$url")
+    [[ -n "$override_squash" ]] && squash="$override_squash"
+    [[ -n "$squash" ]] || squash="true"
+
+    echo "Updating $name ($prefix) from $url @ $branch"
+    run_subtree_pull "$prefix" "$url" "$branch" "$squash"
+    manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
+}
+
+cmd_update() {
+    local root key="" all="false" override_url="" override_prefix="" override_branch="" override_squash=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -a|--all)
+                all="true"
+                shift
+                ;;
+            -u|--url)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                override_url="$2"
+                shift 2
+                ;;
+            -p|--prefix)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                override_prefix="$2"
+                shift 2
+                ;;
+            -b|--branch)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                override_branch="$2"
+                shift 2
+                ;;
+            --no-squash)
+                override_squash="false"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                if [[ -n "$key" ]]; then
+                    die "too many update arguments: $*"
+                fi
+                key="$1"
+                shift
+                ;;
+        esac
+    done
+
+    root=$(project_root)
+    cd "$root"
+
+    if [[ "$all" == "true" ]]; then
+        [[ -z "$key" ]] || die "use either --all or a single repo name/prefix"
+        [[ -f "$MANIFEST" ]] || die "no $MANIFEST manifest found"
+        while IFS=$'\t' read -r name _prefix _url _branch _squash; do
+            [[ -n "$name" ]] || continue
+            update_one "$root" "$name" "$override_url" "$override_prefix" "$override_branch" "$override_squash"
+        done < <(manifest_rows "$root")
+        return 0
+    fi
+
+    [[ -n "$key" ]] || die "Usage: agent-repos update <name|prefix> [options] or agent-repos update --all"
+    update_one "$root" "$key" "$override_url" "$override_prefix" "$override_branch" "$override_squash"
+}
+
+cmd_list() {
+    local root rows_found="false" name prefix url branch squash
+
+    root=$(project_root)
+    cd "$root"
+
+    if [[ -f "$MANIFEST" ]]; then
+        printf '%-20s %-28s %-10s %s\n' "NAME" "PREFIX" "BRANCH" "URL"
+        while IFS=$'\t' read -r name prefix url branch squash; do
+            rows_found="true"
+            printf '%-20s %-28s %-10s %s\n' "$name" "$prefix" "$branch" "$url"
+        done < <(manifest_rows "$root")
+    fi
+
+    if [[ "$rows_found" == "false" ]]; then
+        if [[ -d "$DEFAULT_REPOS_DIR" ]]; then
+            echo "No $MANIFEST manifest entries found. Discovered directories under $DEFAULT_REPOS_DIR/:"
+            find "$DEFAULT_REPOS_DIR" -mindepth 1 -maxdepth 1 -type d -print | sort
+        else
+            echo "No vendored repos found."
+            echo "Add one with: agent-repos add https://github.com/OWNER/REPO.git"
+        fi
+    fi
+}
+
+agent_file_path() {
+    local root="$1"
+    local requested="$2"
+
+    if [[ -n "$requested" ]]; then
+        printf '%s/%s\n' "$root" "$requested"
+    elif [[ -f "$root/AGENTS.md" ]]; then
+        printf '%s/AGENTS.md\n' "$root"
+    elif [[ -f "$root/AGENT.md" ]]; then
+        printf '%s/AGENT.md\n' "$root"
+    else
+        printf '%s/AGENT.md\n' "$root"
+    fi
+}
+
+append_repo_bullets() {
+    local root="$1"
+    local emitted="false"
+    local name prefix url branch squash lower_name
+
+    while IFS=$'\t' read -r name prefix url branch squash; do
+        emitted="true"
+        printf -- '- @%s/ — %s' "${prefix%/}" "$url"
+        [[ -n "$branch" ]] && printf ' (%s)' "$branch"
+        printf '\n'
+    done < <(manifest_rows "$root")
+
+    if [[ "$emitted" == "false" && -d "$root/$DEFAULT_REPOS_DIR" ]]; then
+        find "$root/$DEFAULT_REPOS_DIR" -mindepth 1 -maxdepth 1 -type d -print | sort | while read -r dir; do
+            printf -- '- @%s/\n' "${dir#"$root/"}"
+        done
+    fi
+}
+
+generate_instructions_block() {
+    local root="$1"
+
+    cat <<EOF
+$START_MARKER
+## Vendored Repositories
+
+This project vendors external repositories under @repos/ for coding-agent reference.
+
+- Use vendored repositories as read-only reference material when working with related libraries.
+- Prefer examples and patterns from vendored source code over generated guesses or web search results.
+- Do not edit files under @repos/ unless explicitly asked.
+- Do not import from @repos/; application code should continue importing from normal package dependencies.
+EOF
+
+    if [[ -f "$(manifest_path "$root")" || -d "$root/$DEFAULT_REPOS_DIR" ]]; then
+        cat <<'EOF'
+
+Vendored repositories currently available:
+EOF
+        append_repo_bullets "$root"
+    fi
+
+    cat <<'EOF'
+
+When working with a related library, inspect its vendored repository for idiomatic usage, tests, module structure, API design, examples, and docs. If the vendored repository contains agent-oriented guidance such as LLMS.md, AGENTS.md, or AGENT.md, read that guidance before making changes.
+
+When repeatedly working with a vendored library, consider creating a project-local pattern file under agent-patterns/ (for example, agent-patterns/<library>-<topic>.md) that summarizes the implementation, tests, docs, common constructors/combinators, examples, error-handling patterns, and what to avoid.
+EOF
+
+    cat <<EOF
+$END_MARKER
+EOF
+}
+
+cmd_instructions() {
+    local root requested_file="" file block_file tmp
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--file)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                requested_file="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                die "unknown instructions option: $1"
+                ;;
+        esac
+    done
+
+    root=$(project_root)
+    cd "$root"
+    file=$(agent_file_path "$root" "$requested_file")
+    mkdir -p "$(dirname "$file")"
+
+    block_file=$(mktemp)
+    generate_instructions_block "$root" >"$block_file"
+
+    tmp=$(mktemp)
+    if [[ -f "$file" ]]; then
+        awk -v start="$START_MARKER" -v end="$END_MARKER" -v block_file="$block_file" '
+            BEGIN {
+                while ((getline line < block_file) > 0) {
+                    block = block line ORS
+                }
+                sub(ORS "$", "", block)
+            }
+            $0 == start {
+                print block
+                in_block = 1
+                replaced = 1
+                next
+            }
+            $0 == end {
+                in_block = 0
+                next
+            }
+            !in_block { print }
+            END {
+                if (!replaced) {
+                    if (NR > 0) print ""
+                    print block
+                }
+            }
+        ' "$file" >"$tmp"
+    else
+        {
+            echo "# Agent Instructions"
+            echo
+            cat "$block_file"
+        } >"$tmp"
+    fi
+
+    mv "$tmp" "$file"
+    rm -f "$block_file"
+
+    echo "Updated ${file#$root/}"
+}
+
+generate_fish_completions() {
+    cat <<'EOF'
+# Fish completions for agent-repos.
+# Generated by: agent-repos completions fish
+
+function __agent_repos_names
+    set -l root (git rev-parse --show-toplevel 2>/dev/null)
+    if test -n "$root"; and test -f "$root/.agent-repos"
+        awk -F '\t' 'NF >= 4 && $1 !~ /^#/ { print $1 "\t" $2 }' "$root/.agent-repos"
+    end
+end
+
+complete -c agent-repos -f
+complete -c agent-repos -n __fish_use_subcommand -a 'init' -d 'Initialize project for vendored repos'
+complete -c agent-repos -n __fish_use_subcommand -a 'add' -d 'Add a repo as a git subtree'
+complete -c agent-repos -n __fish_use_subcommand -a 'clone' -d 'Alias for add'
+complete -c agent-repos -n __fish_use_subcommand -a 'update' -d 'Update a vendored subtree'
+complete -c agent-repos -n __fish_use_subcommand -a 'pull' -d 'Alias for update'
+complete -c agent-repos -n __fish_use_subcommand -a 'list' -d 'List vendored repos'
+complete -c agent-repos -n __fish_use_subcommand -a 'ls' -d 'Alias for list'
+complete -c agent-repos -n __fish_use_subcommand -a 'instructions' -d 'Update root agent instructions'
+complete -c agent-repos -n __fish_use_subcommand -a 'agent-md' -d 'Alias for instructions'
+complete -c agent-repos -n __fish_use_subcommand -a 'agents' -d 'Alias for instructions'
+complete -c agent-repos -n __fish_use_subcommand -a 'completions' -d 'Print or install shell completions'
+complete -c agent-repos -n __fish_use_subcommand -a 'completion' -d 'Alias for completions'
+complete -c agent-repos -n __fish_use_subcommand -a 'help' -d 'Show help'
+
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -s f -l file -r -d 'Agent file to update'
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -l no-instructions -d 'Do not update agent instructions'
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -l no-detect -d 'Do not detect existing repos/'
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -l no-gitignore -d 'Do not update .gitignore'
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -l no-gitkeep -d 'Do not create repos/.gitkeep'
+complete -c agent-repos -n '__fish_seen_subcommand_from init' -l install-fish-completions -d 'Install fish completion shim'
+
+complete -c agent-repos -n '__fish_seen_subcommand_from add clone' -s n -l name -r -d 'Logical repo name'
+complete -c agent-repos -n '__fish_seen_subcommand_from add clone' -s p -l prefix -r -d 'Subtree path'
+complete -c agent-repos -n '__fish_seen_subcommand_from add clone' -s b -l branch -r -d 'Branch/ref'
+complete -c agent-repos -n '__fish_seen_subcommand_from add clone' -l no-squash -d 'Do not squash subtree history'
+
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -a '(__agent_repos_names)' -d 'Vendored repo'
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -s a -l all -d 'Update all tracked repos'
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -s u -l url -r -d 'Override repo URL'
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -s p -l prefix -r -d 'Override subtree path'
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -s b -l branch -r -d 'Override branch/ref'
+complete -c agent-repos -n '__fish_seen_subcommand_from update pull' -l no-squash -d 'Do not squash subtree history'
+
+complete -c agent-repos -n '__fish_seen_subcommand_from instructions agent-md agents' -s f -l file -r -d 'Agent file to update'
+
+complete -c agent-repos -n '__fish_seen_subcommand_from completions completion' -a 'fish' -d 'Fish shell'
+complete -c agent-repos -n '__fish_seen_subcommand_from completions completion' -s i -l install -d 'Install self-updating fish completion shim'
+complete -c agent-repos -n '__fish_seen_subcommand_from completions completion' -l path -r -d 'Completion install path'
+EOF
+}
+
+install_fish_completion() {
+    local path="$1"
+
+    mkdir -p "$(dirname "$path")"
+    cat >"$path" <<'EOF'
+# Installed by `agent-repos completions fish --install`.
+# This shim sources completions generated by the CLI so they stay up to date.
+if type -q agent-repos
+    agent-repos completions fish | source
+end
+EOF
+    echo "Installed fish completions to $path"
+}
+
+cmd_completions() {
+    local shell="fish" install="false" path=""
+
+    if [[ $# -gt 0 && "$1" != -* ]]; then
+        shell="$1"
+        shift
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -i|--install)
+                install="true"
+                shift
+                ;;
+            --path)
+                [[ $# -ge 2 ]] || die "$1 requires a value"
+                path="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                die "unknown completions option: $1"
+                ;;
+        esac
+    done
+
+    case "$shell" in
+        fish)
+            if [[ "$install" == "true" ]]; then
+                [[ -n "$path" ]] || path="${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/agent-repos.fish"
+                install_fish_completion "$path"
+            else
+                generate_fish_completions
+            fi
+            ;;
+        *)
+            die "unsupported shell for completions: $shell"
+            ;;
+    esac
+}
+
+cmd="${1:-}"
+if [[ $# -gt 0 ]]; then
+    shift
+fi
+
+case "$cmd" in
+    init)
+        cmd_init "$@"
+        ;;
+    add|clone)
+        cmd_add "$@"
+        ;;
+    update|pull)
+        cmd_update "$@"
+        ;;
+    list|ls)
+        cmd_list "$@"
+        ;;
+    instructions|agent-md|agents)
+        cmd_instructions "$@"
+        ;;
+    completions|completion)
+        cmd_completions "$@"
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    "")
+        usage
+        exit 1
+        ;;
+    *)
+        die "unknown command: $cmd"
+        ;;
+esac
