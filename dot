@@ -197,6 +197,18 @@ _flake_host() {
     scutil --get LocalHostName 2>/dev/null || hostname -s
 }
 
+# `sudo darwin-rebuild`/`sudo nix run nix-darwin` can regenerate flake.lock as
+# root, after which `nix flake update` (run unprivileged) fails with EACCES.
+# Reclaim ownership before any lock-writing step so updates don't break.
+_fix_flake_lock_owner() {
+    local lock="${DOTFILES_DIR}/flake.lock"
+    [[ -e "$lock" ]] || return 0
+    if [[ ! -O "$lock" ]]; then
+        print_warning "flake.lock is not owned by $(whoami); fixing ownership..."
+        sudo chown "$(id -un):$(id -gn)" "$lock"
+    fi
+}
+
 # Apply the nix-darwin configuration. Flakes only see git-tracked files, so we
 # stage the nix sources first (staging, not committing). Uses darwin-rebuild if
 # present, otherwise bootstraps via `nix run nix-darwin`. Activation needs root.
@@ -622,6 +634,7 @@ cmd_update() {
             curl -fsSL -o "$api_cache/cask.jws.json" "https://formulae.brew.sh/api/cask.jws.json" 2>/dev/null
         fi
         print_info "Updating flake inputs..."
+        _fix_flake_lock_owner
         nix flake update --flake "$DOTFILES_DIR"
         print_info "Applying configuration..."
         if _darwin_switch; then
@@ -1456,6 +1469,7 @@ cmd_package_remove() {
 cmd_package_update() {
     print_header "Updating packages"
     print_info "Updating flake inputs (nixpkgs + nix-darwin)..."
+    _fix_flake_lock_owner
     if ! nix flake update --flake "$DOTFILES_DIR"; then
         print_error "nix flake update failed"
         return 1
