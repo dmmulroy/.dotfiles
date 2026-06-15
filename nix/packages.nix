@@ -10,6 +10,7 @@
     cargo
     clippy
     cloc
+    cloudflared
     cmake
     direnv
     doggo

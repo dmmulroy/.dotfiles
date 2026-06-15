@@ -23,4 +23,6 @@
 
   # Used for backwards compatibility — do not change after first switch.
   system.stateVersion = 5;
+
+  services.tailscale.enable = true;
 }
