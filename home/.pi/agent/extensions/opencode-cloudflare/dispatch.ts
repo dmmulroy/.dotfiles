@@ -186,6 +186,20 @@ function adjustMaxTokensForThinking(baseMaxTokens: number, modelMaxTokens: numbe
 	return { maxTokens, thinkingBudget };
 }
 
+function rewriteAnthropicAdaptiveThinkingPayload(payload: unknown, effort: AnthropicOptions["effort"]): unknown {
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+	const body = payload as Record<string, unknown>;
+	const existingThinking = body.thinking && typeof body.thinking === "object" && !Array.isArray(body.thinking)
+		? body.thinking as Record<string, unknown>
+		: {};
+	const display = typeof existingThinking.display === "string" ? existingThinking.display : "summarized";
+	return {
+		...body,
+		thinking: { type: "adaptive", display },
+		...(effort ? { output_config: { ...(body.output_config && typeof body.output_config === "object" && !Array.isArray(body.output_config) ? body.output_config : {}), effort } } : {}),
+	};
+}
+
 function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions | undefined, token: string, client: Anthropic): AnthropicOptions {
 	const base: AnthropicOptions = {
 		temperature: options?.temperature,
@@ -210,7 +224,12 @@ function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions |
 	};
 	if (!options?.reasoning) return { ...base, thinkingEnabled: false };
 	if (supportsAdaptiveThinking(model)) {
-		return { ...base, thinkingEnabled: true, effort: mapThinkingLevelToEffort(model, options.reasoning) };
+		const effort = mapThinkingLevelToEffort(model, options.reasoning);
+		const onPayload = async (payload: unknown, payloadModel: Model<Api>) => {
+			const rewritten = rewriteAnthropicAdaptiveThinkingPayload(payload, effort);
+			return (await options.onPayload?.(rewritten, payloadModel)) ?? rewritten;
+		};
+		return { ...base, thinkingEnabled: true, effort, onPayload };
 	}
 	const adjusted = adjustMaxTokensForThinking(base.maxTokens || 0, model.maxTokens, options.reasoning, options.thinkingBudgets);
 	return { ...base, maxTokens: adjusted.maxTokens, thinkingEnabled: true, thinkingBudgetTokens: adjusted.thinkingBudget };
