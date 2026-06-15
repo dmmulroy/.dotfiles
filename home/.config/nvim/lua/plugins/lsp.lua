@@ -75,19 +75,6 @@ return {
 					},
 				},
 				svelte = {},
-				ts_ls = {
-					filetypes = { "typescript", "javascript", "javascriptreact", "typescriptreact", "vue" },
-					init_options = {
-						plugins = {
-							{
-								name = "@vue/typescript-plugin",
-								location = vim.fn.stdpath("data")
-									.. "/mason/packages/vue-language-server/node_modules/@vue/language-server",
-								languages = { "vue" },
-							},
-						},
-					},
-				},
 				vue_ls = {},
 				rust_analyzer = {
 					settings = {
@@ -103,8 +90,15 @@ return {
 				stylua = {},
 			}
 
+			-- Tools that aren't auto-attaching LSP servers but must still be installed.
+			-- typescript-language-server is used only as the TS host for Vue (see FileType autocmd below).
+			local extra_tools = {
+				["typescript-language-server"] = {},
+			}
+
 			local manually_installed_servers = { "ocamllsp" }
-			local mason_tools_to_install = vim.tbl_keys(vim.tbl_deep_extend("force", {}, servers, formatters))
+			local mason_tools_to_install =
+				vim.tbl_keys(vim.tbl_deep_extend("force", {}, servers, formatters, extra_tools))
 			local ensure_installed = vim.tbl_filter(function(name)
 				return not vim.tbl_contains(manually_installed_servers, name)
 			end, mason_tools_to_install)
@@ -177,25 +171,32 @@ return {
 
 			-- Setup Mason for managing external LSP servers
 			require("mason").setup({ ui = { border = "rounded" } })
-			require("mason-lspconfig").setup()
+			-- Don't auto-enable every installed server; the loop above enables exactly
+			-- the servers we want. Otherwise mason re-enables ts_ls/vtsls just because
+			-- their binaries are installed, duplicating typescript-tools on TS files.
+			require("mason-lspconfig").setup({ automatic_enable = false })
 			vim.api.nvim_create_autocmd("FileType", {
 
 				pattern = "vue",
 				callback = function(args)
 					local root_dir = vim.fs.root(args.buf, { "package.json", "tsconfig.json", "jsconfig.json" })
-					local init_options = vim.deepcopy(servers.ts_ls.init_options)
 
 					local mason_path = vim.fn.stdpath("data")
 						.. "/mason/packages/vue-language-server/node_modules/@vue/language-server"
-					if vim.fn.isdirectory(mason_path) == 1 then
-						init_options.plugins[1].location = mason_path
-					end
 
 					vim.lsp.start({
-						name = "ts_ls",
+						name = "vue_ts",
 						cmd = { "typescript-language-server", "--stdio" },
 						root_dir = root_dir,
-						init_options = init_options,
+						init_options = {
+							plugins = {
+								{
+									name = "@vue/typescript-plugin",
+									location = mason_path,
+									languages = { "vue" },
+								},
+							},
+						},
 						capabilities = capabilities,
 					})
 				end,
