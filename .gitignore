@@ -23,6 +23,11 @@ home/.config/opencode/node_modules/
 home/.config/opencode/plugins/git-ai.ts
 .opencode/plans/
 
+# herdr runtime/state
+home/.config/herdr/*.log
+home/.config/herdr/session-history.json
+home/.config/herdr/session.json
+
 # jj per-repo configs
 home/.config/jj/repos/
 
