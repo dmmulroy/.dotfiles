@@ -49,7 +49,10 @@ rename_workspace = "prefix+shift+w"
 close_workspace = "prefix+shift+d"
 previous_workspace = "prefix+("
 next_workspace = "prefix+)"
-switch_workspace = "prefix+shift+1..9"
+# Shift+digits are not reliably distinguishable from plain digits in every
+# terminal/tmux key protocol; keep the documented binding and add an Option/Alt
+# fallback for dependable indexed workspace jumps.
+switch_workspace = ["prefix+alt+1..9"]
 
 # tmux windows ~= Herdr tabs.
 new_tab = "prefix+c"
@@ -71,11 +74,11 @@ copy_mode = "prefix+v"
 # Herdr exposes resize mode rather than tmux's exact repeatable -/= /[ /] bindings.
 resize_mode = "prefix+shift+r"
 
-# Pane navigation. Prefix mappings mirror vim-ish tmux usage; ctrl+alt variants are safe direct chords.
-focus_pane_left = ["prefix+h", "ctrl+alt+h"]
-focus_pane_down = ["prefix+j", "ctrl+alt+j"]
-focus_pane_up = ["prefix+k", "ctrl+alt+k"]
-focus_pane_right = ["prefix+l", "ctrl+alt+l"]
+# Pane navigation. Prefix mappings mirror vim-ish tmux usage; ctrl+h/j/k/l are direct Herdr chords.
+focus_pane_left = ["ctrl+h"]
+focus_pane_down = ["ctrl+j"]
+focus_pane_up = ["ctrl+k"]
+focus_pane_right = ["ctrl+l"]
 cycle_pane_next = "prefix+tab"
 cycle_pane_previous = "prefix+shift+tab"
 
@@ -99,8 +102,7 @@ right_click_passthrough_modifier = "ctrl"
 mouse_scroll_lines = 3
 # tmux close/kill bindings do not prompt; match that behavior.
 confirm_close = false
-prompt_new_tab_name = false
-show_agent_labels_on_pane_borders = false
+prompt_new_tab_name = true
 agent_panel_scope = "all"
 accent = "#c6a0f6"
 
@@ -109,7 +111,7 @@ delivery = "off"
 delay_seconds = 1
 
 [ui.toast.herdr]
-position = "bottom-right"
+position = "top-right"
 
 [ui.toast.clipboard]
 enabled = true
@@ -132,10 +134,6 @@ manage_ssh_config = true
 pane_history = true
 allow_nested = false
 kitty_graphics = true
-switch_ascii_input_source_in_prefix = false
-reveal_hidden_cursor_for_cjk_ime = false
-cjk_ime_agents = []
-cjk_ime_cursor_shape = "steady_block"
 
 [advanced]
 # tmux uses history-limit 50000 lines; Herdr config is byte-based.
