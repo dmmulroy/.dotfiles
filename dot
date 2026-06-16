@@ -674,10 +674,10 @@ cmd_update() {
 
         local sync_skill="${HOME_DIR}/.pi/agent/skills/sync-pocock-skills/SKILL.md"
         if [[ -f "$sync_skill" ]]; then
-            print_info "Running headless pi skills sync..."
-            # sync-pocock-skills is manual-only; /skill: invokes its full workflow.
-            # Print mode executes headlessly, streams its result here, and exits when complete.
-            if (cd "$DOTFILES_DIR" && pi -p --no-skills --skill "$sync_skill" "/skill:sync-pocock-skills"); then
+            print_info "Running interactive pi skills sync..."
+            # sync-pocock-skills is manual-only and may need decisions (install/exclude/skip).
+            # Run pi interactively so the user can answer instead of print mode exiting at prompts.
+            if (cd "$DOTFILES_DIR" && pi --no-skills --skill "$sync_skill" "/skill:sync-pocock-skills"); then
                 print_success "Matt Pocock skills sync complete"
             else
                 print_error "Matt Pocock skills sync failed"
