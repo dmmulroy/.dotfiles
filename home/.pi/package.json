@@ -7,7 +7,8 @@
     "agent/extensions/*"
   ],
   "scripts": {
-    "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-web-tools-extension",
+    "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-save-md-extension && npm run check --workspace=pi-web-tools-extension",
+    "test:save-md": "npm run test --workspace=pi-save-md-extension",
     "test:web-tools": "npm run test --workspace=pi-web-tools-extension"
   },
   "dependencies": {
