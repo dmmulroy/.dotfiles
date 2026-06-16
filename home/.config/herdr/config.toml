@@ -49,7 +49,6 @@ rename_workspace = "prefix+shift+w"
 close_workspace = "prefix+shift+d"
 previous_workspace = "prefix+("
 next_workspace = "prefix+)"
-# switch_workspace = ["prefix+alt+1..9"]
 
 # agents
 focus_agent = "prefix+alt+1..9"

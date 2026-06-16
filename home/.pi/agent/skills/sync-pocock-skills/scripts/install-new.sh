@@ -27,12 +27,12 @@ bash "$APPLY_SCRIPT" "$SKILL_NAME" "$UPSTREAM_SKILL_DIR" "$SKILLS_DIR" "$PATCHES
 
 echo "INSTALLED: $SKILL_NAME"
 
-PATTERNS='sub.agent|subagent|Agent tool|spawn.*agent|subagent_type|CLAUDE.md'
+PATTERNS='sub.agent|subagent|Agent tool|spawn.*agent|subagent_type|^[[:space:]-]*If.*CLAUDE\.md.*exists|prefer.*CLAUDE\.md|CLAUDE\.md.*first'
 found=0
 while IFS= read -r file; do
   rel_path="${file#"$TARGET_DIR"/}"
-  patch_file="$PATCHES_DIR/${SKILL_NAME}__${rel_path//\//__}.patch"
-  [[ -f "$patch_file" ]] && continue
+  # Scan the installed result even when a patch exists. A patch may handle one
+  # hunk while a later upstream release adds another pattern in the same file.
   matches=$(grep -niE "$PATTERNS" "$file" 2>/dev/null || true)
   if [[ -n "$matches" ]]; then
     if [[ "$found" -eq 0 ]]; then
