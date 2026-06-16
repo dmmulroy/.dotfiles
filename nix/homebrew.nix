@@ -28,6 +28,7 @@
     brews = [
       "jj-starship" # dmmulroy/tap
       "hunk" # modem-dev/tap
+      "herdr"
     ];
 
     casks = [
