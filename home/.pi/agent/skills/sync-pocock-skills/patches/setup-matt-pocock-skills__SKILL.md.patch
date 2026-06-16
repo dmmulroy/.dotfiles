@@ -1,13 +1,5 @@
 --- upstream/setup-matt-pocock-skills/SKILL.md
 +++ ours/setup-matt-pocock-skills/SKILL.md
-@@ -1,6 +1,6 @@
- ---
- name: setup-matt-pocock-skills
--description: Sets up an `## Agent skills` block in AGENTS.md/CLAUDE.md and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local markdown), triage label vocabulary, and domain doc layout. Run before first use of `to-issues`, `to-prd`, `triage`, `diagnose`, `tdd`, `improve-codebase-architecture`, or `zoom-out` — or if those skills appear to be missing context about the issue tracker, triage labels, or domain docs.
-+description: Sets up an `## Agent skills` block in AGENTS.md (or CLAUDE.md) and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local markdown), triage label vocabulary, and domain doc layout. Run before first use of `to-issues`, `to-prd`, `triage`, `diagnose`, `tdd`, `improve-codebase-architecture`, or `zoom-out` — or if those skills appear to be missing context about the issue tracker, triage labels, or domain docs.
- disable-model-invocation: true
- ---
- 
 @@ -21,7 +21,7 @@
  Look at the current repo to understand its starting state. Read whatever exists; don't assume:
  

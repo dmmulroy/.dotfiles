@@ -3,7 +3,7 @@
 
 Usage:
   apply-frontmatter-overrides.py <skill_name> <skill_md_file> <patches_dir> [--quiet]
-  apply-frontmatter-overrides.py <skill_name> <skill_md_file> <patches_dir> --strip [--quiet]
+  apply-frontmatter-overrides.py <skill_name> <skill_md_file> <patches_dir> --strip [--against <upstream_skill_md>] [--quiet]
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 
 def usage() -> None:
     print(
-        "Usage: apply-frontmatter-overrides.py <skill_name> <skill_md_file> <patches_dir> [--strip] [--quiet]",
+        "Usage: apply-frontmatter-overrides.py <skill_name> <skill_md_file> <patches_dir> [--strip] [--against <upstream_skill_md>] [--quiet]",
         file=sys.stderr,
     )
 
@@ -117,15 +117,52 @@ def apply_overrides(skill_name: str, skill_md: Path, patches_dir: Path) -> bool:
     return write_if_changed(skill_md, original, trailing_newline, lines)
 
 
-def strip_overrides(skill_name: str, skill_md: Path, patches_dir: Path) -> bool:
+def strip_overrides(
+    skill_name: str,
+    skill_md: Path,
+    patches_dir: Path,
+    against: Path | None = None,
+) -> bool:
+    """Remove local policy while preserving fields already supplied upstream.
+
+    A preserved key may become native upstream over time. In that case deleting
+    it from the comparison copy would create a patch that removes upstream's
+    field. Restore the upstream line instead.
+    """
     overrides = load_overrides(skill_name, patches_dir)
     if not overrides:
         return False
 
     original, trailing_newline, lines, end = read_frontmatter(skill_md)
-    keys = set(overrides)
-    stripped = [line for idx, line in enumerate(lines) if not (1 <= idx < end and frontmatter_key(line) in keys)]
-    return write_if_changed(skill_md, original, trailing_newline, stripped)
+    upstream_lines: list[str] = []
+    upstream_end = 0
+    if against is not None:
+        _, _, upstream_lines, upstream_end = read_frontmatter(against)
+
+    for key in overrides:
+        indices = find_key_indices(lines, end, key)
+        upstream_indices = find_key_indices(upstream_lines, upstream_end, key)
+
+        if upstream_indices:
+            desired = upstream_lines[upstream_indices[0]]
+            if indices:
+                lines[indices[0]] = desired
+                for idx in reversed(indices[1:]):
+                    del lines[idx]
+                    end -= 1
+            else:
+                insert_at = next(
+                    (idx + 1 for idx in range(1, end) if frontmatter_key(lines[idx]) == "description"),
+                    end,
+                )
+                lines.insert(insert_at, desired)
+                end += 1
+        else:
+            for idx in reversed(indices):
+                del lines[idx]
+                end -= 1
+
+    return write_if_changed(skill_md, original, trailing_newline, lines)
 
 
 def main(argv: list[str]) -> int:
@@ -136,17 +173,31 @@ def main(argv: list[str]) -> int:
     skill_name = argv[1]
     skill_md = Path(argv[2])
     patches_dir = Path(argv[3])
-    flags = set(argv[4:])
-    allowed = {"--quiet", "--strip"}
-    unknown = flags - allowed
-    if unknown or len(flags) != len(argv[4:]):
+    quiet = False
+    strip = False
+    against: Path | None = None
+
+    index = 4
+    while index < len(argv):
+        flag = argv[index]
+        if flag == "--quiet":
+            quiet = True
+            index += 1
+        elif flag == "--strip":
+            strip = True
+            index += 1
+        elif flag == "--against" and index + 1 < len(argv):
+            against = Path(argv[index + 1])
+            index += 2
+        else:
+            usage()
+            return 2
+
+    if against is not None and not strip:
         usage()
         return 2
 
-    quiet = "--quiet" in flags
-    strip = "--strip" in flags
-
-    changed = strip_overrides(skill_name, skill_md, patches_dir) if strip else apply_overrides(skill_name, skill_md, patches_dir)
+    changed = strip_overrides(skill_name, skill_md, patches_dir, against) if strip else apply_overrides(skill_name, skill_md, patches_dir)
     if changed and not quiet:
         action = "STRIPPED" if strip else "OVERRIDE"
         print(f"  {action}: SKILL.md frontmatter")

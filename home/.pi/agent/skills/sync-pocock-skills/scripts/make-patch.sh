@@ -35,7 +35,8 @@ trap cleanup EXIT
 if [[ "$REL_PATH" == "SKILL.md" && -f "$OVERRIDES_SCRIPT" ]]; then
   TEMP_OUR_FILE=$(mktemp)
   cp "$OUR_FILE" "$TEMP_OUR_FILE"
-  python3 "$OVERRIDES_SCRIPT" "$SKILL_NAME" "$TEMP_OUR_FILE" "$PATCHES_DIR" --strip --quiet
+  python3 "$OVERRIDES_SCRIPT" "$SKILL_NAME" "$TEMP_OUR_FILE" "$PATCHES_DIR" \
+    --strip --against "$UPSTREAM_FILE" --quiet
   COMPARE_OUR_FILE="$TEMP_OUR_FILE"
 fi
 
