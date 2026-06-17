@@ -49,10 +49,11 @@ rename_workspace = "prefix+shift+w"
 close_workspace = "prefix+shift+d"
 previous_workspace = "prefix+("
 next_workspace = "prefix+)"
-# Shift+digits are not reliably distinguishable from plain digits in every
-# terminal/tmux key protocol; keep the documented binding and add an Option/Alt
-# fallback for dependable indexed workspace jumps.
-switch_workspace = ["prefix+alt+1..9"]
+# switch_workspace = ["prefix+alt+1..9"]
+
+# agents
+focus_agent = "prefix+alt+1..9"
+
 
 # tmux windows ~= Herdr tabs.
 new_tab = "prefix+c"

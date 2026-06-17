@@ -93,7 +93,7 @@ dot update
 - Updates Homebrew packages
 - Re-stows configuration files
 - Runs `pi update` to update pi and its configured packages
-- Opens interactive pi with `/skill:sync-pocock-skills` so you can install, exclude, or skip newly discovered Matt Pocock skills
+- Runs pi headlessly with `/skill:sync-pocock-skills` and waits for the checked-in Matt Pocock skills sync to complete
 
 #### `dot doctor` - Health Check
 ```bash
