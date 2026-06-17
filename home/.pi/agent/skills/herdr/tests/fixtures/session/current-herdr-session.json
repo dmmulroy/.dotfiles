@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "workspaces": [
+    {
+      "id": "wproj1",
+      "custom_name": null,
+      "identity_cwd": "/home/test/projects/project-a",
+      "tabs": [
+        {
+          "custom_name": "separate-pane",
+          "layout": {
+            "Pane": 1
+          },
+          "panes": {
+            "1": {
+              "cwd": "/home/test/projects/project-a"
+            }
+          },
+          "zoomed": false,
+          "focused": 1,
+          "root_pane": 1
+        },
+        {
+          "custom_name": "p",
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/home/test/projects/project-a"
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
+        }
+      ],
+      "active_tab": 0
+    },
+    {
+      "id": "wproj2",
+      "custom_name": null,
+      "identity_cwd": "/home/test/projects/project-b",
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 3
+          },
+          "panes": {
+            "3": {
+              "cwd": "/home/test/projects/project-b"
+            }
+          },
+          "zoomed": false,
+          "focused": 3,
+          "root_pane": 3
+        }
+      ],
+      "active_tab": 0
+    }
+  ],
+  "active": 0,
+  "selected": 0
+}

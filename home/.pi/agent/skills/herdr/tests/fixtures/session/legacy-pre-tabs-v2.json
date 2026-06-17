@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "workspaces": [
+    {
+      "custom_name": "legacy",
+      "layout": {
+        "Split": {
+          "direction": "Horizontal",
+          "ratio": 0.5,
+          "first": {
+            "Pane": 0
+          },
+          "second": {
+            "Pane": 1
+          }
+        }
+      },
+      "panes": {
+        "0": {
+          "cwd": "/tmp/pion"
+        },
+        "1": {
+          "cwd": "/tmp/herdr"
+        }
+      },
+      "zoomed": false,
+      "focused": 1,
+      "root_pane": 0
+    }
+  ],
+  "active": 0,
+  "selected": 0
+}
