@@ -7,7 +7,10 @@ return {
 			require("tsc").setup({
 				auto_open_qflist = true,
 				pretty_errors = false,
-				flags = "-b --pretty false",
+				flags = {
+					noEmit = true,
+					pretty = "false",
+				},
 			})
 		end,
 	},
