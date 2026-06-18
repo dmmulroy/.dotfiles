@@ -6,7 +6,7 @@ complete -c dot -f
 
 # Commands
 complete -c dot -n "__fish_use_subcommand" -a "init" -d "Initialize and install dotfiles"
-complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles, packages, pi, and Pocock skills"
+complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles, packages, and pi"
 complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and check installation"
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
