@@ -662,7 +662,7 @@ cmd_update() {
         _stow_dotfiles
     fi
 
-    # Update pi and its configured packages, then run the skills sync headlessly.
+    # Update pi and its configured packages.
     if command_exists pi; then
         print_info "Updating pi and configured packages..."
         if (cd "$DOTFILES_DIR" && pi update); then
@@ -671,25 +671,8 @@ cmd_update() {
             print_error "Failed to update pi and configured packages"
             return 1
         fi
-
-        local sync_skill="${HOME_DIR}/.pi/agent/skills/sync-pocock-skills/SKILL.md"
-        if [[ -f "$sync_skill" ]]; then
-            print_info "Running headless pi skills sync..."
-            # sync-pocock-skills is manual-only; /skill: invokes its full workflow.
-            # Keep dot update non-interactive. If upstream adds a skill that needs
-            # a decision, handle that in the checked-in skills state rather than
-            # turning the updater into a pi session.
-            if (cd "$DOTFILES_DIR" && pi -p --no-skills --skill "$sync_skill" "/skill:sync-pocock-skills"); then
-                print_success "Matt Pocock skills sync complete"
-            else
-                print_error "Matt Pocock skills sync failed"
-                return 1
-            fi
-        else
-            print_warning "sync-pocock-skills is not installed; skipping skills sync"
-        fi
     else
-        print_warning "pi is not installed; skipping pi update and skills sync"
+        print_warning "pi is not installed; skipping pi update"
     fi
 }
 
@@ -953,7 +936,7 @@ complete -c dot -f
 
 # Commands
 complete -c dot -n "__fish_use_subcommand" -a "init" -d "Initialize and install dotfiles"
-complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles, packages, pi, and Pocock skills"
+complete -c dot -n "__fish_use_subcommand" -a "update" -d "Update dotfiles, packages, and pi"
 complete -c dot -n "__fish_use_subcommand" -a "doctor" -d "Run diagnostics and check installation"
 complete -c dot -n "__fish_use_subcommand" -a "package" -d "Package management commands"
 complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which packages are installed/missing"
@@ -1937,7 +1920,7 @@ cmd_help() {
     
     echo -e "${BOLD}COMMANDS:${RESET}"
     echo "    init                Initialize and install dotfiles"
-    echo "    update              Update dotfiles, packages, pi, and Pocock skills"
+    echo "    update              Update dotfiles, packages, and pi"
     echo "    doctor              Run diagnostics and check installation"
     echo "    package             Package management commands (add, remove, list)"
     echo "    check-packages      Check which packages are installed/missing"
