@@ -6,7 +6,7 @@
       "lifecycle": "lazy"
     },
     "executor": {
-      "url": "https://executor.mulroy.ai/mcp",
+      "url": "https://exe.mulroy.ai/mcp?elicitation_mode=native",
       "auth": "oauth",
       "lifecycle": "lazy"
     },
