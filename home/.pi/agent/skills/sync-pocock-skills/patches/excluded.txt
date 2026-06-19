@@ -1,7 +1,0 @@
-# Skills we deliberately don't sync from mattpocock/skills.
-# One skill name per line. Comments start with #.
-git-guardrails-claude-code
-setup-pre-commit
-scaffold-exercises
-migrate-to-shoehorn
-grill-me
