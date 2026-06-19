@@ -1,6 +1,0 @@
-# old_name	new_name	kind	release	note
-# kind is one of: renamed, replaced, removed
-diagnose	diagnosing-bugs	renamed	mattpocock-skills@1.0.0	Install the new skill and remove the old directory; diagnosing-bugs is model-invoked.
-write-a-skill	writing-great-skills	replaced	mattpocock-skills@1.0.0	Install the replacement (including GLOSSARY.md) and remove the old directory.
-zoom-out	-	removed	mattpocock-skills@1.0.0	Remove the local skill; upstream removed it as unused.
-caveman	-	removed	mattpocock-skills@1.0.0	Remove the local skill; upstream says it was never intended to be public.

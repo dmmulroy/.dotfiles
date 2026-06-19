@@ -9,7 +9,8 @@
   "scripts": {
     "check": "npm run check --workspace=pi-extension-opencode-cloudflare && npm run check --workspace=pi-save-md-extension && npm run check --workspace=pi-web-tools-extension",
     "test:save-md": "npm run test --workspace=pi-save-md-extension",
-    "test:web-tools": "npm run test --workspace=pi-web-tools-extension"
+    "test:web-tools": "npm run test --workspace=pi-web-tools-extension",
+    "test:codex-fast-mode": "node --import tsx --test tests/codex-fast-mode.test.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.76.0",

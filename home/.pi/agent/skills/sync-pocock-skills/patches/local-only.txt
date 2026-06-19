@@ -1,9 +1,0 @@
-# Skills maintained locally rather than synced from mattpocock/skills.
-# One skill name per line. Comments start with #.
-account-id-tags
-bro
-herdr
-init-deep
-sync-pocock-skills
-tmux
-ui
