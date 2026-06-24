@@ -223,13 +223,15 @@ function buildAnthropicOptions(model: Model<Api>, options: SimpleStreamOptions |
 		client: client as unknown as AnthropicOptions["client"],
 	};
 	if (!options?.reasoning) return { ...base, thinkingEnabled: false };
+	// For adaptive-thinking models (Opus 4-6+, Sonnet 4-6+), rely on pi-ai's
+	// native forceAdaptiveThinking compat handling. The built-in model metadata
+	// already sets compat.forceAdaptiveThinking = true, so pi-ai constructs the
+	// correct adaptive payload (thinking.type: "adaptive" + output_config.effort)
+	// without an onPayload rewrite. The old onPayload approach broke because
+	// pi-ai ignored the callback return for Anthropic payload construction.
 	if (supportsAdaptiveThinking(model)) {
 		const effort = mapThinkingLevelToEffort(model, options.reasoning);
-		const onPayload = async (payload: unknown, payloadModel: Model<Api>) => {
-			const rewritten = rewriteAnthropicAdaptiveThinkingPayload(payload, effort);
-			return (await options.onPayload?.(rewritten, payloadModel)) ?? rewritten;
-		};
-		return { ...base, thinkingEnabled: true, effort, onPayload };
+		return { ...base, thinkingEnabled: true, effort };
 	}
 	const adjusted = adjustMaxTokensForThinking(base.maxTokens || 0, model.maxTokens, options.reasoning, options.thinkingBudgets);
 	return { ...base, maxTokens: adjusted.maxTokens, thinkingEnabled: true, thinkingBudgetTokens: adjusted.thinkingBudget };
