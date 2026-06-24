@@ -1,5 +1,6 @@
 {
   "mcp": {
+    "toolMode": "proxy",
     "servers": {
       "executor": {
         "type": "remote",

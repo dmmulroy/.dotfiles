@@ -5,6 +5,7 @@ import type { SkillSource } from "../types.ts";
 export interface SkillRoot {
   path: string;
   source: SkillSource;
+  includeRootMarkdownFiles: boolean;
 }
 
 export function getAgentDir(): string {
@@ -13,22 +14,38 @@ export function getAgentDir(): string {
   return join(homedir(), ".pi", "agent");
 }
 
+export function getGlobalAgentsSkillDir(): string {
+  return join(homedir(), ".agents", "skills");
+}
+
 export function getSkillRoots(cwd: string): SkillRoot[] {
   const resolvedCwd = resolve(cwd);
+  const userSkillRoot = join(getAgentDir(), "skills");
+  const globalSkillRoot = getGlobalAgentsSkillDir();
+  const projectSkillRoot = resolve(resolvedCwd, ".pi", "skills");
+  const projectLegacySkillRoot = resolve(resolvedCwd, ".agents", "skills");
   const roots: SkillRoot[] = [
     {
-      path: join(getAgentDir(), "skills"),
-      source: { kind: "user", root: join(getAgentDir(), "skills") },
+      path: userSkillRoot,
+      source: { kind: "user", root: userSkillRoot },
+      includeRootMarkdownFiles: true,
     },
     {
-      path: resolve(resolvedCwd, ".pi", "skills"),
-      source: { kind: "project", root: resolve(resolvedCwd, ".pi", "skills") },
+      path: globalSkillRoot,
+      source: { kind: "global", root: globalSkillRoot },
+      includeRootMarkdownFiles: false,
     },
-    // Pi's current loader focuses on .pi/skills, but README-era installs may still
-    // have .agents/skills. Include it as a local editable convenience.
     {
-      path: resolve(resolvedCwd, ".agents", "skills"),
-      source: { kind: "project-legacy", root: resolve(resolvedCwd, ".agents", "skills") },
+      path: projectSkillRoot,
+      source: { kind: "project", root: projectSkillRoot },
+      includeRootMarkdownFiles: true,
+    },
+    // Pi also loads .agents/skills as a project skill directory. Root markdown
+    // files are ignored there; directories containing SKILL.md are discovered.
+    {
+      path: projectLegacySkillRoot,
+      source: { kind: "project-legacy", root: projectLegacySkillRoot },
+      includeRootMarkdownFiles: false,
     },
   ];
 

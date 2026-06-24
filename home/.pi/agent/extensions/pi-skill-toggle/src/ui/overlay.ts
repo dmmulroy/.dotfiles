@@ -170,6 +170,7 @@ class SkillToggleOverlay {
     lines.push(`${this.theme.fg("muted", "Current:")} ${modeLabel(skill.mode)}`);
     lines.push(`${this.theme.fg("muted", "Desired:")} ${modeLabel(desired)}${desired !== skill.mode ? this.theme.fg("accent", " (changed)") : ""}`);
     lines.push(`${this.theme.fg("muted", "Source:")} ${formatSourceKind(skill.source.kind)}`);
+    lines.push(`${this.theme.fg("muted", "Root:")} ${skill.source.root}`);
     lines.push(`${this.theme.fg("muted", "Editable:")} ${skill.editable ? "yes" : this.theme.fg("warning", "no")}`);
     lines.push("");
     lines.push(this.theme.fg("muted", "Path:"));

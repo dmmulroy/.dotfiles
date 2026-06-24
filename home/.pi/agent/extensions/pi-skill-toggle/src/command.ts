@@ -26,7 +26,7 @@ export async function runToggleSkillsCommand(ctx: ExtensionCommandContext, deps:
   }
 
   if (skills.length === 0) {
-    ctx.ui.notify("Pi Skill Toggle: no skills found in user or project skill directories", "info");
+    ctx.ui.notify("Pi Skill Toggle: no skills found in global, user, or project skill directories", "info");
     return;
   }
 
