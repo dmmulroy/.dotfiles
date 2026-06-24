@@ -1,3 +1,4 @@
+import { formatSourceKind, sourceBadge } from "../inventory/classifier.ts";
 import type { SkillInvocationMode, SkillRecord } from "../types.ts";
 
 export function modeLabel(mode: SkillInvocationMode): string {
@@ -9,7 +10,17 @@ export function toggleMode(mode: SkillInvocationMode): SkillInvocationMode {
 }
 
 export function skillSearchText(skill: SkillRecord): string {
-  return [skill.name, skill.description, skill.filePath, skill.source.kind, modeLabel(skill.mode)].join(" ").toLowerCase();
+  return [
+    skill.name,
+    skill.description,
+    skill.filePath,
+    skill.source.kind,
+    sourceBadge(skill.source),
+    formatSourceKind(skill.source.kind),
+    modeLabel(skill.mode),
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 export function filterSkills(skills: SkillRecord[], query: string): SkillRecord[] {

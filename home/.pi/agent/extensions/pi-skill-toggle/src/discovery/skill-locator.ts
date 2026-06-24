@@ -18,7 +18,7 @@ export class DefaultSkillLocator implements SkillLocator {
 
     for (const root of roots) {
       if (!(await this.fs.access(root.path))) continue;
-      const found = await this.scanSkillDir(root.path, root.path, root.source, true);
+      const found = await this.scanSkillDir(root.path, root.path, root.source, root.includeRootMarkdownFiles);
       for (const file of found) {
         if (seen.has(file.filePath)) continue;
         seen.add(file.filePath);
