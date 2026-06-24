@@ -1,0 +1,11 @@
+# Surfaces
+
+- Don't default to white cards on gray backgrounds — prefer content directly on a white background, or white cards with just a `border` on a white background
+- Choose surface treatments based on information hierarchy: white space alone for tightly related items; subtle borders/dividers for sibling content that needs separation; wells (recessed backgrounds like `bg-gray-50`) for secondary or nested content; cards with borders or shadows for standalone, interactive, or highly distinct items
+- Use the lightest separation that still works — whitespace first, then subtle borders/dividers, then cards; never jump straight to cards
+- Reserve cards for content that is independently interactive (clickable to navigate) or contains fundamentally different content types
+- Use subtle top borders or vertical dividers for sibling items in a shared context — stat grids, metric rows, dashboard KPIs
+- Divider-separated items — middle items get equal padding on both sides of the divider (`px-*`); first item in a row gets only `pr-*` (no `pl-*`), last item gets only `pl-*` (no `pr-*`); for horizontal dividers: first item only `pb-*` (no `pt-*`), last item only `pt-*` (no `pb-*`); when grid columns change at a breakpoint, reset padding per the new first/last — e.g. a 4-column grid becoming 2-column: items 1 and 3 are now row-starts (no `pl-*`), items 2 and 4 are now row-ends (no `pr-*`); use responsive prefixes like `sm:pl-0` or `lg:pr-0` to override at each breakpoint
+- Dividers must be reconfigured at each breakpoint when grid columns change — use `nth-child` to target items not in the first column: 2 columns use `[&:nth-child(2n)]:border-l-*`; 4 columns use `[&:not(:nth-child(4n+1))]:border-l-*`; adjust the pattern at each breakpoint to match the column count; when collapsing to a single column, remove vertical dividers and add horizontal dividers between rows (`border-t-*` on all items except the first)
+- Whitespace alone is enough when content has inherent contrast (large numbers vs small labels, bold headings vs body text)
+- Never use solid colors for dividers — use opacity-based colors like `divide-gray-950/5` or `border-gray-950/10` instead of `divide-gray-200` or `border-gray-300`
