@@ -1,0 +1,59 @@
+{
+  "version": 3,
+  "skills": {
+    "code-review": {
+      "source": "dmmulroy/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/dmmulroy/skills.git",
+      "skillPath": "code-review/SKILL.md",
+      "skillFolderHash": "9d9e09dbbb95530801bd4baff195f6598967494f",
+      "installedAt": "2026-06-24T13:28:53.407Z",
+      "updatedAt": "2026-06-24T13:28:53.407Z"
+    },
+    "codebase-design": {
+      "source": "dmmulroy/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/dmmulroy/skills.git",
+      "skillPath": "codebase-design/SKILL.md",
+      "skillFolderHash": "dc9910a8241b33e0b3d11bf990de10f5ac503279",
+      "installedAt": "2026-06-24T13:28:53.411Z",
+      "updatedAt": "2026-06-24T13:28:53.411Z"
+    },
+    "coding-standards": {
+      "source": "dmmulroy/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/dmmulroy/skills.git",
+      "skillPath": "coding-standards/SKILL.md",
+      "skillFolderHash": "4873636bbce1735ca89c1ee56805adc901d67af3",
+      "installedAt": "2026-06-24T13:28:53.413Z",
+      "updatedAt": "2026-06-24T13:28:53.413Z"
+    },
+    "improve-codebase-architecture": {
+      "source": "dmmulroy/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/dmmulroy/skills.git",
+      "skillPath": "improve-codebase-architecture/SKILL.md",
+      "skillFolderHash": "492623603ca7260da7baacdec3feb3ae8fb358d7",
+      "installedAt": "2026-06-24T13:28:53.414Z",
+      "updatedAt": "2026-06-24T13:28:53.414Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "amp",
+    "antigravity",
+    "antigravity-cli",
+    "cline",
+    "codex",
+    "cursor",
+    "deepagents",
+    "gemini-cli",
+    "github-copilot",
+    "kimi-code-cli",
+    "opencode",
+    "warp",
+    "zed"
+  ]
+}
