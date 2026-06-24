@@ -9,6 +9,7 @@ backups/
 packages/failed_packages_*.txt
 tmp/
 .DS_STORE
+home/.agents/skills/ui/
 
 
 # Python
