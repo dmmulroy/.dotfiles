@@ -1,20 +1,23 @@
 {
-  "mcpServers": {
-    "cf-portal": {
-      "url": "https://portal.mcp.cfdata.org/mcp",
-      "auth": "oauth",
-      "lifecycle": "lazy"
-    },
-    "executor": {
-      "url": "https://exe.mulroy.ai/mcp?elicitation_mode=native",
-      "auth": "oauth",
-      "lifecycle": "lazy"
-    },
-    "uidotsh": {
-      "url": "https://ui.sh/mcp?agent=pi",
-      "auth": "bearer",
-      "bearerTokenEnv": "UIDOTSH_TOKEN",
-      "lifecycle": "lazy"
+  "mcp": {
+    "servers": {
+      "executor": {
+        "type": "remote",
+        "url": "https://exe.mulroy.ai/mcp?elicitation_mode=native"
+      },
+      "cf-portal": {
+        "type": "remote",
+        "url": "https://portal.mcp.cfdata.org/mcp",
+        "oauth": {}
+      },
+      "uidotsh": {
+        "type": "remote",
+        "url": "https://ui.sh/mcp?agent=pi",
+        "headers": {
+          "Authorization": "Bearer ${UIDOTSH_TOKEN}"
+        },
+        "oauth": false
+      }
     }
   }
 }

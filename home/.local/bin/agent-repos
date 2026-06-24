@@ -19,11 +19,13 @@ Commands:
 
   add <github-url> [options]
       Add a repository as a squashed git subtree under repos/<name>.
+      Tracked local changes are temporarily stashed while git subtree runs.
       Alias: clone
 
   update <name|prefix> [options]
       Pull the latest changes for one vendored subtree.
       Use --all to update every repo tracked in .agent-repos.
+      Tracked local changes are temporarily stashed while git subtree runs.
       Alias: pull
 
   list
@@ -231,6 +233,55 @@ run_subtree_pull() {
     "${cmd[@]}"
 }
 
+has_tracked_worktree_changes() {
+    [[ -n "$(git status --porcelain --untracked-files=no)" ]]
+}
+
+run_with_clean_worktree() {
+    local reason="$1"
+    shift
+
+    local stashed="false"
+    local status=0
+
+    if has_tracked_worktree_changes; then
+        echo "Temporarily stashing tracked working tree changes so $reason can run."
+        git stash push -q -m "agent-repos: temporary autostash before $reason" || die "failed to stash local changes"
+        stashed="true"
+    fi
+
+    set +e
+    "$@"
+    status=$?
+    set -e
+
+    if [[ "$stashed" == "true" ]]; then
+        echo "Restoring stashed working tree changes."
+        if git stash apply --index -q 'stash@{0}'; then
+            git stash drop -q 'stash@{0}'
+        else
+            echo "agent-repos: failed to restore stashed changes; they remain in stash@{0}" >&2
+            echo "agent-repos: resolve the issue, then run: git stash pop --index stash@{0}" >&2
+            return 1
+        fi
+    fi
+
+    return "$status"
+}
+
+prefix_tracked_in_git() {
+    local prefix="$1"
+    git ls-files --error-unmatch -- "$prefix" >/dev/null 2>&1 || [[ -n "$(git ls-files -- "$prefix")" ]]
+}
+
+restore_tracked_prefix_if_missing() {
+    local prefix="$1"
+
+    [[ ! -e "$prefix" ]] || return 0
+    echo "Restoring tracked prefix $prefix from HEAD."
+    git restore --staged --worktree -- "$prefix" 2>/dev/null || git restore -- "$prefix"
+}
+
 ensure_gitignore_entry() {
     local file="$1"
     local entry="$2"
@@ -352,14 +403,15 @@ PY
 detect_existing_repos() {
     local root="$1"
     local repos_dir="$root/$DEFAULT_REPOS_DIR"
-    local dir name prefix url branch squash detected="false"
+    local dir name prefix url branch squash detected="false" root_prefix_len
 
     [[ -d "$repos_dir" ]] || return 0
+    root_prefix_len=$((${#root} + 1))
 
     for dir in "$repos_dir"/*; do
         [[ -d "$dir" ]] || continue
         name="${dir##*/}"
-        prefix="${dir#$root/}"
+        prefix="${dir:$root_prefix_len}"
 
         if manifest_get "$root" "$name" >/dev/null || manifest_get "$root" "$prefix" >/dev/null; then
             continue
@@ -499,9 +551,19 @@ cmd_add() {
     [[ -n "$name" ]] || name=$(name_from_url "$url")
     [[ -n "$prefix" ]] || prefix="$DEFAULT_REPOS_DIR/$name"
     [[ -n "$branch" ]] || branch=$(default_branch_for_url "$url")
+
+    if prefix_tracked_in_git "$prefix"; then
+        echo "Prefix $prefix is already tracked by git; adopting it in $MANIFEST instead of running git subtree add."
+        restore_tracked_prefix_if_missing "$prefix"
+        manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
+        echo "Tracked $name at $prefix in $MANIFEST"
+        echo "Run: agent-repos instructions"
+        return 0
+    fi
+
     [[ ! -e "$prefix" ]] || die "prefix already exists: $prefix"
 
-    run_subtree_add "$prefix" "$url" "$branch" "$squash"
+    run_with_clean_worktree "git subtree add" run_subtree_add "$prefix" "$url" "$branch" "$squash"
     manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
 
     echo "Tracked $name at $prefix in $MANIFEST"
@@ -538,7 +600,7 @@ update_one() {
     [[ -n "$squash" ]] || squash="true"
 
     echo "Updating $name ($prefix) from $url @ $branch"
-    run_subtree_pull "$prefix" "$url" "$branch" "$squash"
+    run_with_clean_worktree "git subtree pull" run_subtree_pull "$prefix" "$url" "$branch" "$squash"
     manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
 }
 
@@ -644,7 +706,7 @@ agent_file_path() {
 append_repo_bullets() {
     local root="$1"
     local emitted="false"
-    local name prefix url branch squash lower_name
+    local name prefix url branch squash
 
     while IFS=$'\t' read -r name prefix url branch squash; do
         emitted="true"
@@ -696,7 +758,7 @@ EOF
 }
 
 cmd_instructions() {
-    local root requested_file="" file block_file tmp
+    local root requested_file="" file block_file tmp root_prefix_len
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -717,6 +779,7 @@ cmd_instructions() {
 
     root=$(project_root)
     cd "$root"
+    root_prefix_len=$((${#root} + 1))
     file=$(agent_file_path "$root" "$requested_file")
     mkdir -p "$(dirname "$file")"
 
@@ -761,7 +824,7 @@ cmd_instructions() {
     mv "$tmp" "$file"
     rm -f "$block_file"
 
-    echo "Updated ${file#$root/}"
+    echo "Updated ${file:$root_prefix_len}"
 }
 
 generate_fish_completions() {
@@ -876,12 +939,12 @@ cmd_completions() {
     esac
 }
 
-cmd="${1:-}"
+command_name="${1:-}"
 if [[ $# -gt 0 ]]; then
     shift
 fi
 
-case "$cmd" in
+case "$command_name" in
     init)
         cmd_init "$@"
         ;;
@@ -908,6 +971,6 @@ case "$cmd" in
         exit 1
         ;;
     *)
-        die "unknown command: $cmd"
+        die "unknown command: $command_name"
         ;;
 esac
