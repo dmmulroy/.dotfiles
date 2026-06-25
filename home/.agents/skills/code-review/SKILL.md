@@ -90,7 +90,14 @@ Completion criterion: each material changed behavior, boundary, failure path, mo
 
 ## 4. Require proof for every finding
 
-A finding survives only when you can show concrete evidence. Examples:
+A finding survives only when you can show concrete evidence. Favor showing it with real artifacts over prose:
+
+- Quote the actual problematic code from the changed files (with its path and line range), not a paraphrase.
+- When behavior is the issue, show the concrete value flow: real inputs, the resulting outputs, and the call stack or call path that connects them.
+- When you reproduce the issue, show the reproduction and its observed result rather than asserting it.
+- Only fall back to prose-only proof when no code, value, or stack can express the issue.
+
+Examples:
 
 - Sensitive-data finding: trace the sensitive value from source to observable sink.
 - Boundary finding: trace unparsed or less-structured data into trusted application/domain code.
@@ -102,7 +109,7 @@ A finding survives only when you can show concrete evidence. Examples:
 
 If proof is missing, downgrade to **Question** or drop it.
 
-Completion criterion: every candidate finding has a precise location and behavioral proof, not just a standards preference.
+Completion criterion: every candidate finding has a precise location and behavioral proof shown with real code, values, or a reproduction where possible — not just a standards preference.
 
 ## 5. Self-challenge findings
 
@@ -144,12 +151,22 @@ For each finding:
 ```md
 ### <Severity>: <short title>
 
+- **Issue:** <concise explanation of the defect or problem>
 - **Where:** `<file>:<line>` or precise symbol/path
-- **Standard:** <topic / principle>
-- **Proof:** <concrete code path, value flow, reachable state, or missing evidence>
+- **Category:** <topic / principle>
+- **Problematic code:**
+  ```ts
+  // real excerpt quoted from the changed file(s)
+  ```
+- **Proof:** <value flow, reachable state, reproduction with observed result, or missing evidence>
 - **Why it matters:** <behavioral consequence>
-- **Fix direction:** <specific correction shape, not a full patch unless asked>
+- **Fix direction:** <specific correction shape, followed by a snippet or pseudo-code showing it>
+  ```ts
+  // snippet or pseudo-code of the fix; not a full patch unless asked
+  ```
 ```
+
+Include the **Problematic code** block whenever the issue lives in code you can quote; omit it only when the finding is about something absent (e.g. a missing contract or test), and say what is missing instead. Always include a fix-direction snippet or pseudo-code unless the fix is purely a deletion.
 
 Group findings by severity in this order: Blocker, Should Fix, Simplification, Nit, Question.
 
