@@ -106,7 +106,8 @@ prompt_new_tab_name = true
 agent_panel_scope = "all"
 accent = "#c6a0f6"
 
-show_agent_labels_on_pane_borders = true
+show_agent_labels_on_pane_borders = false
+agent_panel_sort = "spaces"
 [ui.toast]
 delivery = "herdr"
 delay_seconds = 1
