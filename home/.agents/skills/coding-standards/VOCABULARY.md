@@ -1,159 +1,82 @@
 # Vocabulary
 
-Use these terms when designing, reviewing, and explaining code. They encode the user's preferred engineering idioms.
+Use these exact terms in explanations, reviews, and code-facing design notes when the concept applies. Topic files may define only topic-local terms near their rules.
 
-## Failure and observability
+## Failure language
 
-**Expected Failure** — normal-operation failure visible in the return type: domain, parsing, authorization, integration, I/O, persistence, workflow, etc. Avoid calling it a recoverable exception.
+**Expected Failure** — A normal-operation failure that callers may need to handle: domain rejection, parse failure, authorization denial, dependency failure, I/O failure, persistence failure, workflow failure, or cancellation outcome. Expected failures are represented as typed values.
 
-**Unrecoverable Defect** — programmer error or catastrophic condition where continuing is invalid: violated invariant, impossible branch, startup misconfiguration, or temporary unimplemented path.
+**Unrecoverable Defect** — A programmer error or catastrophic condition where continuing is invalid: impossible branch, violated internal invariant, startup misconfiguration, or temporary unimplemented path. Defects may throw, panic, or crash.
 
-**Custom Error** — typed/tagged Expected Failure with stable tag, useful message, structured context, safe telemetry fields, and optional `cause: unknown`.
+**Custom Error** — A typed, tagged error value for an Expected Failure. It has a stable tag, useful message, structured safe context, and may retain an `unknown` cause.
 
-**Precise Error Union** — explicit narrow set of Expected Failures callers can handle semantically. Broad app-level unions belong near entrypoints, orchestration, rendering, and logging.
+**Precise Error Union** — The explicit set of Expected Failures a function can return, kept narrow enough that callers can handle cases semantically.
 
-**Not Found Failure** — typed Expected Failure for required get/find/read absence. Optional lookup semantics should be explicit in the operation name/contract.
 
-**Unknown Catch Cause** — caught thrown value treated as `unknown`; JavaScript can throw anything.
+## Boundary language
 
-**Cancellation Classifier** — seam logic that recognizes cancellation/interruption before converting unknown failures into ordinary Expected Failures.
+**Unknown Boundary Input** — Untrusted or less-structured input represented as `unknown` or a boundary DTO until a parser refines it: HTTP bodies, JSON, queue payloads, storage rows, env vars, RPC payloads, third-party responses.
 
-**Redacted Value** — wrapper for secrets that prevents accidental logging/inspection/serialization. Wrap at the seam and unwrap only where raw value is needed.
+**Schema Parser** — A boundary parser built with the repo's schema library that turns unknown input into refined/domain types and typed parse failures.
 
-**Safe Error Summary** — telemetry/panic summary built from stable tags, kinds, operation names, type names, or explicitly safe fields; not arbitrary `JSON.stringify`.
+**Persistence Boundary Parser** — A parser at the storage seam that treats database rows and storage DTOs as less-structured input and reconstructs domain values before service logic sees them.
 
-## Seams and data modeling
+**Protocol Projection** — A named conversion from a domain/service value into an HTTP, RPC, queue, or public API DTO owned by that protocol External Adapter Module.
 
-**Parse, Don't Validate** — convert unknown or less-structured input into a refined/domain value and use that value.
+**Persistence Projection** — A named conversion between domain/service values and storage rows/records owned by the persistence External Adapter Module.
 
-**Unknown Seam Input** — untrusted or less-structured input represented as `unknown` until a parser/smart constructor establishes a precise type.
+## Domain language
 
-**Serialized Data Trust Cast** — direct cast from decoded serialized data to an application/domain type, e.g. `JSON.parse(text) as CreateUserInput`; avoid it.
+**Domain Module** — A TypeScript module centered on one primary domain type or tightly related type family. It exposes parsers, smart constructors, combinators, predicates, transitions, projections, arbitraries, and formatting helpers for that concept.
 
-**Seam Parsing Evasion** — trusted code repeatedly accepting/downcasting/re-guarding `unknown` instead of parsing once at the outer seam.
+**Branded Type** — A nominal TypeScript type that distinguishes a parsed domain value from its primitive representation. It is created through a parser or smart constructor.
 
-**Schema Parser** — seam parser built with the project's established schema library to turn unknown input into refined/domain values and typed custom errors.
+**Value Class** — A cohesive class representation of a domain value. Instances are immutable and created only through parsers or smart constructors.
 
-**Branded Type** — nominal type distinguishing a parsed domain value from its primitive representation, constructed only through parsers/smart constructors.
+**State Machine** — A tagged-union or value-class lifecycle model where each state carries only fields legal for that state and exposes legal transitions.
 
-**Value Class** — immutable domain value class constructed only through parsers/smart constructors, with cohesive methods and no hidden I/O/dependencies.
+**Correct by Construction** — Design that makes invalid states impossible or difficult to construct rather than relying on caller discipline.
 
-**Correct by Construction** — APIs and types make invalid states impossible or difficult to construct rather than relying on caller memory.
+## Module language
 
-**State Machine** — tagged-union or value-class lifecycle model where each state carries only legal fields and transitions.
+**Module** — Anything with an interface and implementation: function, class, file, package, service slice, adapter, or stateful object.
 
-**Boolean Blindness** — loss of meaning from raw booleans used for modes, policies, or lifecycle distinctions.
+**Interface** — Everything callers must know to use a module correctly: type signatures, invariants, ordering constraints, error modes, configuration, performance, and side effects.
 
-**Discriminated Union** — tagged union or string-literal union for finite variants and lifecycle states. Prefer over TypeScript `enum` for internal/domain modeling.
+**Implementation** — What sits behind the interface.
 
-**Tag Field** — discriminant property for internal/domain tagged unions, preferably `_tag` unless another field is real domain vocabulary.
+**Seam** — A place where behavior can vary without editing the caller at that point. The seam is where the interface lives.
 
-**Exhaustiveness Helper** — helper such as `casesHandled(unexpectedCase: never): never` for compile-time exhaustive handling and runtime impossible-branch defects.
+**Service Module** — A dependency-bearing module in the **Imperative Shell** that coordinates a cohesive use case, workflow, or service capability. It composes **Domain Modules** and interfaces implemented by **External Adapter Modules** through explicit dependencies, sequences effects, owns use-case policy, classifies dependency failures, and returns typed outcomes. It receives parsed service/domain values, not raw framework, protocol, persistence, or third-party shapes. Pure domain behavior remains in Domain Modules even when other literature might call it a domain service.
 
-**Protocol Projection** — named conversion from domain/application value to HTTP/RPC/queue/public DTO, owned by the protocol adapter.
+**Adapter** — A concrete implementation that satisfies an interface at a seam, usually translating to a framework, platform, database, external service, or test substitute.
 
-**Persistence Projection** — conversion between domain/application values and storage records/rows, owned by the persistence adapter.
+**External Adapter Module** — A specialized **Adapter** at an external boundary. It includes inbound adapters such as HTTP/RPC/queue handlers and outbound adapters such as persistence, SDK, platform, and third-party integrations. Service Modules depend on narrow behavior-shaped interfaces; External Adapter Modules implement those interfaces at composition seams.
 
-**Persistence Seam Parser** — parser at the storage seam that treats rows/DTOs as less-structured input and reconstructs domain/application values.
+**Deep Module** — A module with high leverage: a cohesive, low-burden interface hiding substantial behavior, invariants, and incidental steps.
 
-## Modules and architecture
+**Accidental Interface** — A leaky or wide interface that forces callers to know unrelated methods, raw DTOs, nullable state bags, ordering constraints, hidden side effects, or implementation details.
 
-**Adoption Rule** — prefer these standards for new code while respecting existing architecture, error handling, observability, and framework conventions; avoid broad migrations unless requested.
+**Functional Core** — The pure, entrypoint-agnostic center: domain logic, parsers, transitions, combinators, and decisions. It avoids I/O, hidden dependencies, ambient time/randomness, framework concerns, and thrown expected failures.
 
-**Project Convention Audit** — inspection before adding libraries or patterns: errors, schemas, testing, dependency injection, observability, adapters, and module layout.
+**Imperative Shell** — The outer layer that parses inputs, sequences effects, calls the functional core, classifies dependency failures, and handles I/O, persistence, HTTP, queues, telemetry, time, and randomness.
 
-**Module** — anything with an interface and implementation: function, class, package, adapter, domain module, application capability, or tier-spanning slice.
+## Runtime and observability language
 
-**Interface** — everything a caller must know to use a module correctly: type signature, invariants, ordering constraints, error modes, configuration, performance, cancellation, idempotency, and observability effects.
+**Structured Tracing** — End-to-end correlated telemetry across requests, jobs, workflows, modules, External Adapter Modules, and external calls using safe fields such as domain IDs, operation names, dependency names, state tags, retry paths, and typed error tags.
 
-**Implementation** — code behind a module's interface. Use adapter when the seam role is the point.
+**Safe Error Summary** — A telemetry or panic summary built from stable tags, kinds, operation names, type names, or explicitly safe fields. It does not serialize arbitrary values.
 
-**Depth** — leverage at the interface: behavior a caller/test can exercise per unit of interface they must learn.
+**Redacted Value** — A wrapper for sensitive values that prevents accidental logging, inspection, and JSON serialization. Use it for tokens, API keys, passwords, raw credentials, and secrets.
 
-**Deep Module** — cohesive module whose low-burden interface hides meaningful behavior, invariants, ordering constraints, and implementation complexity.
+**Caller-Owned Cancellation Lifetime** — A cancellation design where lower-level modules accept and propagate the caller's `AbortSignal` instead of inventing hidden lifetimes.
 
-**Shallow Abstraction** — wrapper/interface nearly as complex as what it hides; often pass-through service, repository-per-table, or interface-per-class habit.
+**Detached Work** — Intentional async work that can outlive the current call path and is handed to a runtime/project mechanism that owns lifetime, cancellation, rejection handling, and observability.
 
-**Seam** — place where a module's interface lives and behavior can vary without editing callers. Use seam for architecture, trust crossings, protocol crossings, serialization crossings, runtime hops, framework edges, persistence edges, and test substitutes.
+## Adoption language
 
-**Adapter** — concrete code that sits at a seam and satisfies an interface.
+**Adoption Rule** — In established codebases, prefer these standards for new/changed paths while respecting compatible local architecture. Improve the local design without forcing broad migrations unless explicitly requested.
 
-**Leverage** — what callers get from depth: more capability per unit of interface they learn.
+**Project Convention Audit** — The required inspection before adding libraries or patterns: errors, schemas, testing, dependency injection, observability, External Adapter Modules, Service Modules, and module layout.
 
-**Locality** — what maintainers get from depth: change, bugs, knowledge, and verification concentrate behind one interface.
-
-**Interface Is the Test Surface** — callers and tests should cross the same seam; if tests must reach past the interface, the module shape is suspect.
-
-**Domain Module** — OCaml-style module centered on a primary domain type or related type family, exposing parsers, constructors, combinators, predicates, interpreters, arbitraries, and formatting helpers.
-
-**Functional Core** — pure entrypoint-agnostic center containing domain logic, parsers, state transitions, combinators, and decisions.
-
-**Imperative Shell** — outer layer that parses input, sequences effects, calls the core, classifies external failures, and handles I/O/persistence/HTTP/queues/telemetry/time/randomness.
-
-**Constructor Injection** — preferred non-Effect dependency style: dependencies accepted by a class constructor through narrow interfaces.
-
-**Effect Service** — preferred Effect dependency style: Services/Tags/Layers rather than constructor injection or dependency bags.
-
-**Narrow Dependency Interface** — dependency type stating only the behavior a module uses, while wider concrete adapters satisfy it structurally.
-
-**Adapter Reuse Audit** — search before creating a new adapter/service: reuse as-is, extend if cohesive, or create new only when reuse/extension would be bad coupling.
-
-## Async and workflows
-
-**Cancellation Propagation** — accepting caller-owned cancellation and passing it through downstream I/O/timer/retry/subprocess/workflow/resource/long-running operations.
-
-**Cancellable Options** — final options object for async APIs needing cancellation, usually `{ readonly signal?: AbortSignal }`.
-
-**Floating Promise** — promise not awaited, returned, collected into concurrency primitive, or handed to explicit detached-work abstraction.
-
-**Detached Work** — intentional async work that may outlive the immediate call path and has owner, lifetime, cancellation, rejection handling, and observability.
-
-**Bounded Concurrency** — concurrent execution with explicit limit chosen from a real bottleneck.
-
-**Retry-Safe Command** — mutating command/route/job/handler/step whose repeated execution after retry/redelivery/crash avoids duplicate or contradictory side effects.
-
-**Durable Workflow** — reliable multi-step process model for retry, compensation, idempotency, resumability, timers, human approval, cross-service coordination, or multiple transaction seams.
-
-## Testing
-
-**Behavior Test** — asserts observable input/output behavior through a module's interface rather than implementation details.
-
-**Real Seam Test** — replaces behavior only through an intentional seam: constructor-injected interface, Effect service/layer, local DB, in-memory adapter, fake external adapter.
-
-**Property Test** — verifies a general property across generated inputs, useful for parsers, smart constructors, state machines, serialization roundtrips, normalization, and lawful combinators.
-
-## TypeScript language idioms
-
-**Type Escape Hatch** — isolated `any` or cast where TypeScript cannot express the invariant; requires precise interface, local scope, and `SAFETY:` comment.
-
-**Safety Comment** — Rust-like comment beside non-`as const` casts or rare `any`, explaining why the operation is sound.
-
-**Exported Symbol JSDoc** — standard JSDoc on directly exported functions/classes/constants/types and public methods of exported classes.
-
-**Nullish Default** — default using `??` so only `null`/`undefined` are absent.
-
-**Falsy Filter** — `filter(Boolean)` style filtering that accidentally removes all falsy values; avoid.
-
-**Parsed Destructuring** — destructuring only after shape is parsed/refined/precise.
-
-**Explicit Shape Construction** — build desired object shapes directly or through named projections instead of subtracting with `delete`.
-
-**Thenable Trap** — callable `then` on a normal object/interface/class causing accidental PromiseLike behavior.
-
-## Cloudflare vocabulary
-
-**Cloudflare Composition Seam** — outer Cloudflare-owned location translating raw `Env`/ctx/bindings into app-level dependencies.
-
-**Cloudflare RPC Context Seam** — runtime hop where request-local ambient scope must not be assumed to propagate; pass typed metadata explicitly.
-
-**Cloudflare Serialization Seam** — workerd seam requiring structured-clone/JSON-serializable values or explicit codecs/projections.
-
-**Agent-backed Durable Object** — stateful Cloudflare unit implemented with Agents SDK `Agent`, default for new DO-like units unless a lower-level reason exists.
-
-**Canonical Stateful Object Name** — normalized domain-specific instance name used to address a DO/Agent.
-
-**Stateful Object Heartbeat** — low-frequency scheduled maintenance method for cleanup, migrations, repairs, health metadata, and operational checks.
-
-**Cloudflare Control Plane** — metadata/lifecycle/routing plane for sharded/multi-tenant systems, kept off high-volume data paths when possible.
-
-**Cloudflare Data Plane** — sharded stateful resource-operation plane reached directly on hot paths after routing metadata is known.
+**Compatibility Glue** — Small temporary adapter/config/integration code used only because current tooling or surrounding architecture cannot express the preferred pattern yet. Keep it isolated and removable.
