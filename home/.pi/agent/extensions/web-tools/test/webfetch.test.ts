@@ -1,12 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+	createWebFetchTool,
 	createWebFetchHeaders,
 	getFallbackUserAgent,
 	OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
 	OPENCODE_WEBFETCH_FALLBACK_USER_AGENT,
 	shouldRetryWithFallbackUserAgent,
 } from "../webfetch.ts";
+
+test("webfetch execute rejects URL credentials with a safe message", async () => {
+	const tool = createWebFetchTool();
+
+	await assert.rejects(
+		tool.execute("id", { url: "https://user:pass@example.com/secret" }),
+		(error: unknown) => error instanceof Error && error.message === "URL credentials are not supported",
+	);
+});
 
 test("createWebFetchHeaders uses the OpenCode browser-like default user agent", () => {
 	const headers = createWebFetchHeaders("text/html");
