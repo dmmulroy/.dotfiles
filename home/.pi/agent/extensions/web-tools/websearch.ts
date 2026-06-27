@@ -1,24 +1,47 @@
-import { StringEnum, type TextContent } from "@earendil-works/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { createOperationSignal, isAbortError } from "./network.ts";
-import { ExaSearchProvider } from "./providers/exa.ts";
+import { createOperationSignal, isOperationTimeoutError } from "./network.ts";
+import { FetchHttpTextClient, ExaSearchProvider } from "./providers/exa.ts";
 import type { SearchProvider } from "./providers/types.ts";
 import { appendExpandHint, appendExpandedPreview, getTextContent } from "./render.ts";
-import { getWebToolsSettings } from "./settings.ts";
-import { truncateTextOutput } from "./truncation.ts";
-import type { NormalizedSearchResult, SearchDepth, WebSearchDetails } from "./types.ts";
+import { SearchWeb, type SearchWebError } from "./search-web.ts";
+import { getWebToolsSettings, SEARCH_DEPTHS, type ToolInputParseError } from "./settings.ts";
+import {
+	TempFileToolOutputStore,
+	formatSearchResults,
+	projectSearchWebResultToPiToolResult,
+	type PiToolResult,
+	type ToolOutputStore,
+	type ToolOutputStoreError,
+	type WebSearchDetails,
+} from "./tool-output.ts";
+import { parseWebSearchToolParams } from "./websearch-input.ts";
+import type { ParseSearchQueryError, SearchDepth, WebToolsSettings } from "./types.ts";
 
-const SEARCH_DEPTHS = ["auto", "fast", "deep"] as const;
+export { formatSearchResults };
 
-export function createWebSearchTool() {
+export interface WebSearchToolComposition {
+	readonly settings: WebToolsSettings;
+	readonly searchWeb: SearchWeb;
+	readonly outputStore: ToolOutputStore;
+}
+
+interface RenderTheme {
+	fg(name: string, value: string): string;
+	bold(value: string): string;
+}
+
+type WebSearchBoundaryError = ToolInputParseError | ParseSearchQueryError | SearchWebError | ToolOutputStoreError;
+
+export function createWebSearchTool(composition?: WebSearchToolComposition) {
 	return {
 		name: "websearch",
 		label: "Web Search",
 		description: "Search the public web for current information and candidate URLs to inspect with webfetch.",
 		promptSnippet: "Search the public web for current information and relevant URLs",
 		promptGuidelines: [
-			"Use this tool when the user needs current public-web information or when the right URL is not yet known.",
+			"Use websearch when the user needs current public-web information or when the right URL is not yet known.",
 			"After picking a promising result, use webfetch on that URL for deeper inspection.",
 		],
 		parameters: Type.Object({
@@ -38,75 +61,54 @@ export function createWebSearchTool() {
 
 		async execute(
 			_toolCallId: string,
-			params: { query: string; maxResults?: number; depth?: SearchDepth },
+			params: unknown,
 			signal?: AbortSignal,
-			onUpdate?: (...args: any[]) => void,
+			onUpdate?: (update: PiToolResult<WebSearchDetails>) => void,
 		) {
-			const settings = getWebToolsSettings();
-			if (!settings.search.enabled) {
-				throw new Error("websearch is disabled in web-tools settings. Enable it to use this tool.");
+			const actualComposition = composition ?? createDefaultWebSearchComposition();
+			const parsed = parseWebSearchToolParams(params, actualComposition.settings.search);
+			if (parsed._tag === "err") {
+				throw toWebSearchToolError(parsed.error);
 			}
 
-			const query = params.query.trim();
-			if (!query) {
-				throw new Error("Search query cannot be empty");
-			}
-
-			const maxResults = clampMaxResults(params.maxResults ?? settings.search.defaultMaxResults);
-			const depth = params.depth ?? settings.search.defaultDepth;
-			const timeoutSeconds = clampTimeoutSeconds(settings.search.timeoutSeconds);
-			const composed = createOperationSignal(timeoutSeconds * 1000, signal);
-
+			const composed = createOperationSignal(parsed.value.timeoutSeconds * 1000, signal);
 			onUpdate?.({
-				content: [textContent(`Searching for ${JSON.stringify(query)}...`)],
+				content: [textContent(`Searching for ${JSON.stringify(parsed.value.query)}...`)],
 				details: {
-					query,
-					depth,
-					maxResults,
-					provider: settings.search.provider,
+					query: parsed.value.query,
+					depth: parsed.value.depth,
+					maxResults: parsed.value.maxResults,
+					provider: actualComposition.settings.search.provider,
 					resultCount: 0,
 					results: [],
 				},
 			});
 
 			try {
-				const provider = createProvider();
-				const results = await provider.search({ query, maxResults, depth }, composed.signal);
-				const output = formatSearchResults(query, results);
-				const truncated = await truncateTextOutput(output, {
-					tempPrefix: "pi-websearch-",
-					fileName: "output.txt",
-				});
-
-				const details: WebSearchDetails = {
-					query,
-					depth,
-					maxResults,
-					provider: provider.name,
-					resultCount: results.length,
-					truncated: truncated.truncated,
-					fullOutputPath: truncated.fullOutputPath,
-					results,
-				};
-
-				return {
-					content: [textContent(truncated.text)],
-					details,
-				};
-			} catch (error) {
-				if (signal?.aborted) {
-					throw new Error("Web search cancelled");
+				const result = await actualComposition.searchWeb.search(
+					{
+						query: parsed.value.query,
+						maxResults: parsed.value.maxResults,
+						depth: parsed.value.depth,
+					},
+					{ signal: composed.signal },
+				);
+				if (result._tag === "err") {
+					throw toWebSearchBoundaryError(result.error, parsed.value.timeoutSeconds, signal, composed.signal);
 				}
-				if (isAbortError(error) || composed.signal.aborted) {
-					throw new Error(`Web search timed out after ${timeoutSeconds}s`);
+
+				const projected = await projectSearchWebResultToPiToolResult(result.value, actualComposition.outputStore);
+				if (projected._tag === "err") {
+					throw toWebSearchBoundaryError(projected.error, parsed.value.timeoutSeconds, signal, composed.signal);
 				}
-				throw error instanceof Error ? error : new Error(String(error));
+
+				return projected.value;
 			} finally {
 				composed.cleanup();
 			}
 		},
 
-		renderCall(args: { query: string; depth?: SearchDepth; maxResults?: number }, theme: any) {
+		renderCall(args: { query: string; depth?: SearchDepth; maxResults?: number }, theme: RenderTheme) {
 			let text = theme.fg("toolTitle", theme.bold("websearch "));
 			text += theme.fg("accent", JSON.stringify(String(args.query)));
 			if (args.depth && args.depth !== "auto") {
@@ -121,7 +123,7 @@ export function createWebSearchTool() {
 		renderResult(
 			result: { content: Array<{ type: string; text?: string }>; details?: WebSearchDetails; isError?: boolean },
 			options: { expanded: boolean; isPartial: boolean },
-			theme: any,
+			theme: RenderTheme,
 		) {
 			if (options.isPartial) {
 				return new Text(theme.fg("warning", "Searching..."), 0, 0);
@@ -152,50 +154,73 @@ export function createWebSearchTool() {
 	};
 }
 
-export function formatSearchResults(query: string, results: NormalizedSearchResult[]): string {
-	if (results.length === 0) {
-		return `Search results for: ${query}\n\nNo results found.`;
-	}
-
-	const lines = [`Search results for: ${query}`, ""];
-	for (const [index, result] of results.entries()) {
-		lines.push(`${index + 1}. ${result.title}`);
-		lines.push(`   URL: ${result.url}`);
-		if (result.publishedAt) {
-			lines.push(`   Published: ${result.publishedAt}`);
-		}
-		if (result.source) {
-			lines.push(`   Source: ${result.source}`);
-		}
-		if (typeof result.score === "number") {
-			lines.push(`   Score: ${result.score}`);
-		}
-		if (result.snippet) {
-			lines.push(`   Snippet: ${result.snippet}`);
-		}
-		lines.push("");
-	}
-	return lines.join("\n").trimEnd();
+export function toWebSearchToolError(error: WebSearchBoundaryError): Error {
+	return new Error(renderSafeWebSearchError(error));
 }
 
-function createProvider(): SearchProvider {
+function createDefaultWebSearchComposition(): WebSearchToolComposition {
 	const settings = getWebToolsSettings();
-	switch (settings.search.provider) {
+	const provider = createSearchProvider(settings.search);
+	return {
+		settings,
+		searchWeb: new SearchWeb({ provider, settings: settings.search }),
+		outputStore: new TempFileToolOutputStore(),
+	};
+}
+
+function createSearchProvider(settings: WebToolsSettings["search"]): SearchProvider {
+	switch (settings.provider) {
 		case "exa":
-			return new ExaSearchProvider(settings.search.endpoint);
+			return new ExaSearchProvider(settings.endpoint, new FetchHttpTextClient());
 	}
 }
 
-function clampMaxResults(value: number): number {
-	if (!Number.isFinite(value)) return 8;
-	return Math.max(1, Math.min(20, Math.round(value)));
+function toWebSearchBoundaryError(
+	error: WebSearchBoundaryError,
+	timeoutSeconds: number,
+	outerSignal: AbortSignal | undefined,
+	operationSignal: AbortSignal,
+): Error {
+	if (outerSignal?.aborted) {
+		return new Error("Web search cancelled");
+	}
+	if (isOperationTimeoutError(operationSignal.reason)) {
+		return new Error(`Web search timed out after ${timeoutSeconds}s`);
+	}
+	return toWebSearchToolError(error);
 }
 
-function clampTimeoutSeconds(timeout: number): number {
-	if (!Number.isFinite(timeout)) return 25;
-	return Math.max(1, Math.min(120, Math.round(timeout)));
+function renderSafeWebSearchError(error: WebSearchBoundaryError): string {
+	switch (error._tag) {
+		case "InvalidToolInput":
+			return error.message;
+		case "InvalidToolField":
+			return `${error.field}: ${error.message}`;
+		case "UnknownToolField":
+			return `Unknown websearch field: ${error.field}`;
+		case "EmptySearchQuery":
+			return "Search query cannot be empty";
+		case "SearchDisabled":
+			return "websearch is disabled in web-tools settings. Enable it to use this tool.";
+		case "SearchProviderUnavailable":
+			return "Search provider unavailable";
+		case "SearchProviderStatusRejected":
+			return `Search request failed (${error.status})`;
+		case "SearchProviderResponseTooLarge":
+			return `Search response too large (${Math.floor(error.maxBytes / (1024 * 1024))}MB limit)`;
+		case "SearchProviderProtocolInvalid":
+			return "Search provider returned an invalid response";
+		case "SearchProviderReturnedError":
+			return error.safeMessage;
+		case "SearchProviderNoRecognizedResults":
+			return "Search provider returned an unrecognized response format";
+		case "SearchProviderCancelled":
+			return "Web search cancelled";
+		case "TempFileWriteFailed":
+			return "Failed to write full websearch output";
+	}
 }
 
-function textContent(text: string): TextContent {
-	return { type: "text", text };
+function textContent(text: string) {
+	return { type: "text" as const, text };
 }

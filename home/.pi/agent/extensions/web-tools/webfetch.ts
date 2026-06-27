@@ -1,28 +1,44 @@
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import { StringEnum, type ImageContent, type TextContent } from "@earendil-works/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { htmlToMarkdown, htmlToText, isPoorMarkdownConversion } from "./html.ts";
-import {
-	createOperationSignal,
-	decodeTextBuffer,
-	fetchWithRedirects,
-	isAbortError,
-	normalizeAndValidateUrl,
-	parseContentType,
-	readBodyWithLimit,
-} from "./network.ts";
+import { FetchPage, type FetchPageError } from "./fetch-page.ts";
+import { createOperationSignal, FetchPublicWebClient, isOperationTimeoutError } from "./network.ts";
 import { appendExpandHint, appendExpandedPreview, getTextContent } from "./render.ts";
-import { getWebToolsSettings } from "./settings.ts";
-import { truncateTextOutput } from "./truncation.ts";
-import type { WebFetchDetails, WebFetchFormat } from "./types.ts";
+import { getWebToolsSettings, WEB_FETCH_FORMATS, type ToolInputParseError } from "./settings.ts";
+import {
+	TempFileToolOutputStore,
+	projectFetchPageResultToPiToolResult,
+	type PiToolResult,
+	type ToolOutputStore,
+	type ToolOutputStoreError,
+	type WebFetchDetails,
+} from "./tool-output.ts";
+import { redactUrlCredentialsForDisplay, type ParsePublicHttpUrlError, type WebFetchFormat, type WebToolsSettings } from "./types.ts";
+import { parseWebFetchToolParams } from "./webfetch-input.ts";
 
-const WEBFETCH_FORMATS = ["text", "markdown", "html"] as const;
-export const OPENCODE_WEBFETCH_DEFAULT_USER_AGENT =
-	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
-export const OPENCODE_WEBFETCH_FALLBACK_USER_AGENT = "opencode";
+export {
+	OPENCODE_WEBFETCH_DEFAULT_USER_AGENT,
+	OPENCODE_WEBFETCH_FALLBACK_USER_AGENT,
+	createWebFetchHeaders,
+	getFallbackUserAgent,
+	shouldRetryWithFallbackUserAgent,
+} from "./fetch-page.ts";
 
-export function createWebFetchTool() {
+export interface WebFetchToolComposition {
+	readonly settings: WebToolsSettings;
+	readonly fetchPage: FetchPage;
+	readonly outputStore: ToolOutputStore;
+}
+
+interface RenderTheme {
+	fg(name: string, value: string): string;
+	bold(value: string): string;
+}
+
+type WebFetchBoundaryError = ToolInputParseError | ParsePublicHttpUrlError | FetchPageError | ToolOutputStoreError;
+
+export function createWebFetchTool(composition?: WebFetchToolComposition) {
 	return {
 		name: "webfetch",
 		label: "Web Fetch",
@@ -30,13 +46,13 @@ export function createWebFetchTool() {
 			"Fetch a single URL and return readable markdown, text, raw HTML/source, or an inline raster image.",
 		promptSnippet: "Fetch one public URL as markdown, text, html, or an inline raster image",
 		promptGuidelines: [
-			"Use this tool when the user provides a URL or after websearch identifies a page to inspect.",
-			"Prefer format=markdown unless the user explicitly wants plain text or raw source.",
+			"Use webfetch when the user provides a URL or after websearch identifies a page to inspect.",
+			"Prefer webfetch format=markdown unless the user explicitly wants plain text or raw source.",
 		],
 		parameters: Type.Object({
 			url: Type.String({ description: "The http:// or https:// URL to fetch." }),
 			format: Type.Optional(
-				StringEnum([...WEBFETCH_FORMATS], {
+				StringEnum([...WEB_FETCH_FORMATS], {
 					description: "Return format. Defaults to the web-tools fetch default format setting.",
 				}),
 			),
@@ -47,19 +63,25 @@ export function createWebFetchTool() {
 			),
 		}),
 
-		async execute(_toolCallId: string, params: { url: string; format?: WebFetchFormat; timeout?: number }, signal?: AbortSignal, onUpdate?: (...args: any[]) => void) {
-			const settings = getWebToolsSettings();
-			const requestedUrl = normalizeAndValidateUrl(params.url);
-			const format = params.format ?? settings.fetch.defaultFormat;
-			const timeoutSeconds = clampTimeoutSeconds(params.timeout ?? settings.fetch.timeoutSeconds);
-			const composed = createOperationSignal(timeoutSeconds * 1000, signal);
+		async execute(
+			_toolCallId: string,
+			params: unknown,
+			signal?: AbortSignal,
+			onUpdate?: (update: PiToolResult<WebFetchDetails>) => void,
+		) {
+			const actualComposition = composition ?? createDefaultWebFetchComposition();
+			const parsed = parseWebFetchToolParams(params, actualComposition.settings.fetch);
+			if (parsed._tag === "err") {
+				throw toWebFetchToolError(parsed.error);
+			}
 
+			const composed = createOperationSignal(parsed.value.timeoutSeconds * 1000, signal);
 			onUpdate?.({
-				content: [textContent(`Fetching ${requestedUrl.toString()}...`)],
+				content: [textContent(`Fetching ${parsed.value.url}...`)],
 				details: {
-					requestedUrl: requestedUrl.toString(),
-					finalUrl: requestedUrl.toString(),
-					format,
+					requestedUrl: parsed.value.url,
+					finalUrl: parsed.value.url,
+					format: parsed.value.format,
 					status: 0,
 					mime: "",
 					contentType: "",
@@ -68,124 +90,39 @@ export function createWebFetchTool() {
 			});
 
 			try {
-				const accept = getAcceptHeader(format);
-				const baseHeaders = createWebFetchHeaders(accept);
-				let { response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-					headers: baseHeaders,
-					signal: composed.signal,
-					maxRedirects: settings.fetch.maxRedirects,
-					blockPrivateHosts: settings.fetch.blockPrivateHosts,
-				});
-
-				if (shouldRetryWithFallbackUserAgent(response)) {
-					await response.body?.cancel().catch(() => undefined);
-					const retryHeaders = createWebFetchHeaders(accept, getFallbackUserAgent(settings.fetch.fallbackUserAgent));
-					({ response, finalUrl } = await fetchWithRedirects(requestedUrl, {
-						headers: retryHeaders,
-						signal: composed.signal,
-						maxRedirects: settings.fetch.maxRedirects,
-						blockPrivateHosts: settings.fetch.blockPrivateHosts,
-					}));
+				const result = await actualComposition.fetchPage.fetch(
+					{ url: parsed.value.url, format: parsed.value.format },
+					{ signal: composed.signal },
+				);
+				if (result._tag === "err") {
+					throw toWebFetchBoundaryError(result.error, parsed.value.timeoutSeconds, signal, composed.signal);
 				}
 
-				if (!response.ok) {
-					throw new Error(`Request failed (${response.status} ${response.statusText || ""})`.trim());
+				const projected = await projectFetchPageResultToPiToolResult(result.value, actualComposition.outputStore);
+				if (projected._tag === "err") {
+					throw toWebFetchBoundaryError(projected.error, parsed.value.timeoutSeconds, signal, composed.signal);
 				}
 
-				const contentLength = response.headers.get("content-length");
-				if (contentLength) {
-					const declaredBytes = Number.parseInt(contentLength, 10);
-					if (Number.isFinite(declaredBytes) && declaredBytes > settings.fetch.maxResponseBytes) {
-						throw new Error(`Response too large (exceeds ${Math.floor(settings.fetch.maxResponseBytes / (1024 * 1024))}MB limit)`);
-					}
-				}
-
-				const parsedContentType = parseContentType(response.headers.get("content-type"));
-				const { buffer, bytes } = await readBodyWithLimit(response, settings.fetch.maxResponseBytes, composed.signal);
-
-				if (parsedContentType.kind === "raster-image") {
-					const details: WebFetchDetails = {
-						requestedUrl: requestedUrl.toString(),
-						finalUrl: finalUrl.toString(),
-						format,
-						status: response.status,
-						mime: parsedContentType.mime,
-						contentType: parsedContentType.contentType,
-						bytes,
-						image: true,
-					};
-					return {
-						content: [
-							textContent(`Fetched image from ${finalUrl.toString()} (${parsedContentType.mime || "image"}, ${formatSize(bytes)})`),
-							imageContent(buffer.toString("base64"), parsedContentType.mime),
-						],
-						details,
-					};
-				}
-
-				if (parsedContentType.kind === "binary") {
-					throw new Error(
-						`Unsupported binary content${parsedContentType.mime ? ` (${parsedContentType.mime})` : ""}. Try a more text-oriented URL.`,
-					);
-				}
-
-				const { text: decodedText, decoder } = decodeTextBuffer(buffer, parsedContentType.charset);
-				let outputText = decodedText;
-				if (parsedContentType.kind === "html" && format === "markdown") {
-					outputText = htmlToMarkdown(decodedText, finalUrl.toString());
-					if (isPoorMarkdownConversion(outputText)) {
-						outputText = htmlToText(decodedText, finalUrl.toString());
-					}
-				} else if (parsedContentType.kind === "html" && format === "text") {
-					outputText = htmlToText(decodedText, finalUrl.toString());
-				}
-
-				const truncated = await truncateTextOutput(outputText, {
-					tempPrefix: "pi-webfetch-",
-					fileName: "output.txt",
-				});
-
-				const details: WebFetchDetails = {
-					requestedUrl: requestedUrl.toString(),
-					finalUrl: finalUrl.toString(),
-					format,
-					status: response.status,
-					mime: parsedContentType.mime,
-					contentType: parsedContentType.contentType,
-					charset: parsedContentType.charset,
-					decoder,
-					bytes,
-					truncated: truncated.truncated,
-					fullOutputPath: truncated.fullOutputPath,
-				};
-
-				return {
-					content: [textContent(truncated.text)],
-					details,
-				};
-			} catch (error) {
-				if (signal?.aborted) {
-					throw new Error("Web fetch cancelled");
-				}
-				if (isAbortError(error) || composed.signal.aborted) {
-					throw new Error(`Web fetch timed out after ${timeoutSeconds}s`);
-				}
-				throw error instanceof Error ? error : new Error(String(error));
+				return projected.value;
 			} finally {
 				composed.cleanup();
 			}
 		},
 
-		renderCall(args: { url: string; format?: WebFetchFormat }, theme: any) {
+		renderCall(args: { url: string; format?: WebFetchFormat }, theme: RenderTheme) {
 			let text = theme.fg("toolTitle", theme.bold("webfetch "));
-			text += theme.fg("accent", String(args.url));
+			text += theme.fg("accent", redactUrlCredentialsForDisplay(args.url));
 			if (args.format && args.format !== "markdown") {
 				text += theme.fg("muted", ` (${args.format})`);
 			}
 			return new Text(text, 0, 0);
 		},
 
-		renderResult(result: { content: Array<{ type: string; text?: string }>; details?: WebFetchDetails; isError?: boolean }, options: { expanded: boolean; isPartial: boolean }, theme: any) {
+		renderResult(
+			result: { content: Array<{ type: string; text?: string }>; details?: WebFetchDetails; isError?: boolean },
+			options: { expanded: boolean; isPartial: boolean },
+			theme: RenderTheme,
+		) {
 			if (options.isPartial) {
 				return new Text(theme.fg("warning", "Fetching..."), 0, 0);
 			}
@@ -225,43 +162,81 @@ export function createWebFetchTool() {
 	};
 }
 
-function getAcceptHeader(format: WebFetchFormat): string {
-	switch (format) {
-		case "markdown":
-			return "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, application/xhtml+xml;q=0.6, */*;q=0.1";
-		case "text":
-			return "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, application/xhtml+xml;q=0.7, */*;q=0.1";
-		case "html":
-			return "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1";
-	}
+export function toWebFetchToolError(error: WebFetchBoundaryError): Error {
+	return new Error(renderSafeWebFetchError(error));
 }
 
-export function createWebFetchHeaders(accept: string, userAgent = OPENCODE_WEBFETCH_DEFAULT_USER_AGENT): Record<string, string> {
+function createDefaultWebFetchComposition(): WebFetchToolComposition {
+	const settings = getWebToolsSettings();
 	return {
-		"User-Agent": userAgent,
-		Accept: accept,
-		"Accept-Language": "en-US,en;q=0.9",
+		settings,
+		fetchPage: new FetchPage({ publicWeb: new FetchPublicWebClient(), settings: settings.fetch }),
+		outputStore: new TempFileToolOutputStore(),
 	};
 }
 
-export function getFallbackUserAgent(configuredUserAgent?: string): string {
-	const trimmed = configuredUserAgent?.trim();
-	return trimmed || OPENCODE_WEBFETCH_FALLBACK_USER_AGENT;
+function toWebFetchBoundaryError(
+	error: WebFetchBoundaryError,
+	timeoutSeconds: number,
+	outerSignal: AbortSignal | undefined,
+	operationSignal: AbortSignal,
+): Error {
+	if (outerSignal?.aborted) {
+		return new Error("Web fetch cancelled");
+	}
+	if (isOperationTimeoutError(operationSignal.reason)) {
+		return new Error(`Web fetch timed out after ${timeoutSeconds}s`);
+	}
+	return toWebFetchToolError(error);
 }
 
-export function shouldRetryWithFallbackUserAgent(response: Pick<Response, "status" | "headers">): boolean {
-	return response.status === 403 && response.headers.get("cf-mitigated") === "challenge";
+function renderSafeWebFetchError(error: WebFetchBoundaryError): string {
+	switch (error._tag) {
+		case "InvalidToolInput":
+			return error.message;
+		case "InvalidToolField":
+			return `${error.field}: ${error.message}`;
+		case "UnknownToolField":
+			return `Unknown webfetch field: ${error.field}`;
+		case "EmptyUrl":
+			return "URL cannot be empty";
+		case "UnsupportedUrlProtocol":
+			return "URL must start with http:// or https://";
+		case "InvalidUrl":
+			return "Invalid URL";
+		case "UrlCredentialsUnsupported":
+			return "URL credentials are not supported";
+		case "PublicWebRequestFailed":
+			return "Request failed";
+		case "PublicWebCancelled":
+			return "Web fetch cancelled";
+		case "PublicWebTimedOut":
+			return `Web fetch timed out after ${error.timeoutSeconds}s`;
+		case "PrivateHostBlocked":
+			return "Blocked private or local host";
+		case "PrivateIpBlocked":
+			return "Blocked private or local IP address";
+		case "RedirectLocationMissing":
+			return "Redirect response was missing a Location header";
+		case "RedirectLocationInvalid":
+			return "Redirect response had an invalid Location header";
+		case "RedirectLimitExceeded":
+			return "Too many redirects while fetching URL";
+		case "RedirectProtocolUnsupported":
+			return "Redirected to unsupported protocol";
+		case "HttpStatusRejected":
+			return `Request failed (${error.status} ${error.statusText || ""})`.trim();
+		case "ResponseTooLarge":
+			return `Response too large (${Math.floor(error.maxBytes / (1024 * 1024))}MB limit)`;
+		case "UnsupportedBinaryContent":
+			return `Unsupported binary content${error.mime ? ` (${error.mime})` : ""}. Try a more text-oriented URL.`;
+		case "HtmlConversionFailed":
+			return "HTML conversion failed";
+		case "TempFileWriteFailed":
+			return "Failed to write full webfetch output";
+	}
 }
 
-function clampTimeoutSeconds(timeout: number): number {
-	if (!Number.isFinite(timeout)) return 30;
-	return Math.max(1, Math.min(120, Math.round(timeout)));
-}
-
-function textContent(text: string): TextContent {
-	return { type: "text", text };
-}
-
-function imageContent(data: string, mimeType: string): ImageContent {
-	return { type: "image", data, mimeType };
+function textContent(text: string) {
+	return { type: "text" as const, text };
 }

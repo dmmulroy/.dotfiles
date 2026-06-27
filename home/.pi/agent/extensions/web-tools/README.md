@@ -27,6 +27,7 @@ Current defaults:
 Behavior notes:
 
 - only `http://` and `https://` URLs are supported
+- URL userinfo credentials (`https://user:pass@example.com`) are rejected and redacted in diagnostics
 - private/local hosts and IPs are blocked by default
 - raster images (`png`, `jpeg`, `gif`, `webp`) are returned inline as images
 - HTML is converted to markdown or text when requested
@@ -45,14 +46,14 @@ Current defaults:
 
 - `enabled`: `true`
 - `provider`: `exa`
-- `endpoint`: `https://mcp.exa.ai/mcp`
+- `endpoint`: configured in `settings.ts`
 - `timeoutSeconds`: `25`
 - `defaultMaxResults`: `8`
 - `defaultDepth`: `auto`
 
 Behavior notes:
 
-- uses the Exa MCP endpoint
+- uses the configured Exa MCP-compatible endpoint
 - Exa currently supports provider depths `auto` and `fast`; tool input `deep` is downgraded to `fast`
 - search responses are limited to `1 MB`
 - provider requests currently send:
@@ -76,7 +77,7 @@ The extension has an internal settings shape:
   search: {
     enabled: boolean;
     provider: "exa";
-    endpoint: string;
+    endpoint: PublicHttpUrl;
     timeoutSeconds: number;
     defaultMaxResults: number;
     defaultDepth: "auto" | "fast" | "deep";
@@ -100,6 +101,12 @@ To change the defaults, edit:
 
 - extension entry: `home/.pi/agent/extensions/web-tools/index.ts`
 - settings/defaults: `home/.pi/agent/extensions/web-tools/settings.ts`
-- fetch tool: `home/.pi/agent/extensions/web-tools/webfetch.ts`
-- search tool: `home/.pi/agent/extensions/web-tools/websearch.ts`
-- Exa provider: `home/.pi/agent/extensions/web-tools/providers/exa.ts`
+- fetch Pi adapter: `home/.pi/agent/extensions/web-tools/webfetch.ts`
+- fetch service: `home/.pi/agent/extensions/web-tools/fetch-page.ts`
+- public web adapter: `home/.pi/agent/extensions/web-tools/network.ts`
+- search Pi adapter: `home/.pi/agent/extensions/web-tools/websearch.ts`
+- search service: `home/.pi/agent/extensions/web-tools/search-web.ts`
+- Exa provider adapter: `home/.pi/agent/extensions/web-tools/providers/exa.ts`
+- Exa protocol parser: `home/.pi/agent/extensions/web-tools/providers/exa-protocol.ts`
+- Exa result parser: `home/.pi/agent/extensions/web-tools/providers/exa-results.ts`
+- tool output projection: `home/.pi/agent/extensions/web-tools/tool-output.ts`
