@@ -1,6 +1,7 @@
 {
   "mcp": {
     "toolMode": "proxy",
+    "startup": "lazy",
     "servers": {
       "executor": {
         "type": "remote",
@@ -8,7 +9,7 @@
       },
       "cf-portal": {
         "type": "remote",
-        "url": "https://portal.mcp.cfdata.org/mcp",
+        "url": "https://portal.mcp.cfdata.org/mcp?codemode=search_and_execute",
         "oauth": {}
       },
       "uidotsh": {
@@ -18,6 +19,12 @@
           "Authorization": "Bearer ${UIDOTSH_TOKEN}"
         },
         "oauth": false
+      },
+      "open-computer-use": {
+        "type": "local",
+        "command": ["open-computer-use", "mcp"],
+        "enabled": true,
+        "timeout": 60000
       }
     }
   }
