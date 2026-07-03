@@ -81,7 +81,7 @@ nvim/
 | `<leader>og` | n,v | Open in GitHub |
 | `gx` | n | Open link (markdown/URL aware) |
 | `]c`/`[c` | n | Next/prev hunk (centered) |
-| `<C-h/j/k/l>` | n | Pane navigation (tmux-aware) |
+| `<C-h/j/k/l>` | n | Window navigation |
 
 ## LSP SERVERS
 

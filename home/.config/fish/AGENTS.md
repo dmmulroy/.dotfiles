@@ -10,12 +10,11 @@ Layered: `config.fish` -> `conf.d/*.fish` (auto) -> `functions/*.fish` (lazy)
 ```
 fish/
 ├── config.fish         # Core: greeting, EDITOR, MANPAGER, dotfiles PATH
-├── conf.d/             # Auto-sourced config fragments (17 files)
+├── conf.d/             # Auto-sourced config fragments (16 files)
 │   ├── aliases.fish    # Shell aliases (c, code, pn, wr)
 │   ├── paths.fish      # PATH modifications (.dotfiles, .local/bin, ghostty)
 │   ├── git.fish        # Git abbreviations init
 │   ├── brew.fish       # Homebrew setup
-│   ├── tmux_keys.fish  # CSI-u Shift+Enter workaround for tmux extended-keys
 │   ├── vite-plus.fish  # Sources Vite+ env
 │   ├── starship.fish   # Starship prompt init
 │   ├── secrets.fish    # Env tokens (GITIGNORED)
@@ -65,7 +64,6 @@ fish/
 | `vim`/`vi` | nvim with `.` default (defined in `conf.d/functions.fish`) |
 | `pn` | pnpm |
 | `wr` | wrangler |
-| `ks` | tmux kill-server |
 | `pbc`/`pbp` | pbcopy/pbpaste |
 | `scratch` | nvim with nofile buftype |
 
@@ -99,10 +97,6 @@ fish/
 | `httpstatus <code>` | HTTP status lookup (supports wildcards) |
 | `nato <text>` | Convert text to NATO phonetic alphabet |
 | `rn` | Right now — current time + calendar |
-
-## TMUX CSI-U WORKAROUND
-
-`conf.d/tmux_keys.fish` binds `\e[13;2u` (Shift+Enter CSI-u) to `execute` inside tmux. Required because tmux `extended-keys always` sends CSI-u to ALL programs, but fish doesn't natively handle them. Only needed inside tmux; TUI apps (pi, nvim) parse CSI-u natively.
 
 ## NOTES
 

@@ -1,21 +1,21 @@
 # Herdr configuration
 # Managed in ~/.dotfiles and stowed to ~/.config/herdr/config.toml
-# Goal: approximate home/.config/tmux/tmux.conf where Herdr has equivalent knobs.
+# Terminal-native workspace/tab/pane manager.
 
 onboarding = false
 
 [terminal]
-# Match tmux default-shell fish while preserving macOS login shell behavior.
+# Use Fish while preserving macOS login shell behavior.
 default_shell = "fish"
 shell_mode = "auto"
-# Match tmux split/new-window -c "#{pane_current_path}".
+# New panes and tabs start in the current pane's directory.
 new_cwd = "follow"
 
 [theme]
 name = "catppuccin"
 
 [theme.custom]
-# Catppuccin Macchiato-inspired overrides matching the tmux theme choices.
+# Catppuccin Macchiato-inspired overrides.
 panel_bg = "#24273a"
 accent = "#c6a0f6"
 blue = "#8aadf4"
@@ -27,22 +27,22 @@ yellow = "#eed49f"
 channel = "stable"
 
 [keys]
-# tmux prefix: C-;
+# Prefix: C-;
 prefix = "ctrl+semicolon"
 
-# tmux-style basics.
+# Basics.
 help = "prefix+?"
-# Free prefix+s for tmux-session-like workspace picking.
+# Keep prefix+s available for workspace picking.
 settings = "prefix+shift+s"
 detach = ["prefix+d", "prefix+q"]
 reload_config = "prefix+r"
 goto = "prefix+g"
 
-# Workspaces are Herdr's closest equivalent to tmux sessions:
-#   prefix+s       choose session/workspace
+# Workspace controls:
+#   prefix+s       choose workspace
 #   prefix+w       also open workspace navigation (Herdr default muscle memory)
-#   prefix+shift+w rename session/workspace (avoids symbol-layer gymnastics)
-#   prefix+( / )   previous / next session/workspace
+#   prefix+shift+w rename workspace (avoids symbol-layer gymnastics)
+#   prefix+( / )   previous / next workspace
 workspace_picker = ["prefix+s", "prefix+w"]
 new_workspace = "prefix+shift+n"
 rename_workspace = "prefix+shift+w"
@@ -54,7 +54,7 @@ next_workspace = "prefix+)"
 focus_agent = "prefix+alt+1..9"
 
 
-# tmux windows ~= Herdr tabs.
+# Tab controls.
 new_tab = "prefix+c"
 previous_tab = "prefix+p"
 next_tab = "prefix+n"
@@ -62,19 +62,19 @@ switch_tab = "prefix+1..9"
 rename_tab = "prefix+comma"
 close_tab = "prefix+shift+x"
 
-# tmux pane creation:
-#   prefix+\     split-window -h  (side-by-side / split right)
-#   prefix+Enter split-window -v  (stacked / split down)
+# Pane creation:
+#   prefix+\     split right
+#   prefix+Enter split down
 split_vertical = "prefix+backslash"
 split_horizontal = "prefix+enter"
 close_pane = "prefix+x"
 zoom = "prefix+m"
 copy_mode = "prefix+v"
 
-# Herdr exposes resize mode rather than tmux's exact repeatable -/= /[ /] bindings.
+# Pane resize mode.
 resize_mode = "prefix+shift+r"
 
-# Pane navigation. Prefix mappings mirror vim-ish tmux usage; ctrl+h/j/k/l are direct Herdr chords.
+# Pane navigation; ctrl+h/j/k/l are direct Herdr chords.
 focus_pane_left = ["ctrl+h"]
 focus_pane_down = ["ctrl+j"]
 focus_pane_up = ["ctrl+k"]
@@ -100,7 +100,7 @@ sidebar_max_width = 36
 mouse_capture = true
 right_click_passthrough_modifier = "ctrl"
 mouse_scroll_lines = 3
-# tmux close/kill bindings do not prompt; match that behavior.
+# Close panes/tabs without prompting.
 confirm_close = false
 prompt_new_tab_name = true
 agent_panel_scope = "all"
@@ -120,23 +120,23 @@ enabled = true
 position = "bottom-center"
 
 [ui.sound]
-# tmux config has no sound notifications.
+# Keep sound notifications disabled.
 enabled = false
 
 [session]
-# Closest analogue to tmux-resurrect for supported coding agents.
+# Resume supported coding agents when restoring sessions.
 resume_agents_on_restore = true
 
 [remote]
 manage_ssh_config = true
 
 [experimental]
-# Closest analogue to tmux-resurrect capture-pane-contents.
+# Persist recent pane output to disk.
 # This persists recent pane output to disk; keep in mind it may include secrets.
 pane_history = true
 allow_nested = false
 kitty_graphics = true
 
 [advanced]
-# tmux uses history-limit 50000 lines; Herdr config is byte-based.
+# Scrollback limit is byte-based.
 scrollback_limit_bytes = 52428800

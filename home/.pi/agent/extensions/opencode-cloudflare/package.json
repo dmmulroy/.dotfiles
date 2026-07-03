@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "echo 'nothing to clean'",
     "build": "echo 'nothing to build'",
-    "check": "node ./test/smoke.mjs && node ./test/local-overlay-regression.mjs && node ./test/gateway-config-regression.mjs && node ./test/gateway-error-regression.mjs && node ./test/auth-command-regression.mjs && node ./test/anthropic-auth-regression.mjs && node ./test/openai-responses-options-regression.mjs && node ./test/google-auth-regression.mjs && node ./test/workers-ai-route-regression.mjs"
+    "check": "node ./test/smoke.mjs && node ./test/local-overlay-regression.mjs && node ./test/gateway-config-regression.mjs && node ./test/gateway-error-regression.mjs && node ./test/auth-command-regression.mjs && node ./test/anthropic-auth-regression.mjs && node ./test/openai-responses-options-regression.mjs && node ./test/programmatic-tool-calling-config-regression.mjs && node ./test/programmatic-tool-calling-regression.mjs && node ./test/google-auth-regression.mjs && node ./test/workers-ai-route-regression.mjs"
   },
   "pi": {
     "extensions": [

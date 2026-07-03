@@ -28,7 +28,7 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 │   │   └── web-tools.json        # Helium browser profile config
 │   └── skills/           # 15 agent skills (SKILL.md + resources)
 │       ├── tdd/          # Test-driven development
-│       ├── tmux/         # Tmux remote control
+│       ├── herdr/        # Herdr remote control
 │       ├── triage/       # Issue triage state machine
 │       ├── init-deep/    # AGENTS.md generation (this skill)
 │       └── ...           # grill-with-docs, to-issues, to-prd, write-a-skill, etc.

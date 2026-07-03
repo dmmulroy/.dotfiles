@@ -1,20 +1,25 @@
 import { getModels, type Api, type Model } from "@earendil-works/pi-ai";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_ROUTE_URLS, type Backend } from "./constants.ts";
+import {
+  parseProgrammaticToolCallingPolicy,
+  type ProgrammaticToolCallingPolicy,
+} from "./programmatic-tool-calling.ts";
 import { getDefaultGatewayConfig, getGatewayConfig, stripRoutePrefix, type GatewayModelConfig } from "./wellknown.ts";
 
 export type ResponseVerbosity = "low" | "medium" | "high";
 export type ReasoningContext = "current_turn" | "all_turns";
 
 export interface RouteDescriptor {
-  backend: Backend;
-  api: Api;
-  baseUrl: string;
-  headers: Record<string, string>;
-  requestModelId?: string;
-  responseVerbosity?: ResponseVerbosity;
-  reasoningContext?: ReasoningContext;
-  compat?: Model<Api>["compat"];
+  readonly backend: Backend;
+  readonly api: Api;
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly requestModelId?: string;
+  readonly responseVerbosity?: ResponseVerbosity;
+  readonly reasoningContext?: ReasoningContext;
+  readonly programmaticToolCalling: ProgrammaticToolCallingPolicy;
+  readonly compat?: Model<Api>["compat"];
 }
 
 export interface CatalogData {
@@ -274,6 +279,7 @@ function buildWorkersModels(
       baseUrl,
       headers,
       requestModelId: config.id || fullModelId,
+      programmaticToolCalling: { _tag: "Disabled" },
       compat: {
         supportsStore: false,
         supportsDeveloperRole: false,
@@ -311,6 +317,7 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
     const builtIns = buildBuiltInModels(backend, route.models, route.blacklist, route.hasGatewayModels);
     const seenModelIds = new Set<string>();
     for (const model of builtIns) {
+      const gatewayModel = resolveGatewayModelConfig(model.id, route.models, backend);
       seenModelIds.add(model.id);
       models.push(toProviderModelConfig(model));
       routes.set(model.id, {
@@ -318,8 +325,12 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         api: model.api,
         baseUrl: route.baseUrl,
         headers: route.headers,
-        responseVerbosity: getResponseVerbosity(resolveGatewayModelConfig(model.id, route.models, backend)),
-        reasoningContext: getReasoningContext(resolveGatewayModelConfig(model.id, route.models, backend)),
+        requestModelId: gatewayModel?.id,
+        responseVerbosity: getResponseVerbosity(gatewayModel),
+        reasoningContext: getReasoningContext(gatewayModel),
+        programmaticToolCalling: backend === "openai"
+          ? parseProgrammaticToolCallingPolicy(gatewayModel?.options)
+          : { _tag: "Disabled" },
         compat: model.compat,
       });
     }
@@ -337,6 +348,9 @@ function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayCo
         requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
         responseVerbosity: getResponseVerbosity(config),
         reasoningContext: getReasoningContext(config),
+        programmaticToolCalling: backend === "openai"
+          ? parseProgrammaticToolCallingPolicy(config.options)
+          : { _tag: "Disabled" },
         compat: config.compat,
       });
     }

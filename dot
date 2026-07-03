@@ -771,7 +771,7 @@ cmd_doctor() {
     done
 
     # Additional tools managed outside the registry (brew packages, etc.)
-    local extra_tools=("git" "nvim" "tmux" "node" "npm")
+    local extra_tools=("git" "herdr" "nvim" "node" "npm")
     for tool in "${extra_tools[@]}"; do
         if command_exists "$tool"; then
             print_success "$tool is available"

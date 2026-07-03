@@ -10,37 +10,21 @@ vim.keymap.set("n", "<space>", "<nop>", { desc = "Disable space (leader) in norm
 
 vim.keymap.set("n", "<C-/>", "<nop>")
 
--- Window and kitty navigation
+-- Window navigation
 vim.keymap.set("n", "<C-j>", function()
-	if vim.fn.exists(":NvimTmuxNavigateDown") ~= 0 then
-		vim.cmd.NvimTmuxNavigateDown()
-	else
-		vim.cmd.wincmd("j")
-	end
+	vim.cmd.wincmd("j")
 end, { desc = "Navigate down" })
 
 vim.keymap.set("n", "<C-k>", function()
-	if vim.fn.exists(":NvimTmuxNavigateUp") ~= 0 then
-		vim.cmd.NvimTmuxNavigateUp()
-	else
-		vim.cmd.wincmd("k")
-	end
+	vim.cmd.wincmd("k")
 end, { desc = "Navigate up" })
 
 vim.keymap.set("n", "<C-l>", function()
-	if vim.fn.exists(":NvimTmuxNavigateRight") ~= 0 then
-		vim.cmd.NvimTmuxNavigateRight()
-	else
-		vim.cmd.wincmd("l")
-	end
+	vim.cmd.wincmd("l")
 end, { desc = "Navigate right" })
 
 vim.keymap.set("n", "<C-h>", function()
-	if vim.fn.exists(":NvimTmuxNavigateLeft") ~= 0 then
-		vim.cmd.NvimTmuxNavigateLeft()
-	else
-		vim.cmd.wincmd("h")
-	end
+	vim.cmd.wincmd("h")
 end, { desc = "Navigate left" })
 
 -- Swap between last two buffers

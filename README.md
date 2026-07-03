@@ -4,7 +4,7 @@ A comprehensive, automated dotfiles management system for macOS development envi
 
 ## Overview
 
-This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management, Homebrew for package installation, and includes configurations for Fish shell, Neovim, Tmux, Git, and other essential development tools.
+This repository contains my personal development environment configuration, managed through a custom CLI tool called `dot`. It uses GNU Stow for symlink management, Homebrew for package installation, and includes configurations for Fish shell, Neovim, Herdr, Git, and other essential development tools.
 
 ### Key Features
 
@@ -40,7 +40,7 @@ After installation, the `dot` command will be available globally for ongoing man
 │   │   ├── fish/      # Fish shell configuration
 │   │   ├── git/       # Git configuration
 │   │   ├── nvim/      # Neovim configuration
-│   │   ├── tmux/      # Tmux configuration
+│   │   ├── herdr/     # Herdr configuration
 │   │   └── ...
 │   └── .ideavimrc     # IntelliJ IDEA Vim config
 ├── packages/
@@ -101,7 +101,7 @@ dot doctor
 ```
 Comprehensive diagnostics including:
 - ✅ Homebrew installation
-- ✅ Essential tools (git, nvim, tmux, node, etc.)
+- ✅ Essential tools (git, herdr, nvim, node, etc.)
 - ✅ pi installation and core development tools
 - ✅ Fish shell configuration
 - ✅ PATH configuration
@@ -230,7 +230,7 @@ dot package remove docker base  # Remove docker from base bundle only
 #### Package Files
 
 **`packages/bundle`** - Base packages for all machines:
-- Development tools: neovim, tmux, fish, git
+- Development tools: neovim, herdr, fish, git
 - CLI utilities: ripgrep, fd, fzf, starship
 - Applications: Arc browser, Raycast, OrbStack
 - AI tools: aider
@@ -251,7 +251,7 @@ dot package remove docker base  # Remove docker from base bundle only
 
 - **Fish Shell**: Custom functions, environment variables, and plugin management via Fisher
 - **Neovim**: Lua-based configuration with lazy.nvim plugin manager
-- **Tmux**: Plugin management via TPM, session persistence, Vim-style navigation
+- **Herdr**: Terminal-native workspaces, tabs, panes, and coding-agent integration
 - **Git**: Conditional work configuration, custom aliases, GPG signing
 
 ### Architecture Highlights
@@ -259,7 +259,7 @@ dot package remove docker base  # Remove docker from base bundle only
 - **GNU Stow**: Manages symlinks from `home/` to `~`
 - **Modular Design**: Separate configs for different tools
 - **Conditional Loading**: Work-specific Git config for `~/Code/work/`
-- **Plugin Managers**: Each tool uses its own (lazy.nvim, TPM, Fisher)
+- **Plugin Managers**: Each tool uses its own where applicable (lazy.nvim, Fisher)
 - **Error Resilience**: Package installation continues despite individual failures
 - **jj Support**: Auto-detects jj-managed repos and uses appropriate update commands
 

@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { getCatalog, refreshCatalog, type ReasoningContext, type ResponseVerbosity, type RouteDescriptor } from "./catalog.ts";
 import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
+import { streamProgrammaticOpenAIResponses } from "./openai-programmatic-responses.ts";
 import { resolveGatewayToken } from "./auth.ts";
 import { applyGatewayToken, getGatewayConfig } from "./wellknown.ts";
 
@@ -480,12 +481,24 @@ function applyRoutePayloadOptions(options: SimpleStreamOptions, route: RouteDesc
 }
 
 function createDelegatedStream(
+	visibleModel: Model<Api>,
 	model: Model<Api>,
 	route: RouteDescriptor,
 	context: Context,
 	options: SimpleStreamOptions,
 	token: string,
 ): AssistantMessageEventStream {
+	if (route.api === "openai-responses" && route.programmaticToolCalling._tag === "Enabled") {
+		return streamProgrammaticOpenAIResponses({
+			visibleModel,
+			// SAFETY: The route discriminant proves this delegated model uses the Responses API.
+			requestModel: model as Model<"openai-responses">,
+			context,
+			options,
+			policy: route.programmaticToolCalling,
+		});
+	}
+
 	switch (route.api) {
 		case "anthropic-messages":
 			return streamAnthropicViaGateway(model, context, options, token);
@@ -543,7 +556,7 @@ export function streamOpencodeCloudflare(
 				apiKey: token,
 			}, route);
 
-			const innerStream = createDelegatedStream(delegatedModel, route, context, delegatedOptions, token);
+			const innerStream = createDelegatedStream(model, delegatedModel, route, context, delegatedOptions, token);
 			for await (const event of innerStream) {
 				stream.push(normalizeEvent(event, model));
 			}

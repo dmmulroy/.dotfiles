@@ -3,7 +3,7 @@
 **Generated:** 2026-05-09T00:00:00Z
 **Commit:** 871ce6f
 
-macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
+macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 
 ## STRUCTURE
 
@@ -13,7 +13,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 ├── home/.config/       # Stowed to ~/.config/
 │   ├── fish/           # Shell (AGENTS.md)
 │   ├── nvim/           # Editor (AGENTS.md)
-│   ├── tmux/           # Multiplexer + TPM plugins
+│   ├── herdr/          # Terminal-native workspace/tab/pane manager
 │   ├── git/            # Conditional work config
 │   ├── ghostty/        # Terminal
 │   ├── starship.toml   # Prompt (custom.scm, 2s timeout for Vite+)
@@ -37,7 +37,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Tmux + Git + pi.
 | Git alias | `home/.config/git/config` [alias] section |
 | Neovim plugin | `home/.config/nvim/lua/plugins/<name>.lua` |
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
-| Tmux binding | `home/.config/tmux/tmux.conf` |
+| Herdr config | `home/.config/herdr/config.toml` |
 | Starship prompt | `home/.config/starship.toml` |
 | Pi extension | `home/.pi/agent/extensions/<name>/` |
 | Pi skill | `home/.pi/agent/skills/<name>/SKILL.md` |
@@ -80,16 +80,16 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 |------|-------|-------|
 | Fish | `config.fish` | Sources `conf.d/`, sets EDITOR/MANPAGER |
 | Neovim | `init.lua` | 1 line: `require("dmmulroy")` |
-| Tmux | `tmux.conf` | Prefix `C-;`, auto-installs TPM |
+| Herdr | `config.toml` | Prefix `C-;`, workspaces/tabs/panes |
 | Git | `config` | SSH signing, `pull.rebase`, conditional include |
 | Starship | `starship.toml` | 2s timeout (Vite+ shims), custom.scm after dir |
 | Pi | `settings.json` | Default provider: opencode.cloudflare.dev, Catppuccin theme |
 
 ## UNIQUE STYLES
 
-- tmux prefix: `C-;` (not `C-b`)
-- tmux splits: `\` horizontal, `Enter` vertical
-- tmux extended-keys: `always` + CSI-u (required for pi/claude-code; fish needs `tmux_keys.fish` workaround)
+- herdr prefix: `C-;`
+- herdr splits: `\` split right, `Enter` split down
+- herdr pane navigation: direct `C-h/j/k/l`
 - nvim: `jj`/`JJ` exit insert, `H`/`L` line start/end
 - nvim completion: blink.cmp (not nvim-cmp), LSP source score_offset=1000
 - git: `fomo` = fetch origin main + rebase
@@ -98,7 +98,6 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 ## NOTES
 
 - `dot update` handles WARP VPN brew API issues automatically
-- Tmux theme must load BEFORE continuum (status-right conflict)
 - Starship `command_timeout = 2000` because Vite+ node shims are slow
 - `secrets.fish` is gitignored — contains env tokens for work services
 - `.pi/agent/*` mostly gitignored; extensions + skills explicitly un-ignored

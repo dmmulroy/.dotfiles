@@ -93,6 +93,37 @@ Example shape:
 
 Provider keys are normalized the same way as the gateway config, including aliases such as `cloudflare-workers-ai`. Local model entries may also provide Pi-specific `thinkingLevelMap` and `compat` fields and `cost.cache_write` for accurate adaptive-thinking behavior and usage reporting. For OpenAI Responses models, `options.text.verbosity` may set an explicit `low`, `medium`, or `high` response verbosity.
 
+### Programmatic Tool Calling
+
+Eligible OpenAI Responses models can opt into OpenAI-hosted Programmatic Tool Calling:
+
+```jsonc
+{
+  "provider": {
+    "openai": {
+      "models": {
+        "<overlay-model-id>": {
+          "id": "<upstream-request-model-id>",
+          "options": {
+            "programmatic_tool_calling": {
+              "allowed_callers": ["direct", "programmatic"]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Use `["programmatic"]` to make every active Pi function tool program-only, or `["direct", "programmatic"]` to allow both invocation modes. Other shapes fail startup rather than silently weakening the policy. Absence of the option leaves the model on Pi AI's standard OpenAI Responses adapter.
+
+Generated JavaScript runs only in OpenAI's isolated hosted V8 runtime. The extension never executes it locally. Client-owned calls are projected into ordinary Pi tool calls, so tool interceptors, approval hooks, mutation queues, rendering, and session persistence remain active. Tool results are returned as strings; image-only results use a textual placeholder because Pi does not expose a truthful tool output schema.
+
+The selected upstream model and Cloudflare AI Gateway route must support the Programmatic Tool Calling preview. Check the OpenAI model page and probe the configured gateway route before relying on it. Requests remain stateless with `store: false`; opaque program, caller, reasoning, program-output, and final-message state is persisted in Pi message signatures for resume, reload, fork, and branch replay. `store: false` does not enable Zero Data Retention by itself; ZDR eligibility depends on the OpenAI organization or project and the complete request path.
+
+Only enable programmatic access for tools whose repeated model-directed use is acceptable. Pi still validates arguments and applies its normal permission boundaries to every nested call.
+
 For example, a private adaptive Anthropic model that is not yet in Pi's built-in catalog can be exposed immediately using placeholders rather than a real private model ID:
 
 ```jsonc
@@ -151,7 +182,7 @@ pi -e ./home/.pi/agent/extensions/opencode-cloudflare -p --provider opencode.clo
 
 ## Notes
 
-- The extension uses a single custom Pi API (`opencode-cloudflare`) and dispatches each request to the appropriate built-in Pi streamer.
+- The extension uses a single custom Pi API (`opencode-cloudflare`) and dispatches each request to the appropriate built-in Pi streamer, except opted-in OpenAI Programmatic Tool Calling routes, which use the extension's stateless Responses adapter.
 - Structured gateway JSON failures are translated into actionable Pi errors, such as prompting `/login opencode.cloudflare.dev` or `/opencode-cf-sync-auth` for rejected Access tokens.
 - Anthropic gateway requests use the Anthropic SDK with explicit `authToken`, producing `Authorization: Bearer <token>` plus `cf-access-token`; the old `provider: "github-copilot"` auth shim is no longer used.
 - If you refresh your OpenCode token outside of Pi while Pi is already running, use `/reload` so Pi refreshes its cached fallback token command.
