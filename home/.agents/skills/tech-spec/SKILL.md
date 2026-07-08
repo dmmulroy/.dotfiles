@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer TypeScript pseudocode over prose wherever precision matters.
 
-Treat `../coding-standards/` as the standards package and `../tdd/` as the testing workflow.
+Treat `../coding-standards/SKILL.md` as the standards source of truth and `../tdd/` as the testing workflow.
 
 This skill is design-only. Do not implement. Save a file only when the user asks for a file; otherwise return the spec inline.
 
@@ -28,23 +28,9 @@ Completion criterion: the branch is chosen from actual available context; missin
 Read:
 
 - `../coding-standards/SKILL.md`
-- `../coding-standards/VOCABULARY.md`
-- `../coding-standards/DESIGNING_MODULES.md`
-- `../coding-standards/DOMAIN_MODELING.md`
-- `../coding-standards/BOUNDARIES_AND_PARSING.md`
-- `../coding-standards/ERROR_HANDLING.md`
-- `../coding-standards/OBSERVABILITY.md`
-- `../coding-standards/TESTING_AND_VERIFICATION.md`
 - `../tdd/SKILL.md`
 
-Load additional standards when relevant:
-
-- `../coding-standards/ASYNC_AND_WORKFLOWS.md` for cancellation, concurrency, retries, transactions, idempotency, or durable workflows.
-- `../coding-standards/TYPESCRIPT_CONTRACTS.md` for public contracts, casts, `any`, collection/object-shape issues, exports, JSDoc, or toolchain changes.
-- `../coding-standards/CLOUDFLARE_ARCHITECTURE.md` for Workers, bindings, Durable Objects, Agents, D1, R2/KV, Queues, Workflows, service bindings, or workerd semantics.
-- `../coding-standards/EFFECT.md` for Effect Services/Layers, typed error channels, Schema, Redacted values, Effect tests, or Effect RPC.
-
-Inspect existing code/docs for local vocabulary, module layout, domain concepts, error handling, adapters, observability, runtime patterns, and test style.
+Inspect existing code and docs for local vocabulary, module layout, domain concepts, errors, adapters, observability, runtime patterns, and test style.
 
 Completion criterion: the spec uses project vocabulary and does not introduce a pattern, library, adapter, schema style, or test strategy before checking local precedent.
 

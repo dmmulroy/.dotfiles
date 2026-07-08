@@ -1,361 +1,441 @@
-import { getModels, type Api, type Model } from "@earendil-works/pi-ai";
+import { type Api, type Model } from "@earendil-works/pi-ai";
+import { getModels } from "@earendil-works/pi-ai/compat";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_ROUTE_URLS, type Backend } from "./constants.ts";
+import type { GatewayConfigStore, GatewayConfigLoadError } from "./config-store.ts";
 import {
-  parseProgrammaticToolCallingPolicy,
-  type ProgrammaticToolCallingPolicy,
-} from "./programmatic-tool-calling.ts";
-import { getDefaultGatewayConfig, getGatewayConfig, stripRoutePrefix, type GatewayModelConfig } from "./wellknown.ts";
+	type GatewayConfig,
+	type GatewayModelConfig,
+	stripRoutePrefix,
+} from "./config.ts";
+import type { Backend } from "./constants.ts";
+import { failure, type Result, success } from "./result.ts";
 
+/** OpenAI response verbosity accepted by the gateway. */
 export type ResponseVerbosity = "low" | "medium" | "high";
+
+/** OpenAI reasoning-context policy accepted by the gateway. */
 export type ReasoningContext = "current_turn" | "all_turns";
 
-export interface RouteDescriptor {
-  readonly backend: Backend;
-  readonly api: Api;
-  readonly baseUrl: string;
-  readonly headers: Readonly<Record<string, string>>;
-  readonly requestModelId?: string;
-  readonly responseVerbosity?: ResponseVerbosity;
-  readonly reasoningContext?: ReasoningContext;
-  readonly programmaticToolCalling: ProgrammaticToolCallingPolicy;
-  readonly compat?: Model<Api>["compat"];
+interface RouteBase {
+	readonly baseUrl: string;
+	readonly headers: Readonly<Record<string, string>>;
+	readonly requestModelId?: string;
+	readonly compat?: Model<Api>["compat"];
 }
 
+/** Route selected for a visible Pi model. */
+export type RouteDescriptor =
+	| (RouteBase & { readonly backend: "anthropic"; readonly api: "anthropic-messages" })
+	| (RouteBase & {
+		readonly backend: "openai";
+		readonly api: "openai-responses";
+		readonly responseVerbosity?: ResponseVerbosity;
+		readonly reasoningContext?: ReasoningContext;
+	})
+	| (RouteBase & { readonly backend: "google"; readonly api: "google-generative-ai" })
+	| (RouteBase & { readonly backend: "workers-ai"; readonly api: "openai-completions" });
+
+/** Models and route index produced from one gateway configuration. */
 export interface CatalogData {
-  models: ProviderModelConfig[];
-  routes: Map<string, RouteDescriptor>;
-  counts: Record<Backend, number>;
+	readonly models: readonly ProviderModelConfig[];
+	readonly routes: ReadonlyMap<string, RouteDescriptor>;
+	readonly counts: Readonly<Record<Backend, number>>;
 }
 
-const DEFAULT_WORKERS_MODELS: Record<string, GatewayModelConfig> = {
-  "@cf/moonshotai/kimi-k2.5": {
-    id: "workers-ai/@cf/moonshotai/kimi-k2.5",
-    name: "Kimi K2.5",
-    attachment: true,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    modalities: { input: ["text", "image"], output: ["text"] },
-    cost: { input: 0.6, cache_read: 0.1, output: 3 },
-    limit: { context: 256000, output: 32000 },
-    options: { temperature: 1, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
-  },
-  "@cf/moonshotai/kimi-k2.6": {
-    id: "workers-ai/@cf/moonshotai/kimi-k2.6",
-    name: "Kimi K2.6",
-    attachment: true,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    modalities: { input: ["text", "image"], output: ["text"] },
-    cost: { input: 0.95, cache_read: 0.16, output: 4 },
-    limit: { context: 262144, output: 32000 },
-    options: { temperature: 1, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
-  },
-  "@cf/zai-org/glm-4.7-flash": {
-    id: "workers-ai/@cf/zai-org/glm-4.7-flash",
-    name: "GLM-4.7-Flash",
-    attachment: true,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    cost: { input: 0.06, output: 0.4 },
-    limit: { context: 131072, output: 32000 },
-    options: { temperature: 0.95, top_p: 0.7, max_tokens: 32000, store: false, parallel_tool_calls: true },
-  },
-  "@cf/nvidia/nemotron-3-120b-a12b": {
-    id: "workers-ai/@cf/nvidia/nemotron-3-120b-a12b",
-    name: "Nemotron 3 Super 120B",
-    attachment: false,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    modalities: { input: ["text"], output: ["text"] },
-    cost: { input: 0.5, output: 1.5 },
-    limit: { context: 256000, output: 32000 },
-    options: { temperature: 0.6, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: false },
-  },
-  "@cf/google/gemma-4-26b-a4b-it": {
-    id: "workers-ai/@cf/google/gemma-4-26b-a4b-it",
-    name: "Gemma 4 26B A4B IT",
-    attachment: true,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    modalities: { input: ["text", "image"], output: ["text"] },
-    cost: { input: 0.1, output: 0.3 },
-  },
-  "@cf/zai-org/glm-5.1": {
-    id: "workers-ai/@cf/zai-org/glm-5.1",
-    name: "GLM 5.1",
-    attachment: false,
-    reasoning: true,
-    tool_call: true,
-    temperature: true,
-    interleaved: { field: "reasoning_content" },
-    modalities: { input: ["text"], output: ["text"] },
-    cost: { input: 1.4, cache_read: 0.26, output: 4.4 },
-    limit: { context: 200000, output: 32000 },
-    options: { temperature: 0.7, top_p: 0.95, max_tokens: 32000, store: false, parallel_tool_calls: true },
-  },
+/** Route and configuration resolved from one atomic catalog snapshot. */
+export interface CatalogRoute {
+	readonly route: RouteDescriptor;
+	readonly config: GatewayConfig;
+}
+
+/** Catalog construction or lookup failure. */
+export class CatalogError extends Error {
+	readonly _tag = "CatalogError" as const;
+
+	/**
+	 * Create a catalog failure.
+	 *
+	 * @param reason - Stable failure classification.
+	 * @param modelId - Model involved in the failure, when applicable.
+	 * @param cause - Configuration loading failure retained for diagnostics.
+	 */
+	constructor(
+		readonly reason: "configuration" | "duplicate-model" | "unknown-model" | "uninitialized",
+		readonly modelId?: string,
+		override readonly cause?: GatewayConfigLoadError,
+	) {
+		super(
+			reason === "configuration"
+				? cause?.message ?? "Gateway configuration failed"
+				: reason === "duplicate-model"
+					? `Gateway catalog contains duplicate model id: ${modelId ?? "unknown"}`
+					: reason === "unknown-model"
+						? `Unknown OpenCode Cloudflare model: ${modelId ?? "unknown"}`
+						: "Gateway catalog has not been initialized",
+		);
+		this.name = "CatalogError";
+	}
+}
+
+/** Instance-owned catalog service. */
+export interface CatalogService {
+	/** Return the current catalog, or an uninitialized failure. */
+	current(): Result<CatalogData, CatalogError>;
+	/** Refresh configuration and rebuild the catalog atomically. */
+	refresh(forceReload?: boolean, signal?: AbortSignal): Promise<Result<CatalogData, CatalogError>>;
+	/** Resolve a model route and configuration from one snapshot. */
+	resolveRoute(modelId: string, signal?: AbortSignal): Promise<Result<CatalogRoute, CatalogError>>;
+}
+
+const DEFAULT_WORKERS_MODELS: Readonly<Record<string, GatewayModelConfig>> = {
+	"@cf/moonshotai/kimi-k2.5": {
+		requestModelId: "workers-ai/@cf/moonshotai/kimi-k2.5",
+		name: "Kimi K2.5",
+		attachment: true,
+		reasoning: true,
+		inputModalities: ["text", "image"],
+		inputCost: 0.6,
+		cacheReadCost: 0.1,
+		outputCost: 3,
+		contextWindow: 256000,
+		maxTokens: 32000,
+	},
+	"@cf/moonshotai/kimi-k2.6": {
+		requestModelId: "workers-ai/@cf/moonshotai/kimi-k2.6",
+		name: "Kimi K2.6",
+		attachment: true,
+		reasoning: true,
+		inputModalities: ["text", "image"],
+		inputCost: 0.95,
+		cacheReadCost: 0.16,
+		outputCost: 4,
+		contextWindow: 262144,
+		maxTokens: 32000,
+	},
+	"@cf/zai-org/glm-4.7-flash": {
+		requestModelId: "workers-ai/@cf/zai-org/glm-4.7-flash",
+		name: "GLM-4.7-Flash",
+		attachment: true,
+		reasoning: true,
+		inputCost: 0.06,
+		outputCost: 0.4,
+		contextWindow: 131072,
+		maxTokens: 32000,
+	},
+	"@cf/nvidia/nemotron-3-120b-a12b": {
+		requestModelId: "workers-ai/@cf/nvidia/nemotron-3-120b-a12b",
+		name: "Nemotron 3 Super 120B",
+		reasoning: true,
+		inputModalities: ["text"],
+		inputCost: 0.5,
+		outputCost: 1.5,
+		contextWindow: 256000,
+		maxTokens: 32000,
+	},
+	"@cf/google/gemma-4-26b-a4b-it": {
+		requestModelId: "workers-ai/@cf/google/gemma-4-26b-a4b-it",
+		name: "Gemma 4 26B A4B IT",
+		attachment: true,
+		reasoning: true,
+		inputModalities: ["text", "image"],
+		inputCost: 0.1,
+		outputCost: 0.3,
+	},
+	"@cf/zai-org/glm-5.1": {
+		requestModelId: "workers-ai/@cf/zai-org/glm-5.1",
+		name: "GLM 5.1",
+		reasoning: true,
+		inputModalities: ["text"],
+		inputCost: 1.4,
+		cacheReadCost: 0.26,
+		outputCost: 4.4,
+		contextWindow: 200000,
+		maxTokens: 32000,
+	},
 };
 
-const DEFAULT_BACKEND_APIS: Record<Backend, Api> = {
-  anthropic: "anthropic-messages",
-  openai: "openai-responses",
-  google: "google-generative-ai",
-  "workers-ai": "openai-completions",
+const WORKERS_COMPAT: NonNullable<Model<Api>["compat"]> = {
+	supportsStore: false,
+	supportsDeveloperRole: false,
+	supportsReasoningEffort: false,
+	maxTokensField: "max_tokens",
 };
-
-let activeCatalog: CatalogData = buildCatalogFromGateway(getDefaultGatewayConfig());
-
-export function getCatalog(): CatalogData {
-  return activeCatalog;
-}
-
-export async function refreshCatalog(forceReload: boolean = false): Promise<CatalogData> {
-  const gateway = await getGatewayConfig({ forceReload, fallbackToDefault: true });
-  activeCatalog = buildCatalogFromGateway(gateway);
-  return activeCatalog;
-}
-
-export function summarizeCatalog(catalog: CatalogData = activeCatalog): string {
-  return `anthropic=${catalog.counts.anthropic}, openai=${catalog.counts.openai}, google=${catalog.counts.google}, workers-ai=${catalog.counts["workers-ai"]}`;
-}
-
-function toProviderModelConfig(model: Model<Api>): ProviderModelConfig {
-  return {
-    id: model.id,
-    name: model.name,
-    reasoning: model.reasoning,
-    thinkingLevelMap: model.thinkingLevelMap,
-    input: model.input,
-    cost: model.cost,
-    contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
-    compat: model.compat,
-  };
-}
 
 function normalizeInputModalities(config: GatewayModelConfig): ("text" | "image")[] {
-  const input = config.modalities?.input?.filter((value): value is "text" | "image" => value === "text" || value === "image");
-  if (input?.length) return input;
-  return config.attachment ? ["text", "image"] : ["text"];
+	const input = config.inputModalities?.filter((value): value is "text" | "image" => value === "text" || value === "image");
+	if (input?.length) return [...input];
+	return config.attachment ? ["text", "image"] : ["text"];
 }
 
-function isBlacklistedModel(
-  modelId: string,
-  backend: Backend,
-  blacklist: string[] | undefined,
-  config?: GatewayModelConfig,
-): boolean {
-  if (!blacklist?.length) return false;
-  const denied = new Set(blacklist.flatMap((id) => [id, stripRoutePrefix(id, backend)]));
-  const candidates = [modelId, stripRoutePrefix(modelId, backend)];
-  if (config?.id) {
-    candidates.push(config.id, stripRoutePrefix(config.id, backend));
-  }
-  return candidates.some((candidate) => denied.has(candidate));
+function isJsonRecord(input: unknown): input is Readonly<Record<string, unknown>> {
+	return input !== null && typeof input === "object" && !Array.isArray(input);
 }
 
-function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelConfig): ProviderModelConfig {
-  return {
-    id: modelId,
-    name: config.name || modelId,
-    reasoning: config.reasoning !== false,
-    thinkingLevelMap: config.thinkingLevelMap,
-    input: normalizeInputModalities(config),
-    cost: {
-      input: config.cost?.input || 0,
-      output: config.cost?.output || 0,
-      cacheRead: config.cost?.cache_read || 0,
-      cacheWrite: config.cost?.cache_write || 0,
-    },
-    contextWindow: config.limit?.context || 128000,
-    maxTokens: config.limit?.output || Number(config.options?.max_tokens) || 16384,
-    compat: config.compat,
-  };
+function getOptionNumber(config: GatewayModelConfig, key: string): number | undefined {
+	const value = config.options?.[key];
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function resolveGatewayModelConfig(
-  modelId: string,
-  gatewayModels: Record<string, GatewayModelConfig>,
-  backend: Backend,
-): GatewayModelConfig | undefined {
-  return gatewayModels[modelId] || gatewayModels[`${backend}/${modelId}`] || gatewayModels[`anthropic/${modelId}`];
+function getNestedOption(config: GatewayModelConfig | undefined, group: string, key: string): unknown {
+	const value = config?.options?.[group];
+	return isJsonRecord(value) ? value[key] : undefined;
 }
 
 function getResponseVerbosity(config: GatewayModelConfig | undefined): ResponseVerbosity | undefined {
-  const text = config?.options?.text;
-  if (!text || typeof text !== "object" || Array.isArray(text)) return undefined;
-  const verbosity = (text as Record<string, unknown>).verbosity;
-  return verbosity === "low" || verbosity === "medium" || verbosity === "high" ? verbosity : undefined;
+	const value = getNestedOption(config, "text", "verbosity");
+	return value === "low" || value === "medium" || value === "high" ? value : undefined;
 }
 
 function getReasoningContext(config: GatewayModelConfig | undefined): ReasoningContext | undefined {
-  const reasoning = config?.options?.reasoning;
-  if (!reasoning || typeof reasoning !== "object" || Array.isArray(reasoning)) return undefined;
-  const context = (reasoning as Record<string, unknown>).context;
-  return context === "current_turn" || context === "all_turns" ? context : undefined;
+	const value = getNestedOption(config, "reasoning", "context");
+	return value === "current_turn" || value === "all_turns" ? value : undefined;
 }
 
-function applyGatewayModelLimit(model: Model<Api>, gatewayModels: Record<string, GatewayModelConfig>, backend: Backend): Model<Api> {
-  const gatewayConfig = resolveGatewayModelConfig(model.id, gatewayModels, backend);
-  if (!gatewayConfig?.limit) return model;
-  return {
-    ...model,
-    contextWindow: gatewayConfig.limit.context || model.contextWindow,
-    maxTokens: gatewayConfig.limit.output || model.maxTokens,
-  };
+function toProviderModelConfig(model: Model<Api>): ProviderModelConfig {
+	return {
+		id: model.id,
+		name: model.name,
+		reasoning: model.reasoning,
+		thinkingLevelMap: model.thinkingLevelMap,
+		input: [...model.input],
+		cost: { ...model.cost },
+		contextWindow: model.contextWindow,
+		maxTokens: model.maxTokens,
+		compat: model.compat,
+	};
+}
+
+function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelConfig): ProviderModelConfig {
+	return {
+		id: modelId,
+		name: config.name ?? modelId,
+		reasoning: config.reasoning ?? true,
+		thinkingLevelMap: config.thinkingLevelMap,
+		input: normalizeInputModalities(config),
+		cost: {
+			input: config.inputCost ?? 0,
+			output: config.outputCost ?? 0,
+			cacheRead: config.cacheReadCost ?? 0,
+			cacheWrite: config.cacheWriteCost ?? 0,
+		},
+		contextWindow: config.contextWindow ?? 128000,
+		maxTokens: config.maxTokens ?? getOptionNumber(config, "max_tokens") ?? 16384,
+		compat: config.compat,
+	};
+}
+
+function applyGatewayOverrides(model: Model<Api>, config: GatewayModelConfig | undefined): Model<Api> {
+	if (!config) return model;
+	return {
+		...model,
+		name: config.name ?? model.name,
+		reasoning: config.reasoning ?? model.reasoning,
+		thinkingLevelMap: config.thinkingLevelMap ?? model.thinkingLevelMap,
+		input: config.inputModalities || config.attachment !== undefined ? normalizeInputModalities(config) : model.input,
+		cost: {
+			input: config.inputCost ?? model.cost.input,
+			output: config.outputCost ?? model.cost.output,
+			cacheRead: config.cacheReadCost ?? model.cost.cacheRead,
+			cacheWrite: config.cacheWriteCost ?? model.cost.cacheWrite,
+		},
+		contextWindow: config.contextWindow ?? model.contextWindow,
+		maxTokens: config.maxTokens ?? model.maxTokens,
+		compat: config.compat ? { ...model.compat, ...config.compat } : model.compat,
+	};
+}
+
+function resolveGatewayModelConfig(
+	modelId: string,
+	models: Readonly<Record<string, GatewayModelConfig>>,
+	backend: Backend,
+): GatewayModelConfig | undefined {
+	return models[modelId] ?? models[`${backend}/${modelId}`] ?? models[`anthropic/${modelId}`];
+}
+
+function isBlacklistedModel(
+	modelId: string,
+	backend: Backend,
+	blacklist: readonly string[] | undefined,
+	config?: GatewayModelConfig,
+): boolean {
+	if (!blacklist?.length) return false;
+	const denied = new Set(blacklist.flatMap((id) => [id, stripRoutePrefix(id, backend)]));
+	const candidates = [modelId, stripRoutePrefix(modelId, backend)];
+	if (config?.requestModelId) {
+		candidates.push(config.requestModelId, stripRoutePrefix(config.requestModelId, backend));
+	}
+	return candidates.some((candidate) => denied.has(candidate));
 }
 
 function buildBuiltInModels(
-  backend: Exclude<Backend, "workers-ai">,
-  gatewayModels: Record<string, GatewayModelConfig>,
-  blacklist?: string[],
-  hasGatewayModels: boolean = false,
-): Model<Api>[] {
-  const provider = backend === "google" ? "google" : backend;
-  let builtIns = getModels(provider as "anthropic" | "openai" | "google") as Model<Api>[];
-
-  // Gateway-provided OpenAI model entries are an allowlist. Machine-local overlays
-  // are additions and must not accidentally hide every built-in OpenAI model.
-  if (backend === "openai" && hasGatewayModels) {
-    const allowlist = new Set(Object.keys(gatewayModels).map((id) => stripRoutePrefix(id, backend)));
-    builtIns = builtIns.filter((model) => allowlist.has(model.id));
-  }
-
-  return builtIns
-    .filter((model) => !isBlacklistedModel(model.id, backend, blacklist))
-    .map((model) => applyGatewayModelLimit(model, gatewayModels, backend));
+	backend: Exclude<Backend, "workers-ai">,
+	config: GatewayConfig,
+): readonly Model<Api>[] {
+	const route = config.routes[backend];
+	const provider = backend === "google" ? "google" : backend;
+	let models = [...getModels(provider)];
+	if (backend === "openai" && route.hasGatewayModels) {
+		const allowlist = new Set(Object.keys(route.models).map((id) => stripRoutePrefix(id, backend)));
+		models = models.filter((model) => allowlist.has(model.id));
+	}
+	return models
+		.filter((model) => !isBlacklistedModel(model.id, backend, route.blacklist, resolveGatewayModelConfig(model.id, route.models, backend)))
+		.map((model) => applyGatewayOverrides(model, resolveGatewayModelConfig(model.id, route.models, backend)));
 }
 
-function buildWorkersModels(
-  gatewayModels: Record<string, GatewayModelConfig>,
-  baseUrl: string,
-  headers: Record<string, string>,
-  whitelist?: string[],
-  blacklist?: string[],
-) {
-  const source = Object.keys(gatewayModels).length > 0 ? gatewayModels : DEFAULT_WORKERS_MODELS;
-  const allowedIds = whitelist?.length ? new Set(whitelist) : undefined;
-  const models: ProviderModelConfig[] = [];
-  const routes = new Map<string, RouteDescriptor>();
-
-  for (const [fullModelId, config] of Object.entries(source)) {
-    const shortId = stripRoutePrefix(fullModelId, "workers-ai");
-    // Skip models not in whitelist (match against both full ID and short ID)
-    if (allowedIds && !allowedIds.has(fullModelId) && !allowedIds.has(shortId)) continue;
-    if (isBlacklistedModel(fullModelId, "workers-ai", blacklist, config)) continue;
-    models.push({
-      id: shortId,
-      name: `${fullModelId} (${config.name || shortId})`,
-      reasoning: config.reasoning !== false,
-      input: normalizeInputModalities(config),
-      cost: {
-        input: config.cost?.input || 0,
-        output: config.cost?.output || 0,
-        cacheRead: config.cost?.cache_read || 0,
-        cacheWrite: 0,
-      },
-      contextWindow: config.limit?.context || 128000,
-      maxTokens: config.limit?.output || Number(config.options?.max_tokens) || 16384,
-      compat: {
-        supportsStore: false,
-        supportsDeveloperRole: false,
-        supportsReasoningEffort: false,
-        maxTokensField: "max_tokens",
-      },
-    });
-    routes.set(shortId, {
-      backend: "workers-ai",
-      api: "openai-completions",
-      baseUrl,
-      headers,
-      requestModelId: config.id || fullModelId,
-      programmaticToolCalling: { _tag: "Disabled" },
-      compat: {
-        supportsStore: false,
-        supportsDeveloperRole: false,
-        supportsReasoningEffort: false,
-        maxTokensField: "max_tokens",
-      },
-    });
-  }
-
-  return { models, routes };
+function createRoute(
+	backend: Exclude<Backend, "workers-ai">,
+	config: GatewayConfig,
+	model: Model<Api>,
+	gatewayModel: GatewayModelConfig | undefined,
+): RouteDescriptor {
+	const route = config.routes[backend];
+	const base = {
+		baseUrl: route.baseUrl,
+		headers: route.headers,
+		requestModelId: gatewayModel?.requestModelId,
+		compat: model.compat,
+	};
+	switch (backend) {
+		case "anthropic":
+			return { ...base, backend, api: "anthropic-messages" };
+		case "openai":
+			return {
+				...base,
+				backend,
+				api: "openai-responses",
+				responseVerbosity: getResponseVerbosity(gatewayModel),
+				reasoningContext: getReasoningContext(gatewayModel),
+			};
+		case "google":
+			return { ...base, backend, api: "google-generative-ai" };
+	}
 }
 
-function buildCatalogFromGateway(gateway: Awaited<ReturnType<typeof getGatewayConfig>>): CatalogData {
-  const models: ProviderModelConfig[] = [];
-  const routes = new Map<string, RouteDescriptor>();
-  const counts: Record<Backend, number> = {
-    anthropic: 0,
-    openai: 0,
-    google: 0,
-    "workers-ai": 0,
-  };
+function addModel(
+	models: ProviderModelConfig[],
+	routes: Map<string, RouteDescriptor>,
+	model: ProviderModelConfig,
+	route: RouteDescriptor,
+): Result<void, CatalogError> {
+	if (routes.has(model.id)) return failure(new CatalogError("duplicate-model", model.id));
+	models.push(model);
+	routes.set(model.id, route);
+	return success(undefined);
+}
 
-  for (const backend of gateway.enabledBackends) {
-    const route = gateway.routes[backend];
-    if (backend === "workers-ai") {
-      const workers = buildWorkersModels(route.models, route.baseUrl || DEFAULT_ROUTE_URLS[backend], route.headers, route.whitelist, route.blacklist);
-      models.push(...workers.models);
-      for (const [modelId, descriptor] of workers.routes.entries()) {
-        routes.set(modelId, descriptor);
-      }
-      counts[backend] = workers.models.length;
-      continue;
-    }
+/**
+ * Build a deterministic model catalog from resolved gateway configuration.
+ *
+ * @param config - Resolved gateway configuration.
+ * @returns Catalog or duplicate-model failure.
+ */
+export function buildCatalog(config: GatewayConfig): Result<CatalogData, CatalogError> {
+	const models: ProviderModelConfig[] = [];
+	const routes = new Map<string, RouteDescriptor>();
+	const counts: Record<Backend, number> = { anthropic: 0, openai: 0, google: 0, "workers-ai": 0 };
 
-    const builtIns = buildBuiltInModels(backend, route.models, route.blacklist, route.hasGatewayModels);
-    const seenModelIds = new Set<string>();
-    for (const model of builtIns) {
-      const gatewayModel = resolveGatewayModelConfig(model.id, route.models, backend);
-      seenModelIds.add(model.id);
-      models.push(toProviderModelConfig(model));
-      routes.set(model.id, {
-        backend,
-        api: model.api,
-        baseUrl: route.baseUrl,
-        headers: route.headers,
-        requestModelId: gatewayModel?.id,
-        responseVerbosity: getResponseVerbosity(gatewayModel),
-        reasoningContext: getReasoningContext(gatewayModel),
-        programmaticToolCalling: backend === "openai"
-          ? parseProgrammaticToolCallingPolicy(gatewayModel?.options)
-          : { _tag: "Disabled" },
-        compat: model.compat,
-      });
-    }
+	for (const backend of config.enabledBackends) {
+		const route = config.routes[backend];
+		if (backend === "workers-ai") {
+			const source = Object.keys(route.models).length > 0 ? route.models : DEFAULT_WORKERS_MODELS;
+			const whitelist = route.whitelist?.length ? new Set(route.whitelist) : undefined;
+			for (const [fullModelId, modelConfig] of Object.entries(source)) {
+				const modelId = stripRoutePrefix(fullModelId, backend);
+				if (whitelist && !whitelist.has(fullModelId) && !whitelist.has(modelId)) continue;
+				if (isBlacklistedModel(fullModelId, backend, route.blacklist, modelConfig)) continue;
+				const model = toProviderModelConfigFromGateway(modelId, modelConfig);
+				model.name = `${fullModelId} (${modelConfig.name ?? modelId})`;
+				model.compat = WORKERS_COMPAT;
+				const added = addModel(models, routes, model, {
+					backend,
+					api: "openai-completions",
+					baseUrl: route.baseUrl,
+					headers: route.headers,
+					requestModelId: modelConfig.requestModelId ?? fullModelId,
+					compat: WORKERS_COMPAT,
+				});
+				if (!added.ok) return added;
+				counts[backend] += 1;
+			}
+			continue;
+		}
 
-    for (const [fullModelId, config] of Object.entries(route.models)) {
-      const shortId = stripRoutePrefix(fullModelId, backend);
-      if (seenModelIds.has(shortId) || isBlacklistedModel(fullModelId, backend, route.blacklist, config)) continue;
-      seenModelIds.add(shortId);
-      models.push(toProviderModelConfigFromGateway(shortId, config));
-      routes.set(shortId, {
-        backend,
-        api: DEFAULT_BACKEND_APIS[backend],
-        baseUrl: route.baseUrl,
-        headers: route.headers,
-        requestModelId: config.id || (backend === "anthropic" ? shortId : fullModelId),
-        responseVerbosity: getResponseVerbosity(config),
-        reasoningContext: getReasoningContext(config),
-        programmaticToolCalling: backend === "openai"
-          ? parseProgrammaticToolCallingPolicy(config.options)
-          : { _tag: "Disabled" },
-        compat: config.compat,
-      });
-    }
-    counts[backend] = seenModelIds.size;
-  }
+		const builtIns = buildBuiltInModels(backend, config);
+		const seen = new Set<string>();
+		for (const model of builtIns) {
+			const gatewayModel = resolveGatewayModelConfig(model.id, route.models, backend);
+			const added = addModel(models, routes, toProviderModelConfig(model), createRoute(backend, config, model, gatewayModel));
+			if (!added.ok) return added;
+			seen.add(model.id);
+		}
+		for (const [fullModelId, modelConfig] of Object.entries(route.models)) {
+			const modelId = stripRoutePrefix(fullModelId, backend);
+			if (seen.has(modelId) || isBlacklistedModel(fullModelId, backend, route.blacklist, modelConfig)) continue;
+			const model = toProviderModelConfigFromGateway(modelId, modelConfig);
+			const routeModel: Model<Api> = {
+				...model,
+				api: backend === "anthropic" ? "anthropic-messages" : backend === "openai" ? "openai-responses" : "google-generative-ai",
+				provider: backend,
+				baseUrl: route.baseUrl,
+			};
+			const added = addModel(models, routes, model, createRoute(backend, config, routeModel, modelConfig));
+			if (!added.ok) return added;
+			seen.add(modelId);
+		}
+		counts[backend] = seen.size;
+	}
+	return success({ models, routes, counts });
+}
 
-  return { models, routes, counts };
+/**
+ * Render compact backend model counts.
+ *
+ * @param catalog - Catalog to summarize.
+ * @returns One-line backend count summary.
+ */
+export function summarizeCatalog(catalog: CatalogData): string {
+	return `anthropic=${catalog.counts.anthropic}, openai=${catalog.counts.openai}, google=${catalog.counts.google}, workers-ai=${catalog.counts["workers-ai"]}`;
+}
+
+/**
+ * Create an instance-owned catalog service.
+ *
+ * @param configStore - Configuration source owned by the same extension runtime.
+ * @returns Catalog service.
+ */
+export function createCatalogService(configStore: GatewayConfigStore): CatalogService {
+	let active: CatalogData | undefined;
+	let activeConfig: GatewayConfig | undefined;
+
+	const refresh = async (forceReload = false, signal?: AbortSignal): Promise<Result<CatalogData, CatalogError>> => {
+		const loaded = await configStore.load({ forceReload, fallbackToDefault: true, signal });
+		if (!loaded.ok) return failure(new CatalogError("configuration", undefined, loaded.error));
+		if (!forceReload && active && activeConfig === loaded.value) return success(active);
+		const built = buildCatalog(loaded.value);
+		if (!built.ok) return built;
+		active = built.value;
+		activeConfig = loaded.value;
+		return success(active);
+	};
+
+	return {
+		current() {
+			return active ? success(active) : failure(new CatalogError("uninitialized"));
+		},
+		refresh,
+		async resolveRoute(modelId, signal) {
+			let refreshed = await refresh(false, signal);
+			if (!refreshed.ok) return refreshed;
+			let route = refreshed.value.routes.get(modelId);
+			if (!route) {
+				refreshed = await refresh(true, signal);
+				if (!refreshed.ok) return refreshed;
+				route = refreshed.value.routes.get(modelId);
+			}
+			return route && activeConfig
+				? success({ route, config: activeConfig })
+				: failure(new CatalogError("unknown-model", modelId));
+		},
+	};
 }

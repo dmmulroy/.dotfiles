@@ -50,7 +50,7 @@ Before writing any code:
 
 - [ ] Confirm with user what interface changes are needed
 - [ ] Confirm with user which behaviors to test (prioritize)
-- [ ] Identify opportunities for deep modules (small interface, deep implementation) — see `../coding-standards/DESIGNING_MODULES.md` for the vocabulary and testability checks
+- [ ] Identify opportunities for deep modules (small interface, deep implementation) — see `../coding-standards/SKILL.md` for the design and testability standards
 - [ ] List the behaviors to test (not implementation steps)
 - [ ] Get user approval on the plan
 
@@ -110,8 +110,8 @@ After all tests pass, look for [refactor candidates](refactoring.md):
 ## Local overrides (dmmulroy/skills)
 
 This skill is vendored from mattpocock/skills. In this repository,
-`../coding-standards/TESTING_AND_VERIFICATION.md` is the source of truth for
-testing and **supersedes `mocking.md`** wherever they disagree:
+`../coding-standards/SKILL.md` is the source of truth and **supersedes
+`mocking.md`** wherever they disagree:
 
 - Do not use module-patching APIs (`vi.mock`, `jest.mock`) or method-spy APIs
   (`vi.spyOn`, `jest.spyOn`). Replace behavior through a real seam instead
@@ -119,5 +119,4 @@ testing and **supersedes `mocking.md`** wherever they disagree:
   local database, runtime binding).
 - Prefer recording fakes supplied through production seams over mocks, even at
   system boundaries.
-- Use risk-matched evidence and the project tooling (Effect, Fast-Check,
-  `vp test`) as described in the standards.
+- Match evidence to risk and use representative databases or runtimes for claims that depend on them.

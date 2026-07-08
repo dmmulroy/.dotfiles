@@ -1,22 +1,40 @@
 import { spawnSync } from "node:child_process";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
+	createProductionGatewayAuthService,
+	createProductionGatewayCredentialStore,
+	createProductionGatewayTokenSource,
 	describeTokenState,
-	findOpenCodeAuthPath,
-	getPiStoredGatewayCredential,
-	hasEnvOverride,
-	loginOpencodeCloudflare,
-	readImportedGatewayToken,
-	refreshOpencodeCloudflare,
-	syncImportedAuthToPi,
+	type GatewayAuthService,
 } from "./auth.ts";
-import { getCatalog, refreshCatalog, summarizeCatalog } from "./catalog.ts";
-import { CUSTOM_API, GATEWAY_ORIGIN, PROVIDER_ID, PROVIDER_NAME, TOKEN_ENV_OVERRIDE } from "./constants.ts";
-import { streamOpencodeCloudflare } from "./dispatch.ts";
-import { clearGatewayConfigCache, getGatewayConfig, getGatewayConfigStatus } from "./wellknown.ts";
+import {
+	createCatalogService,
+	summarizeCatalog,
+	type CatalogData,
+	type CatalogService,
+} from "./catalog.ts";
+import {
+	createProductionGatewayConfigStore,
+	type GatewayConfigStore,
+} from "./config-store.ts";
+import {
+	CUSTOM_API,
+	GATEWAY_ORIGIN,
+	PROVIDER_ID,
+	PROVIDER_NAME,
+	TOKEN_ENV_OVERRIDE,
+} from "./constants.ts";
+import { Redacted } from "./redacted.ts";
+import { createGatewayStream } from "./stream.ts";
 
-function describeStoredCredential(): string {
-	const credential = getPiStoredGatewayCredential();
+interface ExtensionServices {
+	readonly auth: GatewayAuthService;
+	readonly catalog: CatalogService;
+	readonly configStore: GatewayConfigStore;
+}
+
+function describeStoredCredential(auth: GatewayAuthService): string {
+	const credential = auth.getStoredCredential();
 	if (!credential) return "missing";
 	if (credential.expires <= Date.now()) return "expired";
 	return `present (expires ${new Date(credential.expires).toISOString()})`;
@@ -24,14 +42,11 @@ function describeStoredCredential(): string {
 
 function isCommandAvailable(command: string): boolean {
 	if (!/^[A-Za-z0-9._-]+$/.test(command)) return false;
-	const result = spawnSync("/bin/sh", ["-lc", `command -v ${command} >/dev/null 2>&1`], {
-		stdio: "ignore",
-	});
-	return result.status === 0;
+	return spawnSync("/bin/sh", ["-lc", `command -v ${command} >/dev/null 2>&1`], { stdio: "ignore" }).status === 0;
 }
 
-function describeGatewayConfigStatus(): string[] {
-	const status = getGatewayConfigStatus();
+function describeConfigStatus(configStore: GatewayConfigStore): readonly string[] {
+	const status = configStore.status();
 	const cache = status.cacheSource === "live"
 		? "live well-known"
 		: status.cacheSource === "fallback"
@@ -45,83 +60,101 @@ function describeGatewayConfigStatus(): string[] {
 	return [`Gateway config: ${cache}`, `Gateway fetch: ${fetch}`];
 }
 
-function buildStatusReport(): string {
-	const imported = readImportedGatewayToken();
-	const authPath = findOpenCodeAuthPath();
+function requireCatalog(catalog: CatalogService): CatalogData {
+	const current = catalog.current();
+	if (!current.ok) throw current.error;
+	return current.value;
+}
+
+function buildStatusReport(services: ExtensionServices): string {
+	const imported = services.auth.readImportedToken();
+	const importedDescription = imported.ok ? describeTokenState(imported.value?.token) : imported.error.message;
 	return [
-		`${PROVIDER_NAME}`,
-		`Pi auth: ${describeStoredCredential()}`,
-		`${TOKEN_ENV_OVERRIDE}: ${hasEnvOverride() ? "present" : "missing"}`,
-		`OpenCode auth file: ${authPath || "missing"}`,
-		`OpenCode token: ${describeTokenState(imported?.token)}`,
-		...describeGatewayConfigStatus(),
-		`Catalog: ${summarizeCatalog(getCatalog())}`,
+		PROVIDER_NAME,
+		`Pi auth: ${describeStoredCredential(services.auth)}`,
+		`${TOKEN_ENV_OVERRIDE}: ${services.auth.hasEnvironmentOverride() ? "present" : "missing"}`,
+		`OpenCode auth file: ${services.auth.findAuthPath() ?? "missing"}`,
+		`OpenCode token: ${importedDescription}`,
+		...describeConfigStatus(services.configStore),
+		`Catalog: ${summarizeCatalog(requireCatalog(services.catalog))}`,
 	].join("\n");
 }
 
-async function handleStatus(ctx: ExtensionCommandContext): Promise<void> {
-	ctx.ui.notify(buildStatusReport(), "info");
+async function handleStatus(services: ExtensionServices, ctx: ExtensionCommandContext): Promise<void> {
+	ctx.ui.notify(buildStatusReport(services), "info");
 }
 
-async function handleSyncAuth(ctx: ExtensionCommandContext): Promise<void> {
-	const imported = await syncImportedAuthToPi();
-	ctx.ui.notify(`Imported OpenCode auth from ${imported.authPath}. Reloading provider state...`, "info");
+async function handleSyncAuth(services: ExtensionServices, ctx: ExtensionCommandContext): Promise<void> {
+	const imported = services.auth.syncImportedAuth();
+	if (!imported.ok) throw imported.error;
+	ctx.ui.notify(`Imported OpenCode auth from ${imported.value.authPath}. Reloading provider state...`, "info");
 	await ctx.reload();
 }
 
-async function handleDoctor(ctx: ExtensionCommandContext): Promise<void> {
-	clearGatewayConfigCache();
-	const gateway = await getGatewayConfig({ forceReload: true, fallbackToDefault: false });
-	await refreshCatalog(true);
-
+async function handleDoctor(services: ExtensionServices, ctx: ExtensionCommandContext): Promise<void> {
+	services.configStore.clear();
+	const config = await services.configStore.load({ forceReload: true, fallbackToDefault: false });
+	if (!config.ok) throw config.error;
+	const catalog = await services.catalog.refresh(false);
+	if (!catalog.ok) throw catalog.error;
+	const authCommand = config.value.authCommand;
 	const report = [
 		`${PROVIDER_NAME} doctor`,
-		`Gateway origin: ${gateway.origin}`,
-		`Auth command: ${Array.isArray(gateway.authCommand) ? gateway.authCommand.join(" ") : gateway.authCommand || "missing"}`,
-		`Enabled backends: ${gateway.enabledBackends.join(", ")}`,
-		...describeGatewayConfigStatus(),
+		`Gateway origin: ${config.value.origin}`,
+		`Auth command: ${Array.isArray(authCommand) ? authCommand.join(" ") : authCommand ?? "missing"}`,
+		`Enabled backends: ${config.value.enabledBackends.join(", ")}`,
+		...describeConfigStatus(services.configStore),
 		`cloudflared: ${isCommandAvailable("cloudflared") ? "found" : "missing"}`,
-		`Catalog: ${summarizeCatalog(getCatalog())}`,
+		`Catalog: ${summarizeCatalog(catalog.value)}`,
 	].join("\n");
-
 	ctx.ui.notify(report, "info");
 }
 
-export default async function (pi: ExtensionAPI) {
-	const catalog = await refreshCatalog(true);
+/**
+ * Register the OpenCode Cloudflare provider and diagnostics commands.
+ *
+ * @param pi - Pi extension API.
+ * @returns Completion after initial gateway discovery and provider registration.
+ */
+export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Promise<void> {
+	const credentialStore = createProductionGatewayCredentialStore();
+	const tokenSource = createProductionGatewayTokenSource(credentialStore);
+	const configStore = createProductionGatewayConfigStore(() => {
+		const resolved = tokenSource.resolveToken();
+		return resolved.ok && resolved.value ? Redacted.value(resolved.value) : undefined;
+	});
+	const auth = createProductionGatewayAuthService(configStore, tokenSource, credentialStore);
+	const storedCredential = auth.ensureStoredCredential();
+	if (!storedCredential.ok) throw storedCredential.error;
+	const catalog = createCatalogService(configStore);
+	const initialCatalog = await catalog.refresh(true);
+	if (!initialCatalog.ok) throw initialCatalog.error;
+	const services: ExtensionServices = { auth, catalog, configStore };
 
 	pi.registerProvider(PROVIDER_ID, {
 		baseUrl: GATEWAY_ORIGIN,
 		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
 		api: CUSTOM_API,
-		models: catalog.models,
+		models: [...initialCatalog.value.models],
 		oauth: {
 			name: PROVIDER_NAME,
-			login: loginOpencodeCloudflare,
-			refreshToken: refreshOpencodeCloudflare,
-			getApiKey: (credentials) => String(credentials.access || ""),
+			login: (callbacks) => auth.login(callbacks),
+			refreshToken: (credentials) => auth.refresh(credentials),
+			getApiKey: (credentials) => credentials.access,
 		},
-		streamSimple: streamOpencodeCloudflare,
+		streamSimple: createGatewayStream(services),
 	});
 
 	pi.registerCommand("opencode-cf-status", {
 		description: "Show OpenCode Cloudflare auth and catalog status",
-		handler: async (_args, ctx) => {
-			await handleStatus(ctx);
-		},
+		handler: async (_args, ctx) => handleStatus(services, ctx),
 	});
-
 	pi.registerCommand("opencode-cf-sync-auth", {
 		description: "Import the current OpenCode token into Pi auth storage and reload",
-		handler: async (_args, ctx) => {
-			await handleSyncAuth(ctx);
-		},
+		handler: async (_args, ctx) => handleSyncAuth(services, ctx),
 	});
-
 	pi.registerCommand("opencode-cf-doctor", {
 		description: "Validate the OpenCode Cloudflare gateway configuration",
-		handler: async (_args, ctx) => {
-			await handleDoctor(ctx);
-		},
+		handler: async (_args, ctx) => handleDoctor(services, ctx),
 	});
 }

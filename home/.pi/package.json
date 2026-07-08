@@ -13,9 +13,9 @@
     "test:codex-fast-mode": "node --import tsx --test tests/codex-fast-mode.test.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.76.0",
-    "@earendil-works/pi-coding-agent": "^0.76.0",
-    "@earendil-works/pi-tui": "^0.76.0",
+    "@earendil-works/pi-ai": "^0.80.3",
+    "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@earendil-works/pi-tui": "^0.80.3",
     "typebox": "^1.1.38"
   }
 }
