@@ -1,83 +1,94 @@
 ---
 name: coding-standards
-description: TypeScript coding standards and design taste. Use when working on TypeScript code; when adding or changing domain models, modules, adapters, parsers, typed errors, async workflows, tests, TypeScript contracts, Cloudflare Workers/Durable Objects/Agents, or Effect code; or when another engineering skill needs the user's coding standards.
+description: Correct-by-construction TypeScript standards. Use for TypeScript engineering or when another skill needs the user's coding standards.
 ---
 
 # Coding Standards
 
-Use these standards while designing and editing TypeScript. They encode the user's taste: correctness first, precise domain modeling, typed failures, deep modules, explicit boundaries, real-seam tests, strict TypeScript, and boring operational safety.
+Build **correct by construction**. A principle applies when the change introduces or alters the concern it governs. Apply it across the change’s full semantic surface—contracts, behavior, data flow, state, effects, and verification—but do not introduce machinery for absent concerns. Follow compatible project conventions, containing incompatible conventions at their seams rather than copying them inward.
 
-This skill is standalone. Load the topic files that match the code you are touching; do not treat the top-level summary as the whole standard.
+## Principles
 
-## Core tenets
+### 1. Repository before invention
 
-- Correctness, safety, debuggability, boundary integrity, and test integrity come before convenience.
-- Local conventions matter when they are compatible with these standards.
-- Parse boundary input before it reaches core logic; pass refined/domain values inward.
-- Model invariants in types, constructors, parsers, and transitions.
-- Model expected failures in typed channels; reserve throws for defects and boundary translation.
-- Design deep modules with intentional seams, small interfaces, and explicit dependencies.
-- Verify observable behavior through real seams.
-- Keep TypeScript contracts strict, local, documented, and boring.
-- Improve changed paths without forcing broad migrations unless explicitly requested.
-- Do not design for backwards compatibility, migrations, rollout, backfill, dual-write/read paths, or deployment sequencing unless the user explicitly asks. Treat new designs as the desired target state, not a migration plan.
+- Inspect existing contracts, modules, adapters, tests, and dependencies before introducing a library, pattern, module, or seam.
+- Make the smallest coherent improvement.
+- Speculative abstractions and migration, rollout, or compatibility machinery require a concrete current constraint or explicit user intent.
 
-## Non-negotiables
+### 2. Parse, don’t validate
 
-These are not aesthetic preferences. When they conflict with existing code, preserve compatibility at the seam and improve the changed path rather than copying the violation.
+- Treat external, serialized, persisted, framework-shaped, and configuration values as unknown boundary input.
+- A boundary parser returns the refined value that flows inward; checking a value and then continuing with the original is not parsing.
+- Never trust decoded data with `as`.
+- Keep protocol and persistence DTOs as explicit projections defined at the boundary.
+- Treat every serialization or process hop as a new boundary: cross it with explicit serializable DTOs and required context, then parse again.
+- At the **composition root**, parse environment and configuration once and translate raw platform capabilities and bindings into typed configuration and narrow application capabilities.
 
-- Untrusted, serialized, persisted, or framework-shaped input is parsed before core/service logic sees it.
-- Decoded data is not trusted with `as SomeType`.
-- Expected failures are visible in typed return channels, not hidden throws or rejected promises.
-- Secrets do not enter errors, logs, traces, metrics, snapshots, or panic summaries.
-- Raw platform bindings and framework types stay at composition seams or tightly local External Adapter Modules.
-- Dependencies are explicit; hidden globals and ambient time/randomness/IDs do not drive service behavior.
-- Tests prove observable behavior through module interfaces or real seams; module mocks and method spies are out.
-- Type escape hatches are local, justified with `SAFETY:`, and hidden behind precise interfaces.
-- Promises are owned: awaited, returned, collected, or handed to explicit detached-work machinery.
-- Broad migrations require explicit user intent.
-- Backwards compatibility, rollout, deployment sequencing, data backfills, and dual-write/read migration paths require explicit user intent; do not add them as default design concerns.
+### 3. Make invalid states unrepresentable
 
-## How to apply the standards
+- A **Domain Module** is a pure, type-centric abstract data type in the OCaml tradition. It centers one primary domain type or tightly related type family and co-locates its supporting types, invariants, parsers, smart constructors, combinators, predicates, legal transitions, domain projections, test generators, and formatting.
+- It owns its invariants in application code; callers use its operations rather than reimplementing checks or branding with casts, and persistence mirrors applicable invariants with constraints.
+- Use precise operation inputs and required values; push optionality outward.
+- Prefer branded values or immutable value classes for distinctions that prevent realistic misuse, and state machines over contradictory flags.
+- Use **exhaustive case analysis** for closed variants; never use a default branch that masks newly added cases.
 
-1. **Audit the local codebase.** Before choosing a library, pattern, External Adapter Module shape, schema style, error representation, test strategy, observability mechanism, or module layout, inspect until the existing choice for each touched concern is identified or confirmed absent.
-2. **Classify the change.** Identify the concerns touched: domain state, parsing, errors, observability, modules, async, tests, TypeScript contracts, Cloudflare, or Effect.
-3. **Load every relevant topic file.** The top-level summary is only the routing layer.
-4. **Apply safety standards before local convention.** Follow established architecture where compatible. When local convention violates a non-negotiable, isolate compatibility at the boundary and improve the changed path.
-5. **Prefer the smallest coherent improvement.** Do not start unrelated migrations, backwards-compatibility paths, rollout plans, backfill plans, or deployment sequencing. Do not add abstractions, External Adapter Modules, Service Modules, libraries, workflows, or config layers without a concrete reason.
-6. **Verify through the right seam.** Tests should observe outcomes at the module or system interface that callers use.
-7. **Name trade-offs.** If a standard cannot be fully applied without broad migration, state the compatibility constraint and the local improvement made.
+### 4. Expected failures are values; defects fail fast
 
-## Topic routing
+- Define an **error algebra** of custom `Error` subclasses with stable literal discriminants such as `_tag`, safe structured fields, and optional `unknown` causes; expose the precise union through typed result channels.
+- Do not hide expected failures in throws or rejected promises.
+- Catch thrown `unknown` only where it can be classified, recovered from, or translated.
+- Detect cancellation first.
+- Retain original causes internally, but expose or record only explicit safe projections.
 
-Load the files whose triggers match the task.
+### 5. Design deep modules around real seams
 
-| If the change touches... | Load... |
-|---|---|
-| Shared coding-standard terms, adoption language, failure/boundary/domain/module/runtime vocabulary | [`VOCABULARY.md`](VOCABULARY.md) |
-| Domain values, invariants, branded types, value classes, state machines, lifecycle transitions, optionality, `Partial<T>`, boolean flags, operation inputs, exhaustive variants, persisted lifecycle constraints | [`DOMAIN_MODELING.md`](DOMAIN_MODELING.md) |
-| Expected failures, custom errors, not-found semantics, cancellation classification, startup config diagnostics, catch/classification | [`ERROR_HANDLING.md`](ERROR_HANDLING.md) |
-| Tracing, logging, telemetry, safe summaries, secrets, redaction, preserving reporting/correlation hooks | [`OBSERVABILITY.md`](OBSERVABILITY.md) |
-| Domain Modules, Service Modules, External Adapter Modules, interfaces, seams, dependency injection, functional core/shell, resource ownership | [`DESIGNING_MODULES.md`](DESIGNING_MODULES.md) |
-| HTTP/RPC/queue/storage/env parsing, DTOs, codecs, projections, config, runtime-hop payloads | [`BOUNDARIES_AND_PARSING.md`](BOUNDARIES_AND_PARSING.md) |
-| Cancellation, promise ownership, concurrency, idempotency, transactions, retries, workflows, detached work | [`ASYNC_AND_WORKFLOWS.md`](ASYNC_AND_WORKFLOWS.md) |
-| Tests, property tests, real seams, persistence/runtime verification, risk-matched evidence | [`TESTING_AND_VERIFICATION.md`](TESTING_AND_VERIFICATION.md) |
-| Casts, `any`, catch values, thenables, readonly contracts, collections, optionality, object spread/projection/delete, guard clauses, exports, imports, barrels, JSDoc, toolchain | [`TYPESCRIPT_CONTRACTS.md`](TYPESCRIPT_CONTRACTS.md) |
-| Workers, bindings, Durable Objects, Agents, D1, KV/R2, Queues, Workflows, workerd, service bindings, runtime hops | [`CLOUDFLARE_ARCHITECTURE.md`](CLOUDFLARE_ARCHITECTURE.md) |
-| Established Effect responsibilities, Effect services/layers, typed errors, Schema, Redacted, Effect testing/RPC | [`EFFECT.md`](EFFECT.md) |
+- Depth is caller leverage per unit of interface.
+- An **Application Service Module** owns one cohesive use case or capability, applying application policy and sequencing effects through narrow, application-owned ports.
+- An **Adapter Module** owns boundary translation and technology mechanics. It either:
+  - translates an external request or event into an Application Service call and projects the result; or
+  - implements an Application Service port using a framework, protocol, persistence store, runtime, or third party.
+- Use a **functional core, imperative shell**: Domain Modules form the core; Application Services and Adapters form the shell.
+- Raw external types stay at the composition root or inside Adapters.
+- Every interface must hide meaningful invariants, policy, sequencing, or translation; reject globals, mega-interfaces, and pass-through wrappers.
 
-## Strong defaults
+### 6. Every side effect has an owner
 
-Use the repository's established choice when it exists and satisfies these standards. When no established choice exists, load the topic file that owns the concern and follow its strong defaults.
+- Acquire each resource in the scope that owns its lifetime and release it on every exit.
+- Enforce **no floating promises**: every promise is awaited, returned, collected, or handed to explicit detached-work machinery.
+- Detached work has an explicit owner for lifetime, cancellation, rejection handling, and observability.
+- Modules do not acquire resources or perform I/O at import time.
+- When independent work benefits from overlap, use **structured concurrency**: bound fan-out, propagate caller cancellation, await all child work, and prevent it from outliving the owning scope.
 
-Do not treat this root file as enough context for library, runtime, schema, error, testing, Cloudflare, Effect, or toolchain choices.
+### 7. Make mutation retry-safe
 
-## Rejected framings
+- Make retried commands idempotent and guard concurrent transitions atomically.
+- Do not hold database transactions open across network calls; use a **transactional outbox** or equivalent when commit and delivery must agree.
+- Persist coordination state when progress must survive crashes or redelivery; introduce durable workflow machinery only when that need exists.
 
-- **"The existing code throws, so new expected failures can throw."** Preserve compatibility at boundaries; do not copy unsafe failure contracts into new local logic.
-- **"Validation is enough."** Parsing must return the refined value and pass it inward.
-- **"A wrapper is architecture."** A pass-through module earns its keep only when it hides complexity, owns policy, or translates across a real seam.
-- **"Mocks make tests isolated."** Module mocks isolate the wrong thing. Replace behavior through real seams.
-- **"Types are proof."** Serialized data, DB rows, and runtime-hop payloads become less structured at runtime. Parse them.
-- **"Future flexibility justifies an interface."** A seam is real when behavior varies, a boundary translates, or tests substitute through an intentional seam.
-- **"A lint suppression is a fix."** Suppressions must be targeted and explain the safety invariant.
+### 8. Observe without exposing
+
+- Wrap sensitive values in redaction-safe types at ingress and unwrap them only at the use site.
+- Secrets never enter errors, logs, traces, metrics, snapshots, or diagnostic strings.
+- Apply **data minimization** to correlated, structured telemetry: record only stable fields for relevant operations, dependencies, states, retries, safe correlation identifiers, and error tags; never serialize arbitrary payloads, thrown values, or environments.
+- Preserve existing reporting hooks, and keep telemetry out of domain decisions.
+
+### 9. Verify behavior through real seams
+
+- Assert caller-visible results, failures, persisted state, messages, responses, or adapter records—not private helpers or incidental call order.
+- Replace dependencies through production seams; do not use module mocks or method spies.
+- Control time, randomness, IDs, cancellation, and external behavior.
+- Use **risk-based testing**: match evidence depth to consequence.
+- Use property tests for general invariants.
+- Verify database and runtime claims against the actual implementation, applying the production migration path when persistence semantics matter.
+
+### 10. Preserve TypeScript's checks
+
+- Keep compiler strictness and precise, readonly contracts.
+- Avoid `any`, non-null assertions, unchecked casts, hidden mutation, and accidental thenables.
+- Treat an unavoidable escape hatch as an unsafe block: keep it local behind a precise interface, and use `SAFETY:` to state the runtime invariant that makes it sound.
+- Document every directly exported function, class, constant, type, and public method with JSDoc that explains its contract, invariants, side effects, and expected failure values; use `@throws` only for defects or boundary-required exception contracts.
+- Never weaken project-wide checks for a local change.
+
+## Completion criterion
+
+Treat every principle as a **proof obligation** against the full semantic change. Done means each is either inapplicable or supported by repository inspection, static checks, focused tests, or evidence from the actual runtime. For each blocked obligation, report the unsupported claim, blocker, risk, and remaining check; do not present it as verified.

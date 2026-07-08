@@ -1,19 +1,18 @@
 {
   "name": "pi-extension-opencode-cloudflare",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "clean": "echo 'nothing to clean'",
     "build": "echo 'nothing to build'",
-    "check": "node ./test/smoke.mjs && node ./test/local-overlay-regression.mjs && node ./test/gateway-config-regression.mjs && node ./test/gateway-error-regression.mjs && node ./test/auth-command-regression.mjs && node ./test/anthropic-auth-regression.mjs && node ./test/openai-responses-options-regression.mjs && node ./test/programmatic-tool-calling-config-regression.mjs && node ./test/programmatic-tool-calling-regression.mjs && node ./test/google-auth-regression.mjs && node ./test/workers-ai-route-regression.mjs"
+    "typecheck": "tsc --project tsconfig.json --pretty false",
+    "test": "node --import tsx --test test/*.test.mjs",
+    "check": "npm run typecheck && npm test"
   },
   "pi": {
     "extensions": [
       "./index.ts"
     ]
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1"
   }
 }

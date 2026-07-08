@@ -1,173 +1,90 @@
 ---
 name: code-review
-description: Review code against the local coding standards.
+description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
 disable-model-invocation: true
 ---
 
-# Code Review
+Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
-Run a standards-backed code review. This is review-only: do not edit files, apply patches, or "fix as you go" unless the user explicitly asks after the review.
+- **Standards** — does the code conform to this repo's documented coding standards?
+- **Spec** — does the code faithfully implement the originating issue / PRD / spec?
 
-Treat `../coding-standards/` as the standards package. Load standards by topic; do not duplicate or reinvent them here.
+Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
 
-## Review principles
+The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.
 
-- Review changed behavior, contracts, seams, tests, and runtime effects — not style vibes.
-- Every finding needs proof: a concrete path, location, missing contract, reachable failure, leaked value, unparsed boundary, invalid state, or inadequate test seam.
-- Preserve local conventions when compatible with the standards; do not use local convention to excuse correctness, safety, boundary, observability, or test-integrity violations.
-- Prefer fewer, stronger findings over exhaustive commentary.
-- Do not include praise or a "what's good" section.
+## Process
 
-## 1. Select the review target
+### 1. Pin the fixed point
 
-Use the user's explicit target when provided: files, commit range, branch, PR, diff, or staged/unstaged scope.
+Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
 
-When no target is provided, detect it:
+Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
-1. If the working tree has staged or unstaged changes, review the working tree diff.
-2. Otherwise, if the current branch has a merge base with `main`, `master`, or its upstream, review the branch diff.
-3. Otherwise, ask one question to identify the review target.
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
 
-State the selected target before reviewing.
+### 2. Identify the spec source
 
-Completion criterion: the review target is explicit and backed by inspected git state or the user's instruction.
+Look for the originating spec, in this order:
 
-## 2. Load standards and local context
+1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
+2. A path the user passed as an argument.
+3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
+4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 
-Read:
+### 3. Identify the standards sources
 
-- `../coding-standards/SKILL.md`
-- `../coding-standards/VOCABULARY.md`
+Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
 
-Then load topic files matching the changed responsibilities:
+On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
-| Change touches... | Load... |
-|---|---|
-| domain values, invariants, states, transitions | `../coding-standards/DOMAIN_MODELING.md` |
-| expected failures, custom errors, catch/classification | `../coding-standards/ERROR_HANDLING.md` |
-| logs, traces, telemetry, redaction, secrets | `../coding-standards/OBSERVABILITY.md` |
-| modules, interfaces, seams, adapters, dependencies | `../coding-standards/DESIGNING_MODULES.md` |
-| parsing, DTOs, storage rows, config, projections, codecs | `../coding-standards/BOUNDARIES_AND_PARSING.md` |
-| cancellation, promises, concurrency, retries, transactions, workflows | `../coding-standards/ASYNC_AND_WORKFLOWS.md` |
-| tests, real seams, properties, persistence/runtime evidence | `../coding-standards/TESTING_AND_VERIFICATION.md` |
-| casts, `any`, readonly contracts, collections, exports, JSDoc, toolchain | `../coding-standards/TYPESCRIPT_CONTRACTS.md` |
-| Workers, Durable Objects, Agents, D1, KV/R2, Queues, Workflows | `../coding-standards/CLOUDFLARE_ARCHITECTURE.md` |
-| Effect Services/Layers, typed channel, Schema, Redacted, Effect tests | `../coding-standards/EFFECT.md` |
+- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
+- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation — and, like any standard here, skip anything tooling already enforces.
 
-Inspect local code/docs for conventions around errors, schemas, testing, dependency injection, observability, adapters, and module layout before reporting pattern deviations.
+Each smell reads *what it is* → *how to fix*; match it against the diff:
 
-Completion criterion: every changed concern is matched to loaded standards and local precedent has been checked where relevant.
+- **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
+- **Duplicated Code** — the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
+- **Feature Envy** — a method that reaches into another object's data more than its own. → move the method onto the data it envies.
+- **Data Clumps** — the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
+- **Primitive Obsession** — a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
+- **Repeated Switches** — the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
+- **Shotgun Surgery** — one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
+- **Divergent Change** — one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
+- **Speculative Generality** — abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
+- **Message Chains** — long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
+- **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
+- **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-## 3. Review the change
+### 4. Spawn both sub-agents in parallel
 
-Trace changed behavior through the code, not just the diff hunk. Follow values across:
+Send a single message with two `Agent` tool calls. Use the `general-purpose` subagent for both.
 
-- external input → parser → domain/application type;
-- domain invariant → constructor/transition → persistence;
-- function result → caller handling → protocol response;
-- secret source → error/log/trace/snapshot sink;
-- async work → cancellation, promise ownership, concurrency, retry/idempotency;
-- interface → adapter → external dependency;
-- test → public interface / real seam → observable behavior.
+**Standards sub-agent prompt** — include:
 
-Look especially for standards agents commonly miss:
+- The full diff command and commit list.
+- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
+- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 
-- validated-but-not-parsed data;
-- `JSON.parse(...) as Type`, `Response.json() as Type`, row casts;
-- expected failures hidden in throws/rejections;
-- broad error unions where callers need semantic cases;
-- secrets in messages, telemetry fields, snapshots, or arbitrary serialization;
-- pass-through wrappers and accidental interfaces;
-- dependency bags, hidden globals, raw platform bindings outside seams;
-- dropped `AbortSignal`, floating promises, accidental sequential awaits;
-- retryable mutations without idempotency or durable side-effect delivery;
-- tests using module mocks/spies or implementation details;
-- casts, `any`, non-null assertions, mutable exported contracts;
-- Cloudflare runtime-hop context/serialization mistakes;
-- Effect code bypassing established Effect mechanisms.
+**Spec sub-agent prompt** — include:
 
-Completion criterion: each material changed behavior, boundary, failure path, module seam, async path, and test claim has either no issue or a concrete candidate finding.
+- The diff command and commit list.
+- The path or fetched contents of the spec.
+- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
 
-## 4. Require proof for every finding
+If the spec is missing, skip the Spec sub-agent and note this in the final report.
 
-A finding survives only when you can show concrete evidence. Favor showing it with real artifacts over prose:
+### 5. Aggregate
 
-- Quote the actual problematic code from the changed files (with its path and line range), not a paraphrase.
-- When behavior is the issue, show the concrete value flow: real inputs, the resulting outputs, and the call stack or call path that connects them.
-- When you reproduce the issue, show the reproduction and its observed result rather than asserting it.
-- Only fall back to prose-only proof when no code, value, or stack can express the issue.
+Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate (see _Why two axes_).
 
-Examples:
+End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
 
-- Sensitive-data finding: trace the sensitive value from source to observable sink.
-- Boundary finding: trace unparsed or less-structured data into trusted application/domain code.
-- Parse-don't-validate finding: show validation occurs but the refined value is discarded or the value is repeatedly defensively revalidated.
-- Domain finding: show how an invalid state can be constructed, persisted, or reached through a changed path.
-- Failure finding: name the normal-operation failure and show it is absent from the typed contract or misclassified.
-- Async finding: identify the retry, cancellation, redelivery, concurrency, or timeout path and the duplicated/lost/leaked work.
-- Test finding: name the behavior or runtime seam that remains unproven, or the implementation detail the test relies on.
+## Why two axes
 
-If proof is missing, downgrade to **Question** or drop it.
+A change can pass one axis and fail the other:
 
-Completion criterion: every candidate finding has a precise location and behavioral proof shown with real code, values, or a reproduction where possible — not just a standards preference.
+- Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**
+- Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
 
-## 5. Self-challenge findings
-
-Before final output, try to disprove each finding:
-
-- Did local convention already solve this elsewhere?
-- Is there a parser, smart constructor, adapter, layer, middleware, or test setup outside the diff that satisfies the standard?
-- Is the value actually sensitive or safely redacted before the sink?
-- Is the async work intentionally sequential or bounded by a documented contract?
-- Is the apparent broad type narrowed by a surrounding interface?
-- Is the runtime/platform behavior already covered by representative tests?
-- Is this merely a preference with no behavioral consequence?
-
-Drop or downgrade findings that do not survive.
-
-Completion criterion: final findings have survived an explicit attempt to disprove them.
-
-## Severity labels
-
-- **Blocker** — likely correctness, safety, security, data-loss, runtime, idempotency, boundary, observability, or test-integrity issue in changed code; or a changed path violates a standards non-negotiable with behavioral consequence.
-- **Should Fix** — meaningful design, contract, maintainability, diagnosability, or verification issue that should be addressed before merge but is not a blocker.
-- **Simplification** — a clearer/deeper/smaller design that removes unnecessary complexity without changing semantics.
-- **Nit** — small local issue with low behavioral risk, usually documentation/naming/mechanical cleanup.
-- **Question** — unresolved ambiguity where the right call depends on product, domain, operational, or local-convention intent.
-
-## Output format
-
-Start with:
-
-```md
-Review target: <target>
-Standards loaded: <topic files>
-```
-
-If there are no findings, say so briefly and include the standards areas checked. Do not add praise.
-
-For each finding:
-
-```md
-### <Severity>: <short title>
-
-- **Issue:** <concise explanation of the defect or problem>
-- **Where:** `<file>:<line>` or precise symbol/path
-- **Category:** <topic / principle>
-- **Problematic code:**
-  ```ts
-  // real excerpt quoted from the changed file(s)
-  ```
-- **Proof:** <value flow, reachable state, reproduction with observed result, or missing evidence>
-- **Why it matters:** <behavioral consequence>
-- **Fix direction:** <specific correction shape, followed by a snippet or pseudo-code showing it>
-  ```ts
-  // snippet or pseudo-code of the fix; not a full patch unless asked
-  ```
-```
-
-Include the **Problematic code** block whenever the issue lives in code you can quote; omit it only when the finding is about something absent (e.g. a missing contract or test), and say what is missing instead. Always include a fix-direction snippet or pseudo-code unless the fix is purely a deletion.
-
-Group findings by severity in this order: Blocker, Should Fix, Simplification, Nit, Question.
-
-Completion criterion: the final review is actionable without code edits, every finding includes proof, and no review-only step modified the workspace.
+Reporting them separately stops one axis from masking the other.

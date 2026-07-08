@@ -1,214 +1,126 @@
 ---
 name: improve-codebase-architecture
-description: Find standards-backed architecture refactor opportunities.
+description: Architecture scan for evidence-backed TypeScript refactor candidates.
 disable-model-invocation: true
 ---
 
 # Improve Codebase Architecture
 
-Scan a codebase for architecture improvement opportunities grounded in `../coding-standards/`. This is planning-only: do not edit code, run refactors, update docs, create ADRs, run tests, or run static checks unless the user explicitly asks after the scan.
+Run an **architecture scan** grounded in `../coding-standards/SKILL.md`. Return one ranked shortlist of refactor candidates within the scan boundary.
 
-The output is a globally ranked set of refactor candidates. Each candidate names the concrete friction, the standards areas involved, and the leverage the refactor would create.
+**Scan, don’t spec.** Stop at evidence-backed **ownership moves**. Do not edit files, run refactors, update documentation, create ADRs, estimate effort, design final interfaces, or write a tech spec. Record migration, compatibility, rollout, or backfill only as current constraints supported by repository evidence or user intent; do not design them during the scan.
 
-## Principles
+## 1. Set the scan boundary
 
-- Look holistically across the coding standards; do not privilege one lens such as deepening.
-- Prefer architecture opportunities with concrete leverage: safer invariants, clearer boundaries, smaller caller burden, stronger locality, better test seams, clearer runtime ownership, or reduced duplicated policy.
-- Evidence beats vibes. Every candidate needs concrete files, call paths, caller burden, duplicated behavior, leaked DTOs, bad seams, test contortions, or runtime friction.
-- Do not estimate effort. Effort estimation is left to humans.
-- Do not produce a tech spec. Prepare a brief for `../tech-spec/` when the user chooses a candidate.
-- Do not design for backwards compatibility, migrations, rollout, backfill, dual-write/read paths, or deployment sequencing unless the user explicitly asks.
+Use the scope supplied by the user: repository, directory, feature, module, file set, or concern. The boundary controls where candidates may be proposed. Inspect immediate callers, dependencies, composition roots, and tests outside it when needed to establish evidence; record this **evidence halo**, but do not form candidates for it.
 
-## 1. Establish scan scope
+When no useful scope is supplied:
 
-Use the user's explicit scope when provided: repo, directory, feature area, module, file set, or concern.
+1. Inspect the repository shape and major entrypoints.
+2. Infer the scope only when the repository is small or one area clearly dominates the request.
+3. Otherwise ask one question that lets the user choose the scope.
 
-When no scope is provided:
+Read `../coding-standards/SKILL.md`. Search the boundary and its ancestors through the repository root for `CONTEXT.md`, `CONTEXT-MAP.md`, equivalent domain-language files, and decision indexes. Search repository documentation and ADR collections for decisions that name or govern the boundary. Inspect every governing source found, plus precedent in the scoped code, tests, and evidence halo.
 
-1. Inspect the repository shape enough to understand size and major areas.
-2. If the repository is small or the likely area is obvious from the prompt, scan that scope.
-3. If the repository is large and the prompt gives no useful focus, ask one question to choose scope.
+**Completion criterion:** The candidate boundary and any evidence halo are explicit; the coding standards are loaded; the prescribed context and decision locations have been searched; every governing source found has been inspected; and relevant precedent has been identified or its absence recorded.
 
-Do not ask for scope if code inspection can answer it.
+## 2. Build an evidence map
 
-Completion criterion: the scan scope is explicit, either from the user, inferred from repository structure, or chosen after one question.
+Use file reads and search only. Do not run tests, type checks, linters, formatters, builds, package scripts, or static-analysis commands.
 
-## 2. Load standards and local context
+Build a private **evidence map** of the architectural surfaces inside the boundary:
 
-Read the core standards:
+- public and runtime entrypoints;
+- domain and application module clusters;
+- external, persistence, and process/runtime boundaries;
+- side-effect and resource-lifetime owners;
+- tests that exercise those seams.
 
-- `../coding-standards/SKILL.md`
-- `../coding-standards/VOCABULARY.md`
-- `../coding-standards/DESIGNING_MODULES.md`
-- `../coding-standards/DOMAIN_MODELING.md`
-- `../coding-standards/BOUNDARIES_AND_PARSING.md`
-- `../coding-standards/ERROR_HANDLING.md`
-- `../coding-standards/TESTING_AND_VERIFICATION.md`
+Treat each bullet as an inventory category. For each category, record its surfaces, an equivalent group, or that it is absent or inapplicable with a reason. Group surfaces only when they share the same ownership and call-flow shape, and record representative files for the group.
 
-Load optional standards when the repository or scan scope touches them:
+For each distinct shape, trace at least one behavior from an entrypoint or direct caller through relevant boundaries and side effects, if any, to its caller-visible outcome. Inspect the existing tests at that seam or record that none were found. Record the surface or group, representative files, call path, outcome, existing test evidence, applicable standards, and findings.
 
-- `../coding-standards/OBSERVABILITY.md` for tracing, logging, telemetry, redaction, or safe summaries.
-- `../coding-standards/ASYNC_AND_WORKFLOWS.md` for cancellation, promise ownership, concurrency, retries, idempotency, transactions, or workflows.
-- `../coding-standards/TYPESCRIPT_CONTRACTS.md` for casts, `any`, exported contracts, collection/object-shape friction, JSDoc, or toolchain architecture.
-- `../coding-standards/CLOUDFLARE_ARCHITECTURE.md` for Workers, bindings, Durable Objects, Agents, D1, KV/R2, Queues, Workflows, service bindings, or workerd runtime hops.
-- `../coding-standards/EFFECT.md` for Effect Services/Layers, typed error channels, Schema, Redacted values, Effect tests, or Effect RPC.
+**Evidence beats vibes.** Inspect for **architectural friction**: a design burden or correctness risk that is repeated, crosses a boundary, leaks into callers, obscures ownership, or prevents behavior from being tested through a real seam. An isolated code smell is local cleanup, not an architecture candidate.
 
-Read local context when present and relevant:
+For this scan, a coding-standard principle is applicable when an inventoried surface handles the concern it governs; repository-before-invention is always applicable. Account internally for each numbered principle:
 
-- `CONTEXT.md` or similar project domain language files.
-- ADRs near the scanned area.
-- Existing modules, adapters, tests, parsers, error types, and entrypoints around the scan scope.
+- classify it as applicable or inapplicable;
+- for each applicable principle, record the concrete code, call path, test, value, or runtime seam inspected;
+- classify each finding as local cleanup or architectural friction.
 
-Completion criterion: the scan uses project vocabulary and loaded standards, and it does not suggest a new pattern before checking local precedent in the scanned area.
+For broad scans, parallel exploration may gather observations, but final candidate formation and ranking remain one synthesis.
 
-## 3. Inspect code only
+**Completion criterion:** Every inventory category is traced, represented by a recorded equivalent group, or marked absent or inapplicable with a reason; every evidence-halo excursion and deliberate exclusion is recorded; every numbered standard is accounted for; every applicable standard has inspected evidence; and every retained observation is concrete architectural friction. Unsupported observations are discarded.
 
-Explore the codebase with file reads and search. Do not run tests, type checks, lint, formatters, package scripts, build commands, or static analysis commands as part of this skill.
+## 3. Form, rank, and prune candidates
 
-If subagents or parallel exploration are available and the scan scope is broad enough, use them only to gather observations. The final candidate ranking and recommendations remain your synthesis.
+Architecture changes who owns an invariant, policy, translation, orchestration, side effect, resource lifetime, or runtime coordination. Turn each retained friction into an **ownership move** from the current owner or callers to a proposed owner. Do not design the owner’s final interface.
 
-Look for architecture friction across standards areas:
+Rank all candidates within the scan boundary together, rather than by standards category. Rank by **architectural leverage**: the breadth and consequence of concrete burden or risk removed relative to the interface, indirection, or machinery introduced. Consider affected callers, behaviors, runtime ownership, and tests. When leverage is comparable, prefer stronger evidence and then the smaller coherent ownership move.
 
-- domain invariants scattered across callers;
-- missing or weak domain types, value classes, operation inputs, or state machines;
-- boundary input that is validated but not parsed, repeatedly shape-checked, cast, or leaked inward;
-- storage rows, protocol DTOs, or runtime-hop payloads crossing into application/domain modules;
-- expected failures hidden as throws/rejections or broad error contracts;
-- custom errors without stable tags or safe context;
-- secrets, raw payloads, or unknown thrown values reaching diagnostics;
-- pass-through modules, accidental interfaces, adapter sprawl, dependency bags, hidden globals;
-- repeated orchestration or duplicated policy across entrypoints/callers;
-- ambient time, randomness, IDs, resources, or platform bindings outside composition seams;
-- missing cancellation propagation, floating promises, accidental sequential awaits, retry-unsafe mutation, or unclear workflow state;
-- tests reaching past interfaces, using module mocks/spies, or forcing poor seams;
-- TypeScript escape hatches, mutable exported contracts, unclear optionality, broad shapes, or object/projection hazards;
-- Cloudflare binding leakage, context loss at runtime hops, split stateful-object identity, hot-path coordinators, or storage topology friction;
-- Effect code bypassing established Services/Layers, typed channels, Schema, Redacted, or Effect-aware tests.
+Merge candidates that address the same root friction or require the same ownership move; treat secondary standards improvements as gains of the stronger candidate. Drop candidates that are aesthetic, evidence-free, contradicted by sound local precedent, speculative flexibility, isolated cleanup, or implementation work disguised as architecture. Keep at most five candidates, including zero when none clears the evidence bar.
 
-Completion criterion: each potential candidate is tied to concrete files, call paths, interfaces, tests, values, or runtime seams.
+Use recommendation strength consistently:
 
-## 4. Form architecture candidates
+- `Strong` — the friction, ownership move, and leverage are supported by concrete evidence;
+- `Worth exploring` — the friction is supported, but the ownership move or leverage depends on an exact unverified claim.
 
-A candidate is not a complaint. It is a refactor opportunity with a direction and expected leverage.
+Do not use `Worth exploring` to defer available inspection. Resolve every claim verifiable through permitted reads and searches first; retain a gap only when the required evidence is unavailable through source inspection.
 
-For each candidate, identify:
+**Completion criterion:** Every surviving candidate names concrete friction, a current-to-proposed ownership move, its leverage basis, existing test evidence, a verification seam, and recommendation strength; every uncertain claim is an exact source-unverifiable evidence gap; and no more than five candidates survive.
 
-- the module, cluster, boundary, flow, or topology to improve;
-- standards areas involved;
-- concrete evidence of current friction;
-- the refactor direction;
-- what complexity, invariant, policy, parsing, error handling, orchestration, or runtime knowledge moves where;
-- expected leverage, locality, safety, diagnosability, and testability gains;
-- likely test strategy through real seams;
-- recommendation strength: `Strong`, `Worth exploring`, or `Speculative`.
+## 4. Present the result
 
-Use lightweight ASCII diagrams only when they clarify a call stack, seam, or before/after ownership better than prose.
+Begin every result with a concise scan summary naming the candidate boundary, any evidence halo, covered inventory categories, governing context or decision sources, and material exclusions.
 
-Do not include effort estimates.
+If no candidate survives, state that no evidence-backed architecture candidate was found and explain why observed signals were pruned. Do not manufacture a top recommendation or ask the user to start the tech-spec workflow.
 
-Completion criterion: every candidate has evidence, standards tags, a refactor direction, expected gain, test strategy, and recommendation strength.
-
-## 5. Rank and prune
-
-Rank candidates globally by architectural leverage, not by standards area.
-
-Prefer candidates that:
-
-- remove caller burden from multiple sites;
-- make invalid states unconstructable or boundary trust explicit;
-- concentrate policy, invariants, or orchestration in the module that owns them;
-- replace implicit runtime/platform knowledge with explicit seams;
-- improve behavior testing through public interfaces or real adapters;
-- reduce repeated parsing, repeated error translation, repeated authorization, or repeated projection;
-- close correctness, safety, observability, async, or runtime risks.
-
-Downgrade or drop candidates that are:
-
-- only aesthetic;
-- speculative future flexibility;
-- local cleanup with no architecture leverage;
-- contradicted by a sound local convention;
-- impossible to support with concrete evidence;
-- really implementation work rather than architectural opportunity.
-
-Completion criterion: the final list contains only candidates worth a human choosing to explore.
-
-## 6. Suggest context or ADR updates, but do not write them
-
-If `CONTEXT.md` exists and the scan reveals stable domain language that should be named, suggest the exact term or clarification to add.
-
-If a candidate conflicts with an ADR, mention the conflict only when current friction is concrete enough to justify revisiting the decision.
-
-If the user rejects a candidate for a durable architectural reason that future scans would otherwise rediscover, suggest recording an ADR and summarize what it should capture.
-
-Do not create or update `CONTEXT.md` or ADR files unless the user explicitly asks.
-
-Completion criterion: documentation suggestions are specific and durable, not automatic artifact creation.
-
-## 7. Present candidates and ask what to explore
-
-Return candidate cards in globally ranked order. Tag each with standards areas.
-
-Candidate card shape:
+Otherwise, return concise candidate cards in ranked order. Cite enough representative evidence to prove the friction, not every occurrence:
 
 ```md
-### <Candidate title> — <Strong | Worth exploring | Speculative>
+### <Candidate title> — <Strong | Worth exploring>
 
-- **Standards areas:** Domain Modeling; Boundaries and Parsing; Designing Modules; ...
-- **Files/modules:** `path`, `path`
-- **Current friction:** <why the current architecture creates caller burden, risk, duplicated policy, poor seam, or test friction>
-- **Evidence:** <concrete files, call path, repeated pattern, leaked representation, invalid state path, or test contortion>
-- **Refactor direction:** <what changes at the architecture level; no full interface design yet>
-- **Expected leverage:** <what callers, maintainers, tests, or runtime behavior gain>
-- **Likely test strategy:** <how behavior would be verified through public interfaces or real seams>
-- **Context/ADR note:** <optional; only when durable>
+- **Standards:** <applicable coding-standard principle names>
+- **Files/modules:** `path:line`, `path:line`
+- **Current friction:** <caller burden, risk, duplicated policy, poor seam, or test friction>
+- **Evidence:** <concrete call path, repetition, leaked representation, invalid state path, or test contortion>
+- **Ownership move:** <current owner or callers> -> <proposed owner>
+- **Expected leverage:** <burden or risk removed relative to new machinery>
+- **Existing test evidence:** <test path:line or none found>
+- **Verification seam:** <public interface or real adapter through which the move would be tested>
+- **Evidence gap:** <required only for Worth exploring; the exact source-unverifiable claim>
+- **Context/ADR note:** <optional; only for a durable term, conflict, or decision>
 ```
 
-If useful, add a small diagram:
+Use a small current/proposed ASCII diagram when call flow, data flow, ownership, or runtime topology is clearer visually than in prose.
 
-```txt
-Current:  Handler -> parse? -> raw DTO -> Service -> raw row -> callers branch
-Proposed: Handler -> Parser -> Domain Input -> Service Module -> Adapter -> Result
-```
+Suggest an exact `CONTEXT.md` clarification only for stable domain language. Mention an ADR conflict only when concrete friction justifies revisiting it.
 
 End with:
 
 ```md
-Top recommendation: <candidate title> — <why this has the best leverage>
+Top recommendation: <candidate title> — <why it has the greatest architectural leverage>
 
-Which candidate would you like to explore with a tech-spec brief?
+Which candidate would you like to prepare for the tech-spec workflow?
 ```
 
-Do not propose detailed final interfaces in the candidate scan unless a tiny sketch is necessary to explain the opportunity.
+**Completion criterion:** The scan summary exposes the ranking universe; every card follows the candidate contract; every claim traces to cited evidence or an exact evidence gap; and the zero-candidate branch contains no recommendation.
 
-Completion criterion: the user can choose a candidate without needing a full implementation design.
+## After selection: prepare the handoff
 
-## 8. When the user chooses a candidate
+Stop after presenting the result. Run this branch only after the user selects a candidate.
 
-Do not write the tech spec inside this skill. Prepare a concise brief for `../tech-spec/` with:
+Prepare a concise brief for `../tech-spec/` containing:
 
-- chosen candidate title;
-- files/modules involved;
-- problem and current friction;
-- standards areas to load;
+- candidate title and involved files/modules;
+- problem, current friction, and gathered evidence;
+- current-to-proposed ownership move;
+- applicable coding-standard principles;
 - known constraints and invariants;
-- suspected seams, boundaries, adapters, and call stacks;
-- evidence gathered;
+- suspected seams, boundaries, adapters, and call paths;
 - open questions;
-- context/ADR suggestions, if any.
+- context or ADR suggestions, if any.
 
-Then tell the user to run the tech-spec workflow on that brief.
+After the brief, tell the user to invoke `@tech-spec` with it; do not invoke or write the spec inside this skill.
 
-If the chosen candidate needs more product/domain/ownership decisions before a spec can be written, recommend a grilling session first. Use `../grill-with-docs/` when durable discovery artifacts are desired; otherwise use `../grill-me/`.
-
-Completion criterion: the chosen candidate is handed off as a focused brief, not transformed into an implementation plan or code changes.
-
-## Rejected framings
-
-- **"Architecture scan means deepening only."** Deep modules are one lens; scan across all coding standards.
-- **"A candidate is a vibe."** No evidence, no candidate.
-- **"Run the tests to see what's wrong."** This skill inspects architecture; verification commands belong to other workflows.
-- **"Estimate effort."** Humans estimate effort.
-- **"Write the spec now."** Tech specs are owned by the tech-spec workflow.
-- **"Refactor while scanning."** Scanning is planning-only.
-- **"Add migrations/backwards compatibility just in case."** Target-state design is the default unless the user asks for migration planning.
+**Completion criterion:** Every claim in the brief traces to scan evidence or is labeled as an open question; every gathered constraint, invariant, and affected path is included; and the user receives the explicit user-invoked handoff.
