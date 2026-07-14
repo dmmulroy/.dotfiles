@@ -33,6 +33,7 @@ export type RouteDescriptor =
 		readonly reasoningContext?: ReasoningContext;
 	})
 	| (RouteBase & { readonly backend: "google"; readonly api: "google-generative-ai" })
+	| (RouteBase & { readonly backend: "xai"; readonly api: "openai-completions" })
 	| (RouteBase & { readonly backend: "workers-ai"; readonly api: "openai-completions" });
 
 /** Models and route index produced from one gateway configuration. */
@@ -154,10 +155,28 @@ const DEFAULT_WORKERS_MODELS: Readonly<Record<string, GatewayModelConfig>> = {
 	},
 };
 
-const WORKERS_COMPAT: NonNullable<Model<Api>["compat"]> = {
+const DEFAULT_XAI_MODELS: Readonly<Record<string, GatewayModelConfig>> = {
+	"grok-4.5": {
+		name: "Grok 4.5",
+		attachment: true,
+		reasoning: true,
+		inputModalities: ["text", "image"],
+		inputCost: 2,
+		cacheReadCost: 0.5,
+		outputCost: 6,
+		contextWindow: 500000,
+		maxTokens: 500000,
+	},
+};
+
+const OPENAI_COMPLETIONS_COMPAT: NonNullable<Model<Api>["compat"]> = {
 	supportsStore: false,
 	supportsDeveloperRole: false,
 	supportsReasoningEffort: false,
+};
+
+const WORKERS_COMPAT: NonNullable<Model<Api>["compat"]> = {
+	...OPENAI_COMPLETIONS_COMPAT,
 	maxTokensField: "max_tokens",
 };
 
@@ -273,7 +292,21 @@ function buildBuiltInModels(
 ): readonly Model<Api>[] {
 	const route = config.routes[backend];
 	const provider = backend === "google" ? "google" : backend;
-	let models = [...getModels(provider)];
+	let models: Model<Api>[] = [...getModels(provider)];
+	if (backend === "xai") {
+		const known = new Set(models.map((model) => model.id));
+		for (const [modelId, modelConfig] of Object.entries(DEFAULT_XAI_MODELS)) {
+			if (known.has(modelId)) continue;
+			const model = toProviderModelConfigFromGateway(modelId, modelConfig);
+			models.push({
+				...model,
+				api: "openai-completions",
+				provider: backend,
+				baseUrl: route.baseUrl,
+				compat: OPENAI_COMPLETIONS_COMPAT,
+			});
+		}
+	}
 	if (backend === "openai" && route.hasGatewayModels) {
 		const allowlist = new Set(Object.keys(route.models).map((id) => stripRoutePrefix(id, backend)));
 		models = models.filter((model) => allowlist.has(model.id));
@@ -281,6 +314,21 @@ function buildBuiltInModels(
 	return models
 		.filter((model) => !isBlacklistedModel(model.id, backend, route.blacklist, resolveGatewayModelConfig(model.id, route.models, backend)))
 		.map((model) => applyGatewayOverrides(model, resolveGatewayModelConfig(model.id, route.models, backend)));
+}
+
+function getBackendApi(
+	backend: Exclude<Backend, "workers-ai">,
+): "anthropic-messages" | "openai-responses" | "google-generative-ai" | "openai-completions" {
+	switch (backend) {
+		case "anthropic":
+			return "anthropic-messages";
+		case "openai":
+			return "openai-responses";
+		case "google":
+			return "google-generative-ai";
+		case "xai":
+			return "openai-completions";
+	}
 }
 
 function createRoute(
@@ -309,6 +357,8 @@ function createRoute(
 			};
 		case "google":
 			return { ...base, backend, api: "google-generative-ai" };
+		case "xai":
+			return { ...base, backend, api: "openai-completions" };
 	}
 }
 
@@ -333,7 +383,7 @@ function addModel(
 export function buildCatalog(config: GatewayConfig): Result<CatalogData, CatalogError> {
 	const models: ProviderModelConfig[] = [];
 	const routes = new Map<string, RouteDescriptor>();
-	const counts: Record<Backend, number> = { anthropic: 0, openai: 0, google: 0, "workers-ai": 0 };
+	const counts: Record<Backend, number> = { anthropic: 0, openai: 0, google: 0, xai: 0, "workers-ai": 0 };
 
 	for (const backend of config.enabledBackends) {
 		const route = config.routes[backend];
@@ -375,7 +425,7 @@ export function buildCatalog(config: GatewayConfig): Result<CatalogData, Catalog
 			const model = toProviderModelConfigFromGateway(modelId, modelConfig);
 			const routeModel: Model<Api> = {
 				...model,
-				api: backend === "anthropic" ? "anthropic-messages" : backend === "openai" ? "openai-responses" : "google-generative-ai",
+				api: getBackendApi(backend),
 				provider: backend,
 				baseUrl: route.baseUrl,
 			};
@@ -395,7 +445,7 @@ export function buildCatalog(config: GatewayConfig): Result<CatalogData, Catalog
  * @returns One-line backend count summary.
  */
 export function summarizeCatalog(catalog: CatalogData): string {
-	return `anthropic=${catalog.counts.anthropic}, openai=${catalog.counts.openai}, google=${catalog.counts.google}, workers-ai=${catalog.counts["workers-ai"]}`;
+	return `anthropic=${catalog.counts.anthropic}, openai=${catalog.counts.openai}, google=${catalog.counts.google}, xai=${catalog.counts.xai}, workers-ai=${catalog.counts["workers-ai"]}`;
 }
 
 /**

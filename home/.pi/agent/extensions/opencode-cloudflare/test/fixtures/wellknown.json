@@ -14,7 +14,8 @@
       "anthropic",
       "openai",
       "cloudflare-workers-ai",
-      "google"
+      "google",
+      "xai"
     ],
     "provider": {
       "anthropic": {
@@ -81,6 +82,15 @@
       "google": {
         "options": {
           "baseURL": "https://opencode.cloudflare.dev/google-ai-studio/v1beta",
+          "headers": {
+            "cf-access-token": "{env:TOKEN}",
+            "X-Requested-With": "xmlhttprequest"
+          }
+        }
+      },
+      "xai": {
+        "options": {
+          "baseURL": "https://opencode.cloudflare.dev/grok",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest"

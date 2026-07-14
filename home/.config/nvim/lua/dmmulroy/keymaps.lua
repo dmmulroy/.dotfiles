@@ -10,22 +10,7 @@ vim.keymap.set("n", "<space>", "<nop>", { desc = "Disable space (leader) in norm
 
 vim.keymap.set("n", "<C-/>", "<nop>")
 
--- Window navigation
-vim.keymap.set("n", "<C-j>", function()
-	vim.cmd.wincmd("j")
-end, { desc = "Navigate down" })
-
-vim.keymap.set("n", "<C-k>", function()
-	vim.cmd.wincmd("k")
-end, { desc = "Navigate up" })
-
-vim.keymap.set("n", "<C-l>", function()
-	vim.cmd.wincmd("l")
-end, { desc = "Navigate right" })
-
-vim.keymap.set("n", "<C-h>", function()
-	vim.cmd.wincmd("h")
-end, { desc = "Navigate left" })
+-- Window navigation is provided by after/plugin/herdr-navigation.lua.
 
 -- Swap between last two buffers
 vim.keymap.set("n", "<leader>'", "<C-^>", { desc = "Switch to last buffer" })

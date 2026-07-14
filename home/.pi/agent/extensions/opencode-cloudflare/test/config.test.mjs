@@ -27,6 +27,9 @@ test("parses discovery into a deterministic catalog", () => {
 	assert.ok(!ids.has("claude-opus-4-7-fast"));
 	assert.ok(ids.has("@cf/moonshotai/kimi-k2.6"));
 	assert.equal(catalog.value.routes.get("@cf/moonshotai/kimi-k2.6")?.requestModelId, "workers-ai/@cf/moonshotai/kimi-k2.6");
+	assert.ok(ids.has("grok-4.5"));
+	assert.equal(catalog.value.routes.get("grok-4.5")?.backend, "xai");
+	assert.equal(config.routes.xai.baseUrl, "https://opencode.cloudflare.dev/grok");
 	assert.equal(config.routes.anthropic.headers["anthropic-beta"], "context-1m-2025-08-07,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14");
 });
 

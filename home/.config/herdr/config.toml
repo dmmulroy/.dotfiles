@@ -74,11 +74,12 @@ copy_mode = "prefix+v"
 # Pane resize mode.
 resize_mode = "prefix+shift+r"
 
-# Pane navigation; ctrl+h/j/k/l are direct Herdr chords.
-focus_pane_left = ["ctrl+h"]
-focus_pane_down = ["ctrl+j"]
-focus_pane_up = ["ctrl+k"]
-focus_pane_right = ["ctrl+l"]
+# Pane navigation; Vim/Neovim-aware navigation owns the direct chords.
+# Prefix bindings remain available as an escape hatch from any pane.
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+j"
+focus_pane_up = "prefix+k"
+focus_pane_right = "prefix+l"
 cycle_pane_next = "prefix+tab"
 cycle_pane_previous = "prefix+shift+tab"
 
@@ -92,6 +93,32 @@ navigate_pane_left = "h"
 navigate_pane_down = "j"
 navigate_pane_up = "k"
 navigate_pane_right = "l"
+
+# vim-herdr-navigation forwards these chords into Vim/Neovim when focused;
+# otherwise it focuses the adjacent Herdr pane.
+[[keys.command]]
+key = "ctrl+h"
+type = "plugin_action"
+command = "vim-herdr-navigation.left"
+description = "Navigate left (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+j"
+type = "plugin_action"
+command = "vim-herdr-navigation.down"
+description = "Navigate down (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+k"
+type = "plugin_action"
+command = "vim-herdr-navigation.up"
+description = "Navigate up (Vim/Herdr)"
+
+[[keys.command]]
+key = "ctrl+l"
+type = "plugin_action"
+command = "vim-herdr-navigation.right"
+description = "Navigate right (Vim/Herdr)"
 
 [ui]
 sidebar_width = 32

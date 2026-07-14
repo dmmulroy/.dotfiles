@@ -4,7 +4,7 @@ Pi provider for OpenCode's Cloudflare-hosted gateway:
 
 - provider: `opencode.cloudflare.dev`
 - discovery: `https://opencode.cloudflare.dev/.well-known/opencode`
-- backends: Anthropic, OpenAI, Google, and Workers AI
+- backends: Anthropic, OpenAI, Google, xAI, and Workers AI
 
 ## Design
 

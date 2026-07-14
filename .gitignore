@@ -29,6 +29,8 @@ home/.config/herdr/*.log
 home/.config/herdr/session-history.json
 home/.config/herdr/session.json
 home/.config/herdr/release-notes.json
+home/.config/herdr/plugins.json
+home/.config/herdr/plugins/
 
 # jj per-repo configs
 home/.config/jj/repos/

@@ -190,6 +190,36 @@ test("Google delegates full conversation and tool conversion while keeping gatew
 	}
 });
 
+test("xAI delegates to the OpenAI-compatible streamer through the Grok route", async () => {
+	const captured = [];
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async (input, init) => {
+		captured.push({ url: typeof input === "string" ? input : input.url, headers: new Headers(init?.headers) });
+		return new Response([
+			'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":null}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\n',
+			'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\n',
+			"data: [DONE]\n\n",
+		].join(""), { status: 200, headers: { "content-type": "text/event-stream" } });
+	};
+	try {
+		const stream = createHarness({
+			backend: "xai",
+			api: "openai-completions",
+			baseUrl: "https://opencode.cloudflare.dev/grok",
+			headers: {},
+		});
+		const result = await consume(stream(visibleModel("grok-4.5"), {
+			messages: [{ role: "user", content: "Reply", timestamp: 1 }],
+		}));
+		assert.equal(result.error, undefined);
+		assert.equal(captured[0].url, "https://opencode.cloudflare.dev/grok/chat/completions");
+		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
+		assert.equal(captured[0].headers.get("cf-access-token"), gatewayToken);
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
 test("Workers AI delegates to the OpenAI-compatible streamer", async () => {
 	const captured = [];
 	const originalFetch = globalThis.fetch;
