@@ -1,5 +1,5 @@
 /** Gateway backend identifiers supported by the extension. */
-export const BACKENDS = ["anthropic", "openai", "google", "workers-ai"] as const;
+export const BACKENDS = ["anthropic", "openai", "google", "xai", "workers-ai"] as const;
 
 /** Gateway backend identifier. */
 export type Backend = (typeof BACKENDS)[number];
@@ -45,6 +45,7 @@ export const DEFAULT_ROUTE_URLS: Readonly<Record<Backend, string>> = {
 	anthropic: `${GATEWAY_ORIGIN}/anthropic`,
 	openai: `${GATEWAY_ORIGIN}/openai`,
 	google: `${GATEWAY_ORIGIN}/google-ai-studio/v1beta`,
+	xai: `${GATEWAY_ORIGIN}/grok`,
 	"workers-ai": `${GATEWAY_ORIGIN}/compat`,
 };
 
@@ -60,6 +61,10 @@ export const DEFAULT_ROUTE_HEADERS: Readonly<Record<Backend, Readonly<Record<str
 		"X-Requested-With": "xmlhttprequest",
 	},
 	google: {
+		"cf-access-token": "{env:TOKEN}",
+		"X-Requested-With": "xmlhttprequest",
+	},
+	xai: {
 		"cf-access-token": "{env:TOKEN}",
 		"X-Requested-With": "xmlhttprequest",
 	},

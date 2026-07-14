@@ -13,8 +13,9 @@ const PROTECTED_FILE = "worker-configuration.d.ts";
 
 const BLOCK_REASON =
 	`BLOCKED: ${PROTECTED_FILE} is generated and must not be manually ` +
-	"created, edited, deleted, or overwritten by an agent. Run `wrangler types` " +
-	"from the worker project to regenerate it instead.";
+	"created, edited, deleted, or overwritten by an agent. Use the `read` tool " +
+	"to inspect it, or run `wrangler types` from the worker project to " +
+	"regenerate it instead.";
 
 const PROTECTED_FILE_RE = /(?:^|[^\w.-])worker-configuration\.d\.ts(?:$|[^\w.-])/;
 const OUTPUT_REDIRECTION_RE = /(^|[^<=>-])>>?/;

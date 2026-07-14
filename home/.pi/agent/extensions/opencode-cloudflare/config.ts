@@ -528,6 +528,7 @@ export function resolveGatewayConfig(
 			anthropic: resolveRoute("anthropic", document, overlay),
 			openai: resolveRoute("openai", document, overlay),
 			google: resolveRoute("google", document, overlay),
+			xai: resolveRoute("xai", document, overlay),
 			"workers-ai": resolveRoute("workers-ai", document, overlay),
 		},
 	};
@@ -548,6 +549,7 @@ export function stripRoutePrefix(modelId: string, backend: Backend): string {
 			return modelId.replace(/^workers-ai\//, "");
 		case "openai":
 		case "google":
+		case "xai":
 			return modelId;
 	}
 }

@@ -254,6 +254,9 @@ function createDelegatedStream(
 		case "openai":
 			if (!hasApi(model, "openai-responses")) throw new Error("OpenAI route produced an invalid delegated model");
 			return streamSimpleByApi(model, context, { ...options, apiKey: value });
+		case "xai":
+			if (!hasApi(model, "openai-completions")) throw new Error("xAI route produced an invalid delegated model");
+			return streamSimpleByApi(model, context, { ...options, apiKey: value });
 		case "workers-ai":
 			if (!hasApi(model, "openai-completions")) throw new Error("Workers AI route produced an invalid delegated model");
 			return streamSimpleByApi(model, context, { ...options, apiKey: value });
