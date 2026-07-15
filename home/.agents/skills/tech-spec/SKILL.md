@@ -8,8 +8,6 @@ disable-model-invocation: true
 
 A tech spec is a **typed call-stack architecture handoff**: code-shaped contracts plus execution flows. Prefer TypeScript pseudocode over prose wherever precision matters.
 
-Treat `../coding-standards/SKILL.md` as the standards source of truth and `../tdd/` as the testing workflow.
-
 This skill is design-only. Do not implement. Save a file only when the user asks for a file; otherwise return the spec inline.
 
 ## Branch selection
@@ -24,11 +22,6 @@ Completion criterion: the branch is chosen from actual available context; missin
 ## Path A: Convert context to spec
 
 ### 1. Load standards and local context
-
-Read:
-
-- `../coding-standards/SKILL.md`
-- `../tdd/SKILL.md`
 
 Inspect existing code and docs for local vocabulary, module layout, domain concepts, errors, adapters, observability, runtime patterns, and test style.
 
@@ -178,8 +171,6 @@ Completion criterion: the output follows the outline below and is implementation
    - State that there is not enough context for an implementation-ready tech spec.
    - Completion criterion: the agent has not invented requirements, APIs, files, or call stacks.
 2. Start a grilling interview.
-   - Use `../grill-with-docs/` when the user wants docs, ADRs, glossary/domain language, or durable design artifacts created during discovery.
-   - Otherwise use `../grill-me/`.
    - Ask one question at a time and provide the recommended answer with each question.
    - If a question can be answered by exploring the codebase, inspect the codebase instead of asking.
    - Completion criterion: the interview has enough context for Path A: problem, users/callers, constraints, affected systems, desired behavior, boundaries, likely APIs, invariants, risks, and acceptance tests.
