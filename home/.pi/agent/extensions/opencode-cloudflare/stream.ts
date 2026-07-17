@@ -12,7 +12,7 @@ import {
 import { streamSimple as streamSimpleByApi } from "@earendil-works/pi-ai/compat";
 import type { GatewayAuthService, GatewayToken } from "./auth.ts";
 import type { CatalogService, ReasoningContext, ResponseVerbosity, RouteDescriptor } from "./catalog.ts";
-import { GATEWAY_ORIGIN, PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
+import { PROVIDER_ID, TOKEN_ENV_OVERRIDE } from "./constants.ts";
 import { Redacted } from "./redacted.ts";
 
 const GOOGLE_GATEWAY_API_KEY_SENTINEL = "gateway-authenticated";
@@ -81,7 +81,7 @@ export function formatGatewayErrorMessage(error: unknown, secrets: readonly Gate
 	const label = structured.error ?? "Gateway Error";
 	const detail = `${structured.status === undefined ? "" : `${structured.status} `}${label}: ${backendMessage}`;
 	if (structured.status === 401 || structured.error === "Unauthorized") {
-		return `OpenCode Cloudflare rejected the Access token (${detail}). Run /login ${PROVIDER_ID}, or refresh OpenCode auth and run /opencode-cf-sync-auth.`;
+		return `OpenCode Cloudflare rejected the Access token (${detail}). Refresh OpenCode auth, then run /login ${PROVIDER_ID}.`;
 	}
 	if (structured.error === "Configuration Error" || backendMessage === "API key not configured") {
 		return `OpenCode Cloudflare is misconfigured (${detail}). The gateway service owner needs to restore its upstream API key.`;
@@ -285,7 +285,7 @@ export function createGatewayStream(dependencies: GatewayStreamDependencies) {
 				if (!resolvedToken.ok) throw resolvedToken.error;
 				if (!resolvedToken.value) {
 					throw new Error(
-						`No token available for ${PROVIDER_ID}. Run /login ${PROVIDER_ID}, set ${TOKEN_ENV_OVERRIDE}, or run \`opencode auth login ${GATEWAY_ORIGIN}\`.`,
+						`No token available for ${PROVIDER_ID}. Run /login ${PROVIDER_ID}, set ${TOKEN_ENV_OVERRIDE}, or import OpenCode auth by logging in there and then running /login ${PROVIDER_ID}.`,
 					);
 				}
 				token = resolvedToken.value;

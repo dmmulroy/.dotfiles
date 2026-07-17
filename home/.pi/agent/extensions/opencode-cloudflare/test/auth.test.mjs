@@ -19,10 +19,9 @@ function createAuth(overrides = {}) {
 	const environment = new Map(Object.entries(overrides.environment ?? {}));
 	const files = new Map(Object.entries(overrides.files ?? {}));
 	const now = () => overrides.now ?? 1000;
-	let credential = overrides.credential;
-	const credentialStore = overrides.credentialStore ?? {
+	const credential = overrides.credential;
+	const credentialReader = overrides.credentialReader ?? {
 		get: () => credential,
-		set: (value) => { credential = value; },
 	};
 	const tokenSource = createGatewayTokenSource({
 		environment: (name) => environment.get(name),
@@ -33,10 +32,10 @@ function createAuth(overrides = {}) {
 			if (value === undefined) throw new Error("missing test file");
 			return value;
 		},
-		credentialStore,
+		credentialReader,
 		now,
 	});
-	return createGatewayAuthService({ configStore: overrides.configStore ?? {}, tokenSource, credentialStore, now });
+	return createGatewayAuthService({ configStore: overrides.configStore ?? {}, tokenSource, credentialReader, now });
 }
 
 test("GatewayToken uses the Redacted primitive and reports JWT expiry", () => {
@@ -69,31 +68,16 @@ test("resolves explicit environment auth before imported OpenCode auth", () => {
 	assert.equal(Redacted.value(resolved.value), "environment-token");
 });
 
-test("import synchronization preserves higher-priority environment and Pi auth", () => {
-	for (const scenario of [
-		{
-			environment: { OPENCODE_CLOUDFLARE_TOKEN: "environment-token", OPENCODE_CLOUDFLARE_AUTH_FILE: "/tmp/broken.json" },
-			credential: undefined,
-		},
-		{
-			environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: "/tmp/broken.json" },
-			credential: { type: "oauth", refresh: "", access: "stored-token", expires: 5000 },
-		},
-	]) {
-		let writes = 0;
-		let credential = scenario.credential;
-		const auth = createAuth({
-			environment: scenario.environment,
-			files: { "/tmp/broken.json": "not-json" },
-			credentialStore: {
-				get: () => credential,
-				set: (value) => { writes += 1; credential = value; },
-			},
-		});
-		const ensured = auth.ensureStoredCredential();
-		assert.equal(ensured.ok, true);
-		assert.equal(writes, 0);
-	}
+test("resolves stored Pi auth before imported OpenCode auth", () => {
+	const authPath = "/tmp/opencode-auth.json";
+	const auth = createAuth({
+		environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
+		files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "imported-token" } }) },
+		credential: { type: "oauth", refresh: "", access: "stored-token", expires: 5000 },
+	});
+	const resolved = auth.resolveToken();
+	assert.equal(resolved.ok, true);
+	assert.equal(Redacted.value(resolved.value), "stored-token");
 });
 
 test("expired opaque Pi auth falls back to and refreshes identical imported auth", async () => {

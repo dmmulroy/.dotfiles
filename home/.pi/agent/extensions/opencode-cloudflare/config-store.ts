@@ -25,6 +25,8 @@ export interface GatewayConfigStatus {
 export interface GatewayConfigLoadOptions {
 	readonly forceReload?: boolean;
 	readonly fallbackToDefault?: boolean;
+	readonly allowNetwork?: boolean;
+	readonly authToken?: string;
 	readonly signal?: AbortSignal;
 }
 
@@ -180,9 +182,20 @@ export function createGatewayConfigStore(dependencies: GatewayConfigStoreDepende
 	return {
 		async load(options = {}) {
 			const now = dependencies.now();
-			if (!options.forceReload && cache && cache.expiresAt > now) return success(cache.value);
+			if (
+				!options.forceReload
+				&& cache
+				&& cache.expiresAt > now
+				&& (options.allowNetwork !== true || cache.value.source === "live")
+			) return success(cache.value);
 			const overlay = parseLocalOverlay(dependencies);
 			if (!overlay.ok) return overlay;
+			if (options.allowNetwork === false) {
+				if (cache) return success(cache.value);
+				const value = resolveGatewayConfig(undefined, overlay.value, "fallback");
+				cache = { expiresAt: now + WELL_KNOWN_CACHE_TTL_MS, value };
+				return success(value);
+			}
 
 			let discovery: GatewayDocument | undefined;
 			let liveDocument: GatewayDocument | undefined;
@@ -198,7 +211,7 @@ export function createGatewayConfigStore(dependencies: GatewayConfigStoreDepende
 					discovery = parsedDiscovery.value;
 					liveDocument = discovery;
 					if (discovery.remoteConfig) {
-						const headers = resolveRemoteHeaders(discovery, dependencies.resolveToken);
+						const headers = resolveRemoteHeaders(discovery, () => options.authToken ?? dependencies.resolveToken());
 						if (!headers.ok) {
 							fetchError = headers.error;
 						} else {

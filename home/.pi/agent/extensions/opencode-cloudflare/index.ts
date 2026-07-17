@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
 	createProductionGatewayAuthService,
-	createProductionGatewayCredentialStore,
+	createProductionGatewayCredentialReader,
 	createProductionGatewayTokenSource,
 	describeTokenState,
 	type GatewayAuthService,
@@ -84,18 +84,11 @@ async function handleStatus(services: ExtensionServices, ctx: ExtensionCommandCo
 	ctx.ui.notify(buildStatusReport(services), "info");
 }
 
-async function handleSyncAuth(services: ExtensionServices, ctx: ExtensionCommandContext): Promise<void> {
-	const imported = services.auth.syncImportedAuth();
-	if (!imported.ok) throw imported.error;
-	ctx.ui.notify(`Imported OpenCode auth from ${imported.value.authPath}. Reloading provider state...`, "info");
-	await ctx.reload();
-}
-
 async function handleDoctor(services: ExtensionServices, ctx: ExtensionCommandContext): Promise<void> {
 	services.configStore.clear();
 	const config = await services.configStore.load({ forceReload: true, fallbackToDefault: false });
 	if (!config.ok) throw config.error;
-	const catalog = await services.catalog.refresh(false);
+	const catalog = await services.catalog.refresh();
 	if (!catalog.ok) throw catalog.error;
 	const authCommand = config.value.authCommand;
 	const report = [
@@ -117,25 +110,35 @@ async function handleDoctor(services: ExtensionServices, ctx: ExtensionCommandCo
  * @returns Completion after initial gateway discovery and provider registration.
  */
 export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Promise<void> {
-	const credentialStore = createProductionGatewayCredentialStore();
-	const tokenSource = createProductionGatewayTokenSource(credentialStore);
+	const credentialReader = createProductionGatewayCredentialReader();
+	const tokenSource = createProductionGatewayTokenSource(credentialReader);
 	const configStore = createProductionGatewayConfigStore(() => {
 		const resolved = tokenSource.resolveToken();
 		return resolved.ok && resolved.value ? Redacted.value(resolved.value) : undefined;
 	});
-	const auth = createProductionGatewayAuthService(configStore, tokenSource, credentialStore);
-	const storedCredential = auth.ensureStoredCredential();
-	if (!storedCredential.ok) throw storedCredential.error;
+	const auth = createProductionGatewayAuthService(configStore, tokenSource, credentialReader);
 	const catalog = createCatalogService(configStore);
-	const initialCatalog = await catalog.refresh(true);
+	const initialCatalog = await catalog.refresh({ allowNetwork: false });
 	if (!initialCatalog.ok) throw initialCatalog.error;
 	const services: ExtensionServices = { auth, catalog, configStore };
 
 	pi.registerProvider(PROVIDER_ID, {
+		name: PROVIDER_NAME,
 		baseUrl: GATEWAY_ORIGIN,
 		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
 		api: CUSTOM_API,
 		models: [...initialCatalog.value.models],
+		refreshModels: async ({ credential, allowNetwork, force, signal }) => {
+			const authToken = credential?.type === "oauth" ? credential.access : credential?.key;
+			const refreshed = await catalog.refresh({
+				forceReload: force === true,
+				allowNetwork,
+				authToken,
+				signal,
+			});
+			if (!refreshed.ok) throw refreshed.error;
+			return [...refreshed.value.models];
+		},
 		oauth: {
 			name: PROVIDER_NAME,
 			login: (callbacks) => auth.login(callbacks),
@@ -148,10 +151,6 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 	pi.registerCommand("opencode-cf-status", {
 		description: "Show OpenCode Cloudflare auth and catalog status",
 		handler: async (_args, ctx) => handleStatus(services, ctx),
-	});
-	pi.registerCommand("opencode-cf-sync-auth", {
-		description: "Import the current OpenCode token into Pi auth storage and reload",
-		handler: async (_args, ctx) => handleSyncAuth(services, ctx),
 	});
 	pi.registerCommand("opencode-cf-doctor", {
 		description: "Validate the OpenCode Cloudflare gateway configuration",
