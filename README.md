@@ -89,11 +89,10 @@ dot init --skip-ssh --skip-font
 ```bash
 dot update
 ```
-- Pulls latest dotfiles changes (auto-detects jj vs git)
+- Pulls the latest dotfiles changes with Git
 - Updates Homebrew packages
 - Re-stows configuration files
 - Runs `pi update` to update pi and its configured packages
-- Runs pi headlessly with `/skill:sync-pocock-skills` and waits for the checked-in Matt Pocock skills sync to complete
 
 #### `dot doctor` - Health Check
 ```bash
@@ -235,9 +234,10 @@ dot package remove docker base  # Remove docker from base bundle only
 - Applications: Arc browser, Raycast, OrbStack
 - AI tools: aider
 
-**`packages/bundle.work`** - Work-specific additions:
+**`packages/bundle.work`** - Work-specific formula additions:
 - AWS/Kubernetes tools
 - Enterprise development tools
+- Formulae only; casks must be added to the base bundle
 
 #### Package Features
 
@@ -261,7 +261,6 @@ dot package remove docker base  # Remove docker from base bundle only
 - **Conditional Loading**: Work-specific Git config for `~/Code/work/`
 - **Plugin Managers**: Each tool uses its own where applicable (lazy.nvim, Fisher)
 - **Error Resilience**: Package installation continues despite individual failures
-- **jj Support**: Auto-detects jj-managed repos and uses appropriate update commands
 
 ## Environment Setup
 
