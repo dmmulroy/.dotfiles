@@ -24,6 +24,10 @@ home/.config/opencode/node_modules/
 home/.config/opencode/plugins/git-ai.ts
 .opencode/plans/
 
+# Plannotator runtime/state (keep config tracked)
+home/.plannotator/*
+!home/.plannotator/config.json
+
 # herdr runtime/state
 home/.config/herdr/*.log
 home/.config/herdr/session-history.json
