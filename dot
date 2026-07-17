@@ -751,7 +751,6 @@ cmd_update() {
         return 1
     fi
     
-    # Update packages without prompting; `dot update` always runs every update step.
     __print_info "Updating Homebrew..."
     # WARP adds latency that triggers brew's curl speed-limit abort
     # Pre-download API files to work around this
@@ -762,9 +761,33 @@ cmd_update() {
         curl -fsSL -o "$api_cache/formula.jws.json" "https://formulae.brew.sh/api/formula.jws.json" 2>/dev/null
         curl -fsSL -o "$api_cache/cask.jws.json" "https://formulae.brew.sh/api/cask.jws.json" 2>/dev/null
     fi
-    brew update
-    brew upgrade
-    __print_success "Packages updated"
+    if ! brew update; then
+        __print_error "Failed to update Homebrew"
+        return 1
+    fi
+
+    local outdated
+    if ! outdated=$(brew outdated); then
+        __print_error "Failed to check outdated packages"
+        return 1
+    fi
+
+    if [[ -z "$outdated" ]]; then
+        __print_success "All packages are already up to date"
+    else
+        __print_info "The following packages can be upgraded:"
+        echo "$outdated"
+        if __confirm "Do you want to proceed with the upgrade?" "n"; then
+            if brew upgrade; then
+                __print_success "Packages updated"
+            else
+                __print_error "Failed to upgrade packages"
+                return 1
+            fi
+        else
+            __print_info "Skipping package upgrade"
+        fi
+    fi
 
     # Re-stow dotfiles before pi uses checked-out skills and configuration.
     __stow_dotfiles
@@ -2130,7 +2153,7 @@ corresponding option.
 EOF
             ;;
         update)
-            echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} update\n\nPull dotfiles, update Homebrew, re-stow configuration, and update pi."
+            echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} update\n\nPull dotfiles, update Homebrew (with upgrade confirmation), re-stow configuration, and update pi."
             ;;
         doctor)
             echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} doctor\n\nRun environment diagnostics."
