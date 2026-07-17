@@ -90,7 +90,7 @@ dot init --skip-ssh --skip-font
 dot update
 ```
 - Pulls the latest dotfiles changes with Git
-- Updates Homebrew packages
+- Updates Homebrew and prompts before upgrading packages
 - Re-stows configuration files
 - Runs `pi update` to update pi and its configured packages
 
