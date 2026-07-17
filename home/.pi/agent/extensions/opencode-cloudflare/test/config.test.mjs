@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildCatalog } from "../catalog.ts";
+import { buildCatalog, createCatalogService } from "../catalog.ts";
 import {
 	parseGatewayDocument,
 	parseGatewayLocalOverlay,
@@ -57,12 +57,55 @@ test("configuration store follows authenticated two-step discovery", async () =>
 		resolveToken: () => "fixture-token",
 		now: () => 1,
 	});
-	const loaded = await store.load();
+	const loaded = await store.load({ authToken: "context-token" });
 	assert.equal(loaded.ok, true);
 	assert.equal(loaded.value.source, "live");
 	assert.deepEqual(loaded.value.enabledBackends, ["openai"]);
 	assert.equal(requests.length, 2);
-	assert.equal(requests[1].headers.get("cf-access-token"), "fixture-token");
+	assert.equal(requests[1].headers.get("cf-access-token"), "context-token");
+});
+
+test("configuration store builds fallback state without network access", async () => {
+	let fetches = 0;
+	const store = createGatewayConfigStore({
+		fetch: async () => {
+			fetches += 1;
+			return new Response(fixtureText, { status: 200, headers: { "content-type": "application/json" } });
+		},
+		readTextFile: () => undefined,
+		localConfigPath: () => "/tmp/overlay.jsonc",
+		resolveToken: () => undefined,
+		now: () => 1,
+	});
+	const loaded = await store.load({ allowNetwork: false });
+	assert.equal(loaded.ok, true);
+	assert.equal(loaded.value.source, "fallback");
+	assert.equal(fetches, 0);
+
+	const refreshed = await store.load({ allowNetwork: true });
+	assert.equal(refreshed.ok, true);
+	assert.equal(refreshed.value.source, "live");
+	assert.equal(fetches, 1);
+});
+
+test("request-time route resolution is cache-only", async () => {
+	const parsed = parseGatewayDocument(fixture);
+	assert.equal(parsed.ok, true);
+	const config = resolveGatewayConfig(parsed.value);
+	const loads = [];
+	const catalog = createCatalogService({
+		load: async (options) => {
+			loads.push(options);
+			return { ok: true, value: config };
+		},
+		clear() {},
+		status: () => ({}),
+	});
+
+	const resolved = await catalog.resolveRoute("gpt-4o");
+	assert.equal(resolved.ok, true);
+	assert.equal(loads.length, 1);
+	assert.equal(loads[0].allowNetwork, false);
 });
 
 test("local overlays augment built-in models and preserve typed options", () => {

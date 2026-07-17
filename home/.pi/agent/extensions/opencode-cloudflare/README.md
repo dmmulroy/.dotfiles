@@ -34,7 +34,9 @@ Reuse OpenCode authentication:
 opencode auth login https://opencode.cloudflare.dev
 ```
 
-At startup, a usable imported OpenCode token is synchronized into Pi OAuth storage so the provider is immediately selectable.
+Then run `/login opencode.cloudflare.dev` once in Pi. The login flow imports the usable OpenCode token and Pi's model runtime persists it for subsequent sessions.
+
+Configured provider catalogs refresh in the background when `/model` opens, and immediately with `pi update --models`.
 
 Optional explicit token override:
 
@@ -103,7 +105,6 @@ Known fields are parsed at the boundary. Invalid known fields fail startup inste
 ## Commands
 
 - `/opencode-cf-status` — show auth, discovery-cache, and catalog status
-- `/opencode-cf-sync-auth` — copy current OpenCode auth into Pi storage and reload
 - `/opencode-cf-doctor` — require live discovery and report gateway diagnostics
 
 ## Development

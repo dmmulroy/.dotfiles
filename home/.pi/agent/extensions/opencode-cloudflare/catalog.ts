@@ -49,6 +49,14 @@ export interface CatalogRoute {
 	readonly config: GatewayConfig;
 }
 
+/** Inputs controlling one catalog refresh. */
+export interface CatalogRefreshOptions {
+	readonly forceReload?: boolean;
+	readonly allowNetwork?: boolean;
+	readonly authToken?: string;
+	readonly signal?: AbortSignal;
+}
+
 /** Catalog construction or lookup failure. */
 export class CatalogError extends Error {
 	readonly _tag = "CatalogError" as const;
@@ -83,7 +91,7 @@ export interface CatalogService {
 	/** Return the current catalog, or an uninitialized failure. */
 	current(): Result<CatalogData, CatalogError>;
 	/** Refresh configuration and rebuild the catalog atomically. */
-	refresh(forceReload?: boolean, signal?: AbortSignal): Promise<Result<CatalogData, CatalogError>>;
+	refresh(options?: CatalogRefreshOptions): Promise<Result<CatalogData, CatalogError>>;
 	/** Resolve a model route and configuration from one snapshot. */
 	resolveRoute(modelId: string, signal?: AbortSignal): Promise<Result<CatalogRoute, CatalogError>>;
 }
@@ -458,10 +466,16 @@ export function createCatalogService(configStore: GatewayConfigStore): CatalogSe
 	let active: CatalogData | undefined;
 	let activeConfig: GatewayConfig | undefined;
 
-	const refresh = async (forceReload = false, signal?: AbortSignal): Promise<Result<CatalogData, CatalogError>> => {
-		const loaded = await configStore.load({ forceReload, fallbackToDefault: true, signal });
+	const refresh = async (options: CatalogRefreshOptions = {}): Promise<Result<CatalogData, CatalogError>> => {
+		const loaded = await configStore.load({
+			forceReload: options.forceReload,
+			fallbackToDefault: true,
+			allowNetwork: options.allowNetwork,
+			authToken: options.authToken,
+			signal: options.signal,
+		});
 		if (!loaded.ok) return failure(new CatalogError("configuration", undefined, loaded.error));
-		if (!forceReload && active && activeConfig === loaded.value) return success(active);
+		if (!options.forceReload && active && activeConfig === loaded.value) return success(active);
 		const built = buildCatalog(loaded.value);
 		if (!built.ok) return built;
 		active = built.value;
@@ -475,14 +489,9 @@ export function createCatalogService(configStore: GatewayConfigStore): CatalogSe
 		},
 		refresh,
 		async resolveRoute(modelId, signal) {
-			let refreshed = await refresh(false, signal);
+			const refreshed = await refresh({ allowNetwork: false, signal });
 			if (!refreshed.ok) return refreshed;
-			let route = refreshed.value.routes.get(modelId);
-			if (!route) {
-				refreshed = await refresh(true, signal);
-				if (!refreshed.ok) return refreshed;
-				route = refreshed.value.routes.get(modelId);
-			}
+			const route = refreshed.value.routes.get(modelId);
 			return route && activeConfig
 				? success({ route, config: activeConfig })
 				: failure(new CatalogError("unknown-model", modelId));

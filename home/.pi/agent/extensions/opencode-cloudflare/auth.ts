@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve, join } from "node:path";
-import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
-import { AuthStorage, type OAuthCredential } from "@earendil-works/pi-coding-agent";
+import type { OAuthCredential, OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
+import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 import type { GatewayConfigStore } from "./config-store.ts";
 import {
 	DEFAULT_TOKEN_EXPIRY_MS,
@@ -77,12 +77,10 @@ export class GatewayAuthError extends Error {
 	}
 }
 
-/** Provider-scoped Pi OAuth credential storage. */
-export interface GatewayCredentialStore {
+/** Provider-scoped Pi OAuth credential reader. */
+export interface GatewayCredentialReader {
 	/** Return the stored provider credential. */
 	get(): OAuthCredential | undefined;
-	/** Persist the provider credential. */
-	set(credential: OAuthCredential): void;
 }
 
 /** Token-source dependencies. */
@@ -91,7 +89,7 @@ export interface GatewayTokenSourceDependencies {
 	readonly homeDirectory: () => string;
 	readonly fileExists: (path: string) => boolean;
 	readonly readTextFile: (path: string) => string;
-	readonly credentialStore: GatewayCredentialStore;
+	readonly credentialReader: GatewayCredentialReader;
 	readonly now: () => number;
 }
 
@@ -113,7 +111,7 @@ export interface GatewayTokenSource {
 export interface GatewayAuthDependencies {
 	readonly configStore: GatewayConfigStore;
 	readonly tokenSource: GatewayTokenSource;
-	readonly credentialStore: GatewayCredentialStore;
+	readonly credentialReader: GatewayCredentialReader;
 	readonly now: () => number;
 }
 
@@ -129,10 +127,6 @@ export interface GatewayAuthService {
 	resolveToken(apiKey?: string): Result<GatewayToken | undefined, GatewayAuthError>;
 	/** Return Pi's stored OAuth credential, when present. */
 	getStoredCredential(): OAuthCredential | undefined;
-	/** Copy imported OpenCode authentication into Pi storage. */
-	syncImportedAuth(): Result<ImportedGatewayToken, GatewayAuthError>;
-	/** Ensure imported OpenCode authentication is visible to Pi's model registry. */
-	ensureStoredCredential(): Result<void, GatewayAuthError>;
 	/** Run Pi's OAuth login flow. */
 	login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials>;
 	/** Refresh Pi OAuth credentials from newer OpenCode authentication. */
@@ -379,7 +373,7 @@ export function createGatewayTokenSource(dependencies: GatewayTokenSourceDepende
 		readImportedToken: () => readImportedToken(),
 		resolveToken(apiKey) {
 			const now = dependencies.now();
-			const storedCredential = dependencies.credentialStore.get();
+			const storedCredential = dependencies.credentialReader.get();
 			const storedToken = storedCredential?.type === "oauth" && storedCredential.expires > now
 				? GatewayToken.parse(storedCredential.access)
 				: undefined;
@@ -408,34 +402,14 @@ export function createGatewayTokenSource(dependencies: GatewayTokenSourceDepende
  * @returns Gateway authentication service.
  */
 export function createGatewayAuthService(dependencies: GatewayAuthDependencies): GatewayAuthService {
-	const syncImportedAuth = (): Result<ImportedGatewayToken, GatewayAuthError> => {
-		const imported = dependencies.tokenSource.readImportedToken();
-		if (!imported.ok) return imported;
-		if (!imported.value) return failure(new GatewayAuthError("missing-token", `No OpenCode auth found for ${GATEWAY_ORIGIN}`));
-		dependencies.credentialStore.set({ type: "oauth", ...createGatewayCredentials(imported.value.token, dependencies.now()) });
-		return success(imported.value);
-	};
 	return {
 		listAuthCandidates: () => dependencies.tokenSource.listAuthCandidates(),
 		findAuthPath: () => dependencies.tokenSource.findAuthPath(),
 		readImportedToken: () => dependencies.tokenSource.readImportedToken(),
 		resolveToken: (apiKey) => dependencies.tokenSource.resolveToken(apiKey),
 		getStoredCredential() {
-			const credential = dependencies.credentialStore.get();
+			const credential = dependencies.credentialReader.get();
 			return credential?.type === "oauth" ? credential : undefined;
-		},
-		syncImportedAuth,
-		ensureStoredCredential() {
-			if (dependencies.tokenSource.hasEnvironmentOverride()) return success(undefined);
-			const stored = dependencies.credentialStore.get();
-			if (stored?.type === "oauth" && stored.expires > dependencies.now() && GatewayToken.parse(stored.access)) {
-				return success(undefined);
-			}
-			const imported = dependencies.tokenSource.readImportedToken();
-			if (!imported.ok) return imported;
-			if (!isUsableToken(imported.value?.token, dependencies.now())) return success(undefined);
-			dependencies.credentialStore.set({ type: "oauth", ...createGatewayCredentials(imported.value.token, dependencies.now()) });
-			return success(undefined);
 		},
 		async login(callbacks) {
 			const imported = dependencies.tokenSource.readImportedToken();
@@ -461,36 +435,34 @@ export function createGatewayAuthService(dependencies: GatewayAuthDependencies):
 			if (isUsableToken(imported.value?.token, dependencies.now())) {
 				return createGatewayCredentials(imported.value.token, dependencies.now());
 			}
-			throw new GatewayAuthError("expired-token", `The OpenCode Cloudflare token has expired. Run /login ${PROVIDER_ID} or refresh OpenCode auth and use /opencode-cf-sync-auth.`);
+			throw new GatewayAuthError("expired-token", `The OpenCode Cloudflare token has expired. Refresh OpenCode auth, then run /login ${PROVIDER_ID}.`);
 		},
 		hasEnvironmentOverride: () => dependencies.tokenSource.hasEnvironmentOverride(),
 	};
 }
 
-/** Create production Pi OAuth credential storage scoped to this provider. */
-export function createProductionGatewayCredentialStore(): GatewayCredentialStore {
-	const storage = AuthStorage.create();
+/** Create a production Pi OAuth credential reader scoped to this provider. */
+export function createProductionGatewayCredentialReader(): GatewayCredentialReader {
 	return {
 		get() {
-			const credential = storage.get(PROVIDER_ID);
+			const credential = readStoredCredential(PROVIDER_ID);
 			return credential?.type === "oauth" ? credential : undefined;
 		},
-		set: (credential) => storage.set(PROVIDER_ID, credential),
 	};
 }
 
 /**
  * Create the production gateway token source.
  *
- * @param credentialStore - Shared provider-scoped Pi credential storage.
+ * @param credentialReader - Shared provider-scoped Pi credential reader.
  */
-export function createProductionGatewayTokenSource(credentialStore: GatewayCredentialStore): GatewayTokenSource {
+export function createProductionGatewayTokenSource(credentialReader: GatewayCredentialReader): GatewayTokenSource {
 	return createGatewayTokenSource({
 		environment: (name) => process.env[name],
 		homeDirectory: () => homedir(),
 		fileExists: (path) => existsSync(path),
 		readTextFile: (path) => readFileSync(path, "utf8"),
-		credentialStore,
+		credentialReader,
 		now: () => Date.now(),
 	});
 }
@@ -500,15 +472,15 @@ export function createProductionGatewayTokenSource(credentialStore: GatewayCrede
  *
  * @param configStore - Configuration store owned by the extension runtime.
  * @param tokenSource - Shared production token source.
- * @param credentialStore - Shared provider-scoped Pi credential storage.
+ * @param credentialReader - Shared provider-scoped Pi credential reader.
  * @returns Authentication service using Pi and OpenCode credential storage.
  */
 export function createProductionGatewayAuthService(
 	configStore: GatewayConfigStore,
 	tokenSource: GatewayTokenSource,
-	credentialStore: GatewayCredentialStore,
+	credentialReader: GatewayCredentialReader,
 ): GatewayAuthService {
-	return createGatewayAuthService({ configStore, tokenSource, credentialStore, now: () => Date.now() });
+	return createGatewayAuthService({ configStore, tokenSource, credentialReader, now: () => Date.now() });
 }
 
 /**
