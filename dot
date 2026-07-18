@@ -777,15 +777,11 @@ cmd_update() {
     else
         __print_info "The following packages can be upgraded:"
         echo "$outdated"
-        if __confirm "Do you want to proceed with the upgrade?" "n"; then
-            if brew upgrade; then
-                __print_success "Packages updated"
-            else
-                __print_error "Failed to upgrade packages"
-                return 1
-            fi
+        if brew upgrade --yes; then
+            __print_success "Packages updated"
         else
-            __print_info "Skipping package upgrade"
+            __print_error "Failed to upgrade packages"
+            return 1
         fi
     fi
 

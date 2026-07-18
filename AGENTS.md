@@ -66,7 +66,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 
 ```bash
 dot init              # Full setup (brew, stow, bun, ssh, font, fish)
-dot update            # Pull + brew update (confirm upgrade) + restow + pi update
+dot update            # Pull + brew update/upgrade + restow + pi update
 dot doctor            # Health check
 dot stow              # Resymlink only
 dot package add X     # Add + install package
