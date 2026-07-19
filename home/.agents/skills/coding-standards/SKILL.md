@@ -2,6 +2,7 @@
 name: coding-standards
 description: Correct-by-construction TypeScript standards. Use for TypeScript engineering or when another skill needs the user's coding standards.
 ---
+
 These standards describe how to design and write TypeScript code in this codebase. They are especially intended for agents: inspect existing code before adding patterns, libraries, Adapters, or abstractions, but apply these standards to all new and refactored behavior. Follow existing conventions only when they are compatible with these standards.
 
 ## Decision priority
@@ -115,6 +116,10 @@ Custom errors should include:
 - safe telemetry fields
 - optional `cause: unknown`
 
+The error that owns a failure should construct its stable, useful message. Callers
+may add safe context or translate the error at an outer boundary, but should not
+duplicate the error's message policy or classify it by matching message text.
+
 Example:
 
 ```ts
@@ -157,7 +162,9 @@ Do not put secrets in errors, traces, logs, or snapshots.
 
 Use a `Redacted<T>` wrapper for sensitive values such as tokens, API keys, passwords, raw credentials, and secrets. Prefer Effect's `Redacted.Redacted` in Effect codebases or a local shared `Redacted<T>` wrapper.
 
-Wrap sensitive values at the boundary and unwrap only where the raw value is needed, usually inside an adapter making an external call.
+Wrap sensitive values at the boundary and keep them redacted through application
+code. Unwrap only at the final I/O operation that needs the raw value, usually inside
+an adapter immediately before the external call.
 
 ## Parse, don't validate
 
@@ -203,6 +210,12 @@ Preference:
 - use hand-written smart constructors/parsers for small domain types when clearer
 
 Schema parsing should produce refined/domain types and typed custom errors where practical.
+
+Parsing is required on every path where less-trusted data re-enters typed code, not
+only on initial writes or inbound requests. Treat database reads, cache hits, RPC
+responses, event consumption, workflow replay, and serialized-state rehydration as
+distinct boundaries. A write-time parser does not prove stored or replayed bytes are
+still valid.
 
 ## Branded types and correct construction
 
@@ -261,6 +274,16 @@ Booleans are fine as clear predicate return values:
 isExpired(token): boolean;
 hasPermission(user, permission): boolean;
 ```
+
+For non-trivial calls, keep the primary domain input positional and group related
+configuration or capability controls into a named options object when names prevent
+order mistakes or make policy visible. Do not wrap one obvious argument merely to
+obey a shape rule.
+
+Handle closed tagged unions exhaustively with `casesHandled` or the repository's
+native equivalent. Avoid a catch-all/default branch that silently accepts a new tag;
+if the external protocol truly has an open-ended fallback, model and test that as an
+explicit boundary policy.
 
 ## Modules and abstractions
 
@@ -537,6 +560,15 @@ src/billing/
 
 Tests should not bypass parsers, smart constructors, or invariants.
 
+Do not add production branches, exports, flags, or behavior solely for tests. Add a
+dependency seam only when it also represents a real ownership or variability
+boundary; otherwise test through the existing public seam or a faithful inert
+harness.
+
+When inference is public behavior, add compile-time tests that exercise ordinary
+call-site inference without rescue annotations or casts. Assert the inferred success
+and expected-failure types so a widening regression actually fails the test.
+
 ## TypeScript style and safety
 
 Use strict TypeScript settings where practical:
@@ -557,6 +589,12 @@ type CreateUserInput = {
 ```
 
 Mutation is acceptable inside localized imperative shell code, performance-sensitive internals, builders, or adapters when hidden behind a precise interface.
+
+At stable exported seams, give non-trivial operations explicit return types. For a non-trivial public object,
+union, or collection result, prefer a named exported contract over an anonymous
+inferred shape. Derive the contract from the runtime schema when one owns the shape;
+do not duplicate schema and handwritten types that can drift. Local callbacks and
+small private helpers may rely on inference when it remains obvious and precise.
 
 ### Casts, `any`, and non-null assertions
 
@@ -606,6 +644,10 @@ import { PasswordReset } from "./password-reset";
 
 Use `import type` / `export type` for type-only imports and exports.
 
+Use static imports by default. Use dynamic `import()` only for an actual lazy-loading,
+optional-runtime, plugin, or code-splitting boundary; do not use it to obscure a
+dependency cycle or make ordinary dependency timing implicit.
+
 Export only what callers should use. Keep internal helpers unexported unless intentionally shared. Do not export internals just for tests.
 
 Avoid TypeScript `namespace` unless there is a compelling interop reason.
@@ -638,13 +680,19 @@ Tiny ubiquitous generic helpers/types may share one explicit module when no more
 - common `Result` helpers when the project uses neither Effect nor `better-result`
 - broad type utilities
 
-Keep only helpers justified by the target project. Keep domain and application policy with their owning modules.
+Keep only helpers justified by the target project. A second consumer is useful
+evidence but not a prerequisite when the helper's semantics are already genuinely
+generic and stable. Keep domain and application policy with their owning modules.
 
 No arbitrary file-size limits. Prefer cohesion and discoverability over small files for their own sake. Split when a file has multiple unrelated reasons to change or callers must understand unrelated concepts.
 
 ## Comments and JSDoc
 
 Comments should explain invariants, trade-offs, non-obvious domain rules, and safety justifications. Avoid comments that narrate obvious code.
+
+Names, public documentation, UI copy, and rendered errors should use vocabulary
+appropriate to their audience. Do not leak ticket names, migration phases, internal
+storage fields, framework mechanics, or planning language into a public contract.
 
 Every exported symbol from a JavaScript or TypeScript module requires JSDoc. Public methods and properties of an exported class also require JSDoc. Private and otherwise internal code requires documentation only when its complexity warrants it. Put documentation on the original declaration; re-exports do not need duplicate documentation.
 
