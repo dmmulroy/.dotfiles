@@ -1,10 +1,10 @@
 {
   "diffOptions": {
-    "diffStyle": "unified",
+    "diffStyle": "split",
     "defaultDiffType": "since-base",
     "hideWhitespace": true,
     "diffIndicators": "bars",
-    "overflow": "scroll",
+    "overflow": "wrap",
     "lineBgIntensity": "subtle",
     "lineDiffType": "word-alt"
   },
