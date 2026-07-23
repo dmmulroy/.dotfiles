@@ -130,7 +130,7 @@ mouse_scroll_lines = 3
 # Close panes/tabs without prompting.
 confirm_close = false
 prompt_new_tab_name = true
-agent_panel_scope = "all"
+prompt_new_workspace_name = true
 accent = "#c6a0f6"
 
 show_agent_labels_on_pane_borders = false
