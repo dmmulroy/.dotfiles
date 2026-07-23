@@ -1,5 +1,6 @@
 import type { Api, Model, ThinkingLevelMap } from "@earendil-works/pi-ai";
 import {
+	AUTH_ORIGIN,
 	BACKENDS,
 	DEFAULT_ROUTE_HEADERS,
 	DEFAULT_ROUTE_URLS,
@@ -140,18 +141,18 @@ function optionalString(input: unknown, path: string): string | undefined {
 	return value;
 }
 
-function optionalTrustedGatewayUrl(input: unknown, path: string): string | undefined {
+function optionalTrustedUrl(input: unknown, path: string, trustedOrigin: string): string | undefined {
 	const value = optionalString(input, path);
 	if (value === undefined) return undefined;
 	try {
 		const url = new URL(value);
-		if (url.origin !== new URL(GATEWAY_ORIGIN).origin) {
-			throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN}`);
+		if (url.origin !== new URL(trustedOrigin).origin) {
+			throw new GatewayConfigParseError(path, `a URL on ${trustedOrigin}`);
 		}
 		return url.toString().replace(/\/$/, "");
 	} catch (error) {
 		if (Error.isError(error) && error instanceof GatewayConfigParseError) throw error;
-		throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN}`);
+		throw new GatewayConfigParseError(path, `a URL on ${trustedOrigin}`);
 	}
 }
 
@@ -340,7 +341,7 @@ function parseProvider(input: unknown, path: string): GatewayProviderConfig {
 	const record = requireRecord(input, path);
 	const options = optionalRecord(record.options, `${path}.options`);
 	return {
-		baseUrl: optionalTrustedGatewayUrl(options?.baseURL ?? options?.baseUrl, `${path}.options.baseURL`),
+		baseUrl: optionalTrustedUrl(options?.baseURL ?? options?.baseUrl, `${path}.options.baseURL`, GATEWAY_ORIGIN),
 		headers: parseHeaders(options?.headers, `${path}.options.headers`),
 		whitelist: optionalStringArray(record.whitelist, `${path}.whitelist`),
 		blacklist: optionalStringArray(record.blacklist, `${path}.blacklist`),
@@ -400,7 +401,7 @@ export function parseGatewayDocument(input: unknown): Result<GatewayDocument, Ga
 		const nestedConfig = optionalRecord(root.config, "$.config");
 		const config = nestedConfig ?? root;
 		const configPath = nestedConfig ? "$.config" : "$";
-		const remoteUrl = optionalTrustedGatewayUrl(remoteConfig?.url, "$.remote_config.url");
+		const remoteUrl = optionalTrustedUrl(remoteConfig?.url, "$.remote_config.url", AUTH_ORIGIN);
 		return success({
 			authEnv: optionalString(auth?.env, "$.auth.env"),
 			authCommand: parseAuthCommand(auth?.command, "$.auth.command"),

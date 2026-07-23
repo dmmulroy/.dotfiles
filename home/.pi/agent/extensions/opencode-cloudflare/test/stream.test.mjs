@@ -13,7 +13,7 @@ function visibleModel(id, overrides = {}) {
 		name: id,
 		api: "opencode-cloudflare",
 		provider: "opencode.cloudflare.dev",
-		baseUrl: "https://opencode.cloudflare.dev",
+		baseUrl: "https://gateway.opencode.cloudflare.dev",
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -59,7 +59,7 @@ test("OpenAI Responses delegates payload construction and adds route options", a
 		const stream = createHarness({
 			backend: "openai",
 			api: "openai-responses",
-			baseUrl: "https://opencode.cloudflare.dev/openai",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/openai",
 			headers: {},
 			responseVerbosity: "medium",
 			reasoningContext: "all_turns",
@@ -75,7 +75,7 @@ test("OpenAI Responses delegates payload construction and adds route options", a
 		}));
 		assert.equal(result.error, undefined);
 		assert.equal(captured.length, 1);
-		assert.equal(captured[0].url, "https://opencode.cloudflare.dev/openai/responses");
+		assert.equal(captured[0].url, "https://gateway.opencode.cloudflare.dev/openai/responses");
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
 		assert.equal(captured[0].headers.get("cf-access-token"), gatewayToken);
 		assert.equal(captured[0].body.text.verbosity, "medium");
@@ -109,7 +109,7 @@ test("Anthropic uses bearer auth and native adaptive-thinking semantics", async 
 		const stream = createHarness({
 			backend: "anthropic",
 			api: "anthropic-messages",
-			baseUrl: "https://opencode.cloudflare.dev/anthropic",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/anthropic",
 			headers: {},
 			requestModelId: "fixture-adaptive-model",
 			compat: { forceAdaptiveThinking: true },
@@ -122,7 +122,7 @@ test("Anthropic uses bearer auth and native adaptive-thinking semantics", async 
 		assert.equal(result.error, undefined);
 		assert.equal(result.done?.api, "anthropic-messages");
 		assert.equal(result.done?.provider, "opencode.cloudflare.dev");
-		assert.equal(captured[0].url, "https://opencode.cloudflare.dev/anthropic/v1/messages");
+		assert.equal(captured[0].url, "https://gateway.opencode.cloudflare.dev/anthropic/v1/messages");
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
 		assert.equal(captured[0].headers.get("x-api-key"), null);
 		assert.deepEqual(captured[0].body.thinking, { type: "adaptive", display: "summarized" });
@@ -151,7 +151,7 @@ test("Google delegates full conversation and tool conversion while keeping gatew
 		const stream = createHarness({
 			backend: "google",
 			api: "google-generative-ai",
-			baseUrl: "https://opencode.cloudflare.dev/google-ai-studio/v1beta",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/google-ai-studio/v1beta",
 			headers: {},
 		});
 		const context = {
@@ -178,7 +178,7 @@ test("Google delegates full conversation and tool conversion while keeping gatew
 		};
 		const result = await consume(stream(visibleModel("gemini-2.5-flash"), context));
 		assert.equal(result.error, undefined);
-		assert.match(captured[0].url, /google-ai-studio\/v1beta\/models\/gemini-2\.5-flash:streamGenerateContent\?alt=sse/);
+		assert.match(captured[0].url, /^https:\/\/gateway\.opencode\.cloudflare\.dev\/google-ai-studio\/v1beta\/models\/gemini-2\.5-flash:streamGenerateContent\?alt=sse/);
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
 		assert.equal(captured[0].headers.get("cf-access-token"), gatewayToken);
 		assert.equal(captured[0].headers.get("x-goog-api-key"), "gateway-authenticated");
@@ -205,14 +205,14 @@ test("xAI delegates to the OpenAI-compatible streamer through the Grok route", a
 		const stream = createHarness({
 			backend: "xai",
 			api: "openai-completions",
-			baseUrl: "https://opencode.cloudflare.dev/grok",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/grok",
 			headers: {},
 		});
 		const result = await consume(stream(visibleModel("grok-4.5"), {
 			messages: [{ role: "user", content: "Reply", timestamp: 1 }],
 		}));
 		assert.equal(result.error, undefined);
-		assert.equal(captured[0].url, "https://opencode.cloudflare.dev/grok/chat/completions");
+		assert.equal(captured[0].url, "https://gateway.opencode.cloudflare.dev/grok/chat/completions");
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
 		assert.equal(captured[0].headers.get("cf-access-token"), gatewayToken);
 	} finally {
@@ -235,7 +235,7 @@ test("Workers AI delegates to the OpenAI-compatible streamer", async () => {
 		const stream = createHarness({
 			backend: "workers-ai",
 			api: "openai-completions",
-			baseUrl: "https://opencode.cloudflare.dev/compat",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/compat",
 			headers: {},
 			requestModelId: "workers-ai/@cf/example/model",
 			compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: false, maxTokensField: "max_tokens" },
@@ -244,7 +244,7 @@ test("Workers AI delegates to the OpenAI-compatible streamer", async () => {
 			messages: [{ role: "user", content: "Reply", timestamp: 1 }],
 		}));
 		assert.equal(result.error, undefined);
-		assert.equal(captured[0].url, "https://opencode.cloudflare.dev/compat/chat/completions");
+		assert.equal(captured[0].url, "https://gateway.opencode.cloudflare.dev/compat/chat/completions");
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
 	} finally {
 		globalThis.fetch = originalFetch;
@@ -262,7 +262,7 @@ test("structured gateway failures become actionable errors", async () => {
 		const stream = createHarness({
 			backend: "google",
 			api: "google-generative-ai",
-			baseUrl: "https://opencode.cloudflare.dev/google-ai-studio/v1beta",
+			baseUrl: "https://gateway.opencode.cloudflare.dev/google-ai-studio/v1beta",
 			headers: {},
 		});
 		const result = await consume(stream(visibleModel("gemini-2.5-flash"), {

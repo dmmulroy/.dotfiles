@@ -24,7 +24,7 @@
           "claude-opus-4-7-fast"
         ],
         "options": {
-          "baseURL": "https://opencode.cloudflare.dev/anthropic",
+          "baseURL": "https://gateway.opencode.cloudflare.dev/anthropic",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest",
@@ -55,7 +55,7 @@
           "gpt-5.5-fast"
         ],
         "options": {
-          "baseURL": "https://opencode.cloudflare.dev/openai",
+          "baseURL": "https://gateway.opencode.cloudflare.dev/openai",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest"
@@ -81,7 +81,7 @@
       },
       "google": {
         "options": {
-          "baseURL": "https://opencode.cloudflare.dev/google-ai-studio/v1beta",
+          "baseURL": "https://gateway.opencode.cloudflare.dev/google-ai-studio/v1beta",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest"
@@ -90,7 +90,7 @@
       },
       "xai": {
         "options": {
-          "baseURL": "https://opencode.cloudflare.dev/grok",
+          "baseURL": "https://gateway.opencode.cloudflare.dev/grok",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest"
@@ -107,7 +107,7 @@
           "@cf/zai-org/glm-5.1"
         ],
         "options": {
-          "baseURL": "https://opencode.cloudflare.dev/compat",
+          "baseURL": "https://gateway.opencode.cloudflare.dev/compat",
           "headers": {
             "cf-access-token": "{env:TOKEN}",
             "X-Requested-With": "xmlhttprequest"

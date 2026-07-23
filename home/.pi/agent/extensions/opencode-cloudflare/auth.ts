@@ -6,9 +6,9 @@ import type { OAuthCredential, OAuthCredentials, OAuthLoginCallbacks } from "@ea
 import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 import type { GatewayConfigStore } from "./config-store.ts";
 import {
+	AUTH_ORIGIN,
 	DEFAULT_TOKEN_EXPIRY_MS,
 	EXPIRY_SAFETY_BUFFER_MS,
-	GATEWAY_ORIGIN,
 	OPENCODE_AUTH_FILE_ENV,
 	PROVIDER_ID,
 	TOKEN_ENV_OVERRIDE,
@@ -141,7 +141,7 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 
 function isAllowedGatewayOrigin(input: string): boolean {
 	try {
-		return new URL(input).origin === new URL(GATEWAY_ORIGIN).origin;
+		return new URL(input).origin === new URL(AUTH_ORIGIN).origin;
 	} catch {
 		return false;
 	}
@@ -253,7 +253,7 @@ export function validateGatewayAuthCommand(
 		return failure(new GatewayAuthError("untrusted-auth-command", `Refusing unexpected gateway auth command from ${WELL_KNOWN_URL}`));
 	}
 	if (!getTrustedGatewayApp(command)) {
-		return failure(new GatewayAuthError("untrusted-auth-command", `Refusing gateway auth command without exactly one trusted -app=${GATEWAY_ORIGIN} target`));
+		return failure(new GatewayAuthError("untrusted-auth-command", `Refusing gateway auth command without exactly one trusted -app=${AUTH_ORIGIN} target`));
 	}
 	return success([executable, ...command.slice(1)]);
 }
@@ -344,7 +344,7 @@ export function createGatewayTokenSource(dependencies: GatewayTokenSourceDepende
 		return Array.from(candidates);
 	};
 	const findAuthPath = (): string | undefined => listAuthCandidates().find((candidate) => dependencies.fileExists(candidate));
-	const readImportedToken = (origin = GATEWAY_ORIGIN): Result<ImportedGatewayToken | undefined, GatewayAuthError> => {
+	const readImportedToken = (origin = AUTH_ORIGIN): Result<ImportedGatewayToken | undefined, GatewayAuthError> => {
 		if (!isAllowedGatewayOrigin(origin)) {
 			return failure(new GatewayAuthError("untrusted-origin", `Refusing to read auth for untrusted gateway origin: ${origin}`));
 		}
@@ -420,7 +420,7 @@ export function createGatewayAuthService(dependencies: GatewayAuthDependencies):
 			}
 			const config = await dependencies.configStore.load({ forceReload: true, fallbackToDefault: true, signal: callbacks.signal });
 			if (!config.ok) throw config.error;
-			callbacks.onAuth({ url: GATEWAY_ORIGIN, instructions: "Complete the Cloudflare Access login in your browser." });
+			callbacks.onAuth({ url: AUTH_ORIGIN, instructions: "Complete the Cloudflare Access login in your browser." });
 			callbacks.onProgress?.("Running Cloudflare Access login command...");
 			const command = validateGatewayAuthCommand(config.value.authCommand);
 			if (!command.ok) throw command.error;

@@ -13,14 +13,17 @@ export const PROVIDER_NAME = "OpenCode Cloudflare";
 /** Internal Pi API identifier used to dispatch gateway requests. */
 export const CUSTOM_API = "opencode-cloudflare";
 
-/** Trusted gateway origin. */
-export const GATEWAY_ORIGIN = "https://opencode.cloudflare.dev";
+/** Trusted OpenCode authentication and discovery origin. */
+export const AUTH_ORIGIN = "https://opencode.cloudflare.dev";
+
+/** Trusted AI Gateway inference origin. */
+export const GATEWAY_ORIGIN = "https://gateway.opencode.cloudflare.dev";
 
 /** Gateway discovery document path. */
 export const WELL_KNOWN_PATH = "/.well-known/opencode";
 
 /** Gateway discovery document URL. */
-export const WELL_KNOWN_URL = `${GATEWAY_ORIGIN}${WELL_KNOWN_PATH}`;
+export const WELL_KNOWN_URL = `${AUTH_ORIGIN}${WELL_KNOWN_PATH}`;
 
 /** Environment variable overriding the OpenCode auth file path. */
 export const OPENCODE_AUTH_FILE_ENV = "OPENCODE_CLOUDFLARE_AUTH_FILE";

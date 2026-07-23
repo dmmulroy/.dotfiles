@@ -3,7 +3,8 @@
 Pi provider for OpenCode's Cloudflare-hosted gateway:
 
 - provider: `opencode.cloudflare.dev`
-- discovery: `https://opencode.cloudflare.dev/.well-known/opencode`
+- authentication and discovery: `https://opencode.cloudflare.dev`
+- inference: `https://gateway.opencode.cloudflare.dev`
 - backends: Anthropic, OpenAI, Google, xAI, and Workers AI
 
 ## Design
@@ -17,7 +18,7 @@ The extension is an adapter around Pi's native provider implementations:
 5. `stream.ts` resolves a route and delegates protocol behavior to Pi's native Anthropic, OpenAI Responses, Google, or OpenAI-compatible streamer.
 6. `index.ts` is the composition root and command adapter.
 
-There is no module-global runtime cache, import-time I/O, or hand-written substitute for Pi's provider protocols. Every backend uses Pi's native provider conversion while gateway authentication remains isolated in request headers.
+There is no module-global runtime cache, import-time I/O, or hand-written substitute for Pi's provider protocols. Every backend uses Pi's native provider conversion while gateway authentication remains isolated in request headers. Authentication and discovery stay on `opencode.cloudflare.dev`; inference requests use the Access-protected AI Gateway at `gateway.opencode.cloudflare.dev`.
 
 ## Authentication
 
