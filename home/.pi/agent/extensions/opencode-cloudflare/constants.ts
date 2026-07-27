@@ -13,8 +13,11 @@ export const PROVIDER_NAME = "OpenCode Cloudflare";
 /** Internal Pi API identifier used to dispatch gateway requests. */
 export const CUSTOM_API = "opencode-cloudflare";
 
-/** Trusted gateway origin. */
+/** Trusted gateway control-plane origin. */
 export const GATEWAY_ORIGIN = "https://opencode.cloudflare.dev";
+
+/** Trusted gateway API origin. */
+export const GATEWAY_API_ORIGIN = "https://gateway.opencode.cloudflare.dev";
 
 /** Gateway discovery document path. */
 export const WELL_KNOWN_PATH = "/.well-known/opencode";
@@ -42,11 +45,11 @@ export const WELL_KNOWN_CACHE_TTL_MS = 60 * 1000;
 
 /** Backend URLs used when gateway discovery is unavailable. */
 export const DEFAULT_ROUTE_URLS: Readonly<Record<Backend, string>> = {
-	anthropic: `${GATEWAY_ORIGIN}/anthropic`,
-	openai: `${GATEWAY_ORIGIN}/openai`,
-	google: `${GATEWAY_ORIGIN}/google-ai-studio/v1beta`,
-	xai: `${GATEWAY_ORIGIN}/grok`,
-	"workers-ai": `${GATEWAY_ORIGIN}/compat`,
+	anthropic: `${GATEWAY_API_ORIGIN}/anthropic`,
+	openai: `${GATEWAY_API_ORIGIN}/openai`,
+	google: `${GATEWAY_API_ORIGIN}/google-ai-studio/v1beta`,
+	xai: `${GATEWAY_API_ORIGIN}/grok`,
+	"workers-ai": `${GATEWAY_API_ORIGIN}/compat`,
 };
 
 /** Backend headers used when gateway discovery is unavailable. */

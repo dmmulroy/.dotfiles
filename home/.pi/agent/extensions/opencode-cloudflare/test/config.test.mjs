@@ -182,6 +182,19 @@ test("rejects malformed known fields at the configuration boundary", () => {
 	assert.match(parsed.error.message, /broken\.reasoning/);
 });
 
+test("accepts the dedicated gateway API origin", () => {
+	const parsed = parseGatewayDocument({
+		config: {
+			provider: {
+				anthropic: { options: { baseURL: "https://gateway.opencode.cloudflare.dev/anthropic" } },
+			},
+		},
+	});
+	assert.equal(parsed.ok, true);
+	const config = resolveGatewayConfig(parsed.value);
+	assert.equal(config.routes.anthropic.baseUrl, "https://gateway.opencode.cloudflare.dev/anthropic");
+});
+
 test("rejects route URLs that could exfiltrate gateway credentials", () => {
 	const parsed = parseGatewayDocument({
 		config: {
@@ -191,7 +204,7 @@ test("rejects route URLs that could exfiltrate gateway credentials", () => {
 		},
 	});
 	assert.equal(parsed.ok, false);
-	assert.match(parsed.error.message, /a URL on https:\/\/opencode\.cloudflare\.dev/);
+	assert.match(parsed.error.message, /a URL on https:\/\/opencode\.cloudflare\.dev or https:\/\/gateway\.opencode\.cloudflare\.dev/);
 });
 
 test("configuration fetch observes cancellation", async () => {

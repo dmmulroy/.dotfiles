@@ -3,6 +3,7 @@ import {
 	BACKENDS,
 	DEFAULT_ROUTE_HEADERS,
 	DEFAULT_ROUTE_URLS,
+	GATEWAY_API_ORIGIN,
 	GATEWAY_ORIGIN,
 	type Backend,
 } from "./constants.ts";
@@ -145,13 +146,14 @@ function optionalTrustedGatewayUrl(input: unknown, path: string): string | undef
 	if (value === undefined) return undefined;
 	try {
 		const url = new URL(value);
-		if (url.origin !== new URL(GATEWAY_ORIGIN).origin) {
-			throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN}`);
+		const trustedOrigins = new Set([GATEWAY_ORIGIN, GATEWAY_API_ORIGIN]);
+		if (!trustedOrigins.has(url.origin)) {
+			throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN} or ${GATEWAY_API_ORIGIN}`);
 		}
 		return url.toString().replace(/\/$/, "");
 	} catch (error) {
 		if (Error.isError(error) && error instanceof GatewayConfigParseError) throw error;
-		throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN}`);
+		throw new GatewayConfigParseError(path, `a URL on ${GATEWAY_ORIGIN} or ${GATEWAY_API_ORIGIN}`);
 	}
 }
 
