@@ -1,98 +1,335 @@
 # Herdr configuration
-# Managed in ~/.dotfiles and stowed to ~/.config/herdr/config.toml
-# Terminal-native workspace/tab/pane manager.
+# Managed in ~/.dotfiles and stowed to ~/.config/herdr/config.toml.
+# Full reference: https://herdr.dev/docs/config-reference/
+#
+# Active values differ from Herdr's defaults. Default or unset values remain
+# commented so this file also serves as a complete configuration reference.
 
+# Show first-run setup on startup. Missing or true shows onboarding.
+# Default: unset.
 onboarding = false
 
-[terminal]
-# Use Fish while preserving macOS login shell behavior.
-default_shell = "fish"
-shell_mode = "auto"
-# New panes and tabs start in the current pane's directory.
-new_cwd = "follow"
+# -----------------------------------------------------------------------------
+# Theme
+# -----------------------------------------------------------------------------
 
 [theme]
-name = "catppuccin"
+# Built-in theme name. Available themes include catppuccin, terminal,
+# tokyo-night, dracula, nord, gruvbox, one-dark, solarized, kanagawa,
+# rose-pine, and vesper.
+# Default: "catppuccin".
+# name = "catppuccin"
+
+# Follow the host terminal's light/dark appearance and switch themes.
+# Default: false.
+# auto_switch = false
+
+# Theme used when auto_switch selects a dark appearance.
+# Default: unset; Herdr uses the configured theme's dark sibling if available.
+# dark_name = "catppuccin"
+
+# Theme used when auto_switch selects a light appearance.
+# Default: unset; Herdr uses the configured theme's light sibling if available.
+# light_name = "catppuccin-latte"
 
 [theme.custom]
-# Catppuccin Macchiato-inspired overrides.
-panel_bg = "#24273a"
+# Override individual tokens from the base theme. Colors accept #rrggbb, named
+# colors, rgb(r,g,b), or reset aliases such as reset, default, none, and
+# transparent. Every custom token defaults to unset.
+
+# Highlight and selection accent.
 accent = "#c6a0f6"
-blue = "#8aadf4"
+# Sidebar and panel background.
+panel_bg = "#24273a"
+# Lowest elevated surface color.
+# surface0 = "#363a4f"
+# Higher elevated surface color.
+# surface1 = "#494d64"
+# Dimmed surface color.
+# surface_dim = "#1e2030"
+# Lowest overlay color.
+# overlay0 = "#6e738d"
+# Higher overlay color.
+# overlay1 = "#8087a2"
+# Primary foreground text.
+# text = "#cad3f5"
+# Secondary foreground text.
+# subtext0 = "#a5adcb"
+# Mauve semantic color.
+# mauve = "#c6a0f6"
+# Green semantic color.
 green = "#a6da95"
-red = "#ed8796"
+# Yellow semantic color.
 yellow = "#eed49f"
+# Red semantic color.
+red = "#ed8796"
+# Blue semantic color.
+blue = "#8aadf4"
+# Teal semantic color.
+# teal = "#8bd5ca"
+# Peach semantic color.
+# peach = "#f5a97f"
+
+# -----------------------------------------------------------------------------
+# Terminal
+# -----------------------------------------------------------------------------
+
+[terminal]
+# Executable used for new interactive panes. Empty uses $SHELL, then /bin/sh.
+# Default: "".
+default_shell = "fish"
+
+# New-shell startup mode: "auto", "login", or "non_login". Auto uses login
+# shells on macOS and non-login behavior elsewhere.
+# Default: "auto".
+# shell_mode = "auto"
+
+# CWD policy for new panes, tabs, and workspaces: "follow", "home", "current",
+# or a fixed path. Explicit --cwd values take precedence.
+# Default: "follow".
+# new_cwd = "follow"
+
+# -----------------------------------------------------------------------------
+# Updates
+# -----------------------------------------------------------------------------
 
 [update]
-channel = "stable"
+# Release channel used by background checks and `herdr update`: "stable" or
+# "preview". Homebrew, mise, and Nix installs ignore the preview channel.
+# Default: "stable" on Linux/macOS and "preview" on Windows.
+# channel = "stable"
+
+# Check herdr.dev for new Herdr versions in the background.
+# Default: true.
+# version_check = true
+
+# Check herdr.dev for remote agent-detection manifest updates. Bundled
+# manifests and local overrides still apply when this is disabled.
+# Default: true.
+# manifest_check = true
+
+# -----------------------------------------------------------------------------
+# Keybindings
+# -----------------------------------------------------------------------------
 
 [keys]
-# Prefix: C-;
+# Prefix key used to enter prefix mode.
+# Default: "ctrl+b".
 prefix = "ctrl+semicolon"
 
-# Basics.
-help = "prefix+?"
-# Keep prefix+s available for workspace picking.
-settings = "prefix+shift+s"
-detach = ["prefix+d", "prefix+q"]
-reload_config = "prefix+r"
-goto = "prefix+g"
+# Open keybinding help.
+# Default: "prefix+?".
+# help = "prefix+?"
 
-# Workspace controls:
-#   prefix+s       choose workspace
-#   prefix+w       also open workspace navigation (Herdr default muscle memory)
-#   prefix+shift+w rename workspace (avoids symbol-layer gymnastics)
-#   prefix+( / )   previous / next workspace
+# Open settings.
+# Default: "prefix+s".
+settings = "prefix+shift+s"
+
+# Create a workspace.
+# Default: "prefix+shift+n".
+# new_workspace = "prefix+shift+n"
+
+# Create a Git worktree from the selected workspace.
+# Default: "prefix+shift+g".
+# new_worktree = "prefix+shift+g"
+
+# Open an existing Git worktree from the selected workspace.
+# Default: unset.
+# open_worktree = ""
+
+# Delete the selected managed worktree checkout after confirmation.
+# Default: unset.
+# remove_worktree = ""
+
+# Rename the selected workspace.
+# Default: "prefix+shift+w".
+# rename_workspace = "prefix+shift+w"
+
+# Close the selected workspace.
+# Default: "prefix+shift+d".
+# close_workspace = "prefix+shift+d"
+
+# Open workspace navigation. An array gives one action multiple shortcuts.
+# Default: "prefix+w".
 workspace_picker = ["prefix+s", "prefix+w"]
-new_workspace = "prefix+shift+n"
-rename_workspace = "prefix+shift+w"
-close_workspace = "prefix+shift+d"
+
+# Open the session navigator.
+# Default: "prefix+g".
+# goto = "prefix+g"
+
+# Move workspace selection up in navigate mode.
+# Default: "up".
+# navigate_workspace_up = "up"
+
+# Move workspace selection down in navigate mode.
+# Default: "down".
+# navigate_workspace_down = "down"
+
+# Focus the pane to the left in navigate mode; Left is always an alias.
+# Default: "h".
+# navigate_pane_left = "h"
+
+# Focus the pane below in navigate mode.
+# Default: "j".
+# navigate_pane_down = "j"
+
+# Focus the pane above in navigate mode.
+# Default: "k".
+# navigate_pane_up = "k"
+
+# Focus the pane to the right in navigate mode; Right is always an alias.
+# Default: "l".
+# navigate_pane_right = "l"
+
+# Detach from server/client mode, or exit --no-session mode.
+# Default: "prefix+q".
+detach = ["prefix+d", "prefix+q"]
+
+# Reload config.toml in the running app/server.
+# Default: "prefix+shift+r".
+reload_config = "prefix+r"
+
+# Focus the target of the currently visible notification.
+# Default: "prefix+o".
+# open_notification_target = "prefix+o"
+
+# Select the previous workspace.
+# Default: unset.
 previous_workspace = "prefix+("
+
+# Select the next workspace.
+# Default: unset.
 next_workspace = "prefix+)"
 
-# agents
+# Focus the previous agent shown in the Agent panel.
+# Default: unset.
+# previous_agent = ""
+
+# Focus the next agent shown in the Agent panel.
+# Default: unset.
+# next_agent = ""
+
+# Focus Agent panel entries by index 1-9.
+# Default: unset.
 focus_agent = "prefix+alt+1..9"
 
+# Local-client shortcut that sends a clipboard image to a remote Herdr session.
+# Empty disables raw-key remote image paste.
+# Default: "ctrl+v".
+# remote_image_paste = "ctrl+v"
 
-# Tab controls.
-new_tab = "prefix+c"
-previous_tab = "prefix+p"
-next_tab = "prefix+n"
-switch_tab = "prefix+1..9"
+# Create a tab in the active workspace.
+# Default: "prefix+c".
+# new_tab = "prefix+c"
+
+# Rename the active tab.
+# Default: "prefix+shift+t".
 rename_tab = "prefix+comma"
-close_tab = "prefix+shift+x"
 
-# Pane creation:
-#   prefix+\     split right
-#   prefix+Enter split down
-split_vertical = "prefix+backslash"
-split_horizontal = "prefix+enter"
-close_pane = "prefix+x"
-zoom = "prefix+m"
+# Select the previous tab.
+# Default: "prefix+p".
+# previous_tab = "prefix+p"
+
+# Select the next tab.
+# Default: "prefix+n".
+# next_tab = "prefix+n"
+
+# Switch to tab 1-9.
+# Default: "prefix+1..9".
+# switch_tab = "prefix+1..9"
+
+# Switch to workspace 1-9 from prefix mode.
+# Default: unset.
+# switch_workspace = ""
+
+# Close the active tab.
+# Default: "prefix+shift+x".
+# close_tab = "prefix+shift+x"
+
+# Rename the focused pane.
+# Default: "prefix+shift+p".
+# rename_pane = "prefix+shift+p"
+
+# Open the focused pane's scrollback in $EDITOR.
+# Default: "prefix+e".
+# edit_scrollback = "prefix+e"
+
+# Enter keyboard copy mode for the focused pane.
+# Default: "prefix+[".
 copy_mode = "prefix+v"
 
-# Pane resize mode.
+# Focus the pane to the left.
+# Default: "prefix+h".
+# focus_pane_left = "prefix+h"
+
+# Focus the pane below.
+# Default: "prefix+j".
+# focus_pane_down = "prefix+j"
+
+# Focus the pane above.
+# Default: "prefix+k".
+# focus_pane_up = "prefix+k"
+
+# Focus the pane to the right.
+# Default: "prefix+l".
+# focus_pane_right = "prefix+l"
+
+# Swap the focused pane with the pane to the left.
+# Default: "prefix+shift+h".
+# swap_pane_left = "prefix+shift+h"
+
+# Swap the focused pane with the pane below.
+# Default: "prefix+shift+j".
+# swap_pane_down = "prefix+shift+j"
+
+# Swap the focused pane with the pane above.
+# Default: "prefix+shift+k".
+# swap_pane_up = "prefix+shift+k"
+
+# Swap the focused pane with the pane to the right.
+# Default: "prefix+shift+l".
+# swap_pane_right = "prefix+shift+l"
+
+# Cycle to the next pane.
+# Default: "prefix+tab".
+# cycle_pane_next = "prefix+tab"
+
+# Cycle to the previous pane.
+# Default: "prefix+shift+tab".
+# cycle_pane_previous = "prefix+shift+tab"
+
+# Focus the last-focused pane across workspaces and tabs.
+# Default: unset.
+# last_pane = ""
+
+# Split the focused pane vertically (side by side / split right).
+# Default: "prefix+v".
+split_vertical = "prefix+backslash"
+
+# Split the focused pane horizontally (stacked / split down).
+# Default: "prefix+minus".
+split_horizontal = "prefix+enter"
+
+# Close the focused pane.
+# Default: "prefix+x".
+# close_pane = "prefix+x"
+
+# Toggle zoom for the focused pane. `fullscreen` is accepted as a legacy alias.
+# Default: "prefix+z".
+zoom = "prefix+m"
+
+# Enter pane resize mode.
+# Default: "prefix+r".
 resize_mode = "prefix+shift+r"
 
-# Pane navigation; Vim/Neovim-aware navigation owns the direct chords.
-# Prefix bindings remain available as an escape hatch from any pane.
-focus_pane_left = "prefix+h"
-focus_pane_down = "prefix+j"
-focus_pane_up = "prefix+k"
-focus_pane_right = "prefix+l"
-cycle_pane_next = "prefix+tab"
-cycle_pane_previous = "prefix+shift+tab"
+# Toggle sidebar collapse.
+# Default: "prefix+b".
+# toggle_sidebar = "prefix+b"
 
-# Keep Herdr's dashboard/sidebar available, but not on prefix+b since C-b is not the prefix here.
-toggle_sidebar = "prefix+b"
-
-# Navigate-mode movement.
-navigate_workspace_up = "up"
-navigate_workspace_down = "down"
-navigate_pane_left = "h"
-navigate_pane_down = "j"
-navigate_pane_up = "k"
-navigate_pane_right = "l"
+# Custom commands use the normal binding syntax. Types are `shell` for a
+# detached process, `pane` for a temporary pane, `popup` for a modal terminal,
+# and `plugin_action` for an installed plugin action. Popup commands may also
+# specify width and height in cells or percentages.
 
 # vim-herdr-navigation forwards these chords into Vim/Neovim when focused;
 # otherwise it focuses the adjacent Herdr pane.
@@ -120,50 +357,318 @@ type = "plugin_action"
 command = "vim-herdr-navigation.right"
 description = "Navigate right (Vim/Herdr)"
 
+# Legacy indexed shortcuts are parsed for compatibility. Prefer switch_tab,
+# switch_workspace, and focus_agent in new configurations.
+# [keys.indexed]
+# Modifier combo making 1-9 switch tabs directly.
+# Default: unset.
+# tabs = ""
+# Modifier combo making 1-9 switch workspaces directly.
+# Default: unset.
+# workspaces = ""
+# Modifier combo making 1-9 focus Agent panel entries directly.
+# Default: unset.
+# agents = ""
+
+# -----------------------------------------------------------------------------
+# Worktrees
+# -----------------------------------------------------------------------------
+
+# [worktrees]
+# Root directory for <repo>/<branch-slug> worktree checkouts. Relative paths
+# are resolved when Herdr applies the config.
+# Default: "~/.herdr/worktrees".
+# directory = "~/.herdr/worktrees"
+
+# -----------------------------------------------------------------------------
+# UI and sidebar
+# -----------------------------------------------------------------------------
+
 [ui]
+# Default expanded sidebar width in columns; auto-scales for workspace names.
+# Default: 26.
 sidebar_width = 32
-sidebar_min_width = 18
-sidebar_max_width = 36
-mouse_capture = true
+
+# Minimum expanded sidebar width in columns.
+# Default: 18.
+# sidebar_min_width = 18
+
+# Maximum expanded sidebar width in columns.
+# Default: 36.
+# sidebar_max_width = 36
+
+# Start Herdr with the sidebar collapsed; takes effect on the next launch.
+# Default: false.
+# sidebar_start_collapsed = false
+
+# Collapsed sidebar presentation: "compact" keeps the status rail and "hidden"
+# uses zero width.
+# Default: "compact".
+# sidebar_collapsed_mode = "compact"
+
+# Width at or below which Herdr uses its mobile single-column layout.
+# Default: 64.
+# mobile_width_threshold = 64
+
+# Capture mouse input for Herdr's mouse UI. Pane apps that request mouse input
+# can still receive it.
+# Default: true.
+# mouse_capture = true
+
+# Copy text selected by mouse drag. Double-click still copies a word when off.
+# Default: true.
+# copy_on_select = true
+
+# Host cursor policy: "auto", "native", or "drawn". Auto uses a drawn cursor
+# on native Windows/WSL and the terminal's native cursor elsewhere.
+# Default: "auto".
+# host_cursor = "auto"
+
+# Modifier that passes right-click gestures through to pane apps. Accepts ctrl,
+# alt, cmd, super, meta, hyper, or + combinations; shift is unsupported.
+# Empty disables passthrough.
+# Default: "".
 right_click_passthrough_modifier = "ctrl"
-mouse_scroll_lines = 3
-# Close panes/tabs without prompting.
+
+# Force a full host-terminal redraw when the outer terminal regains focus.
+# Disabling may reduce flashing but leave rare corruption until the next redraw.
+# Default: true.
+# redraw_on_focus_gained = true
+
+# Scrollback lines moved per mouse-wheel notch.
+# Default: 3.
+# mouse_scroll_lines = 3
+
+# Ask for confirmation before closing a workspace.
+# Default: true.
 confirm_close = false
-prompt_new_tab_name = true
+
+# Ask for a name before creating a tab.
+# Default: true.
+# prompt_new_tab_name = true
+
+# Ask for a name before interactively creating a workspace.
+# Default: false.
 prompt_new_workspace_name = true
+
+# Draw borders around split panes.
+# Default: true.
+# pane_borders = true
+
+# Visually separate split panes instead of sharing divider borders.
+# Default: true.
+# pane_gaps = true
+
+# Show detected Agent labels in pane borders when no manual label is set.
+# Default: false.
+# show_agent_labels_on_pane_borders = false
+
+# Hide the tab row when the workspace has exactly one tab.
+# Default: false.
+# hide_tab_bar_when_single_tab = false
+
+# Agent sidebar ordering: "spaces" groups by workspace; "priority" creates an
+# attention queue. "workspaces" is accepted as an alias for "spaces".
+# Default: "spaces".
+# agent_panel_sort = "spaces"
+
+# Accent color for highlights, borders, and navigation UI. Accepts #rrggbb,
+# named colors, or rgb(r,g,b).
+# Default: "cyan".
 accent = "#c6a0f6"
 
-show_agent_labels_on_pane_borders = false
-agent_panel_sort = "spaces"
+[ui.sidebar.agents]
+# Blank rows between expanded Agent entries. At most 16 rows and 16 tokens per
+# row. Consecutive indented worktree children remain packed together.
+# Default: 0.
+# row_gap = 0
+
+# Expanded Agent layout. Built-in tokens: state_icon, state_text, workspace,
+# tab, pane, agent, terminal_title, and terminal_title_stripped. `$name` reads
+# custom pane metadata. A token can be styled with an inline table such as
+# { token = "workspace", fg = "#89b4fa", bold = true, dim = false }.
+# Default: [["state_icon", "workspace", "tab"], ["agent"]].
+# rows = [["state_icon", "workspace", "tab"], ["agent"]]
+
+# Complete Agent-row overrides keyed by strict canonical Agent ID. Agents
+# without an override use ui.sidebar.agents.rows.
+# Default: {}.
+# [ui.sidebar.agents.rows_by_agent]
+# claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"], ["agent"]]
+
+[ui.sidebar.spaces]
+# Blank rows between expanded Space entries. Consecutive indented worktree
+# children remain packed as one group.
+# Default: 0.
+# row_gap = 0
+
+# Expanded Space layout. Built-in tokens: state_icon, state_text, workspace,
+# branch, and git_status. `$name` reads custom workspace metadata. Inline token
+# style tables support fg, bold, and dim.
+# Default: [["state_icon", "workspace"], ["branch", "git_status"]].
+# rows = [["state_icon", "workspace"], ["branch", "git_status"]]
+
+# -----------------------------------------------------------------------------
+# Notifications
+# -----------------------------------------------------------------------------
+
 [ui.toast]
+# Popup delivery: "off", in-app "herdr", outer-terminal "terminal", or direct
+# OS "system" notifications.
+# Default: "off".
 delivery = "herdr"
-delay_seconds = 1
+
+# Delay before finished or needs-input Agent notifications. Herdr sends only if
+# the pane remains in that state. Valid range: 0-3600 seconds.
+# Default: 1.
+# delay_seconds = 1
 
 [ui.toast.herdr]
+# In-app toast position: top-left, top-right, bottom-left, or bottom-right.
+# Default: "bottom-right".
 position = "top-right"
 
 [ui.toast.clipboard]
-enabled = true
-position = "bottom-center"
+# Show the copied-to-clipboard popup after mouse copy.
+# Default: true.
+# enabled = true
+
+# Clipboard popup position: top-left, top-center, top-right, bottom-left,
+# bottom-center, or bottom-right.
+# Default: "bottom-center".
+# position = "bottom-center"
+
+# -----------------------------------------------------------------------------
+# Sound
+# -----------------------------------------------------------------------------
 
 [ui.sound]
-# Keep sound notifications disabled.
+# Play sounds when Agents change state in background workspaces.
+# Default: true.
 enabled = false
 
+# MP3 used for every notification sound. Relative paths resolve from this file.
+# Default: unset.
+# path = "sounds/notification.mp3"
+
+# MP3 overriding only finished notifications.
+# Default: unset.
+# done_path = "sounds/done.mp3"
+
+# MP3 overriding only needs-input notifications.
+# Default: unset.
+# request_path = "sounds/request.mp3"
+
+# Per-Agent sound policy: "default", "on", or "off". These keys use strict
+# canonical Agent IDs.
+# [ui.sound.agents]
+# Pi. Default: "default".
+# pi = "default"
+# Claude Code. Default: "default".
+# claude = "default"
+# Codex. Default: "default".
+# codex = "default"
+# Gemini CLI. Default: "default".
+# gemini = "default"
+# Cursor Agent CLI. Default: "default".
+# cursor = "default"
+# Devin. Default: "default".
+# devin = "default"
+# Agy. Default: "default".
+# agy = "default"
+# Cline. Default: "default".
+# cline = "default"
+# OpenCode. Default: "default".
+# open_code = "default"
+# GitHub Copilot CLI. Default: "default".
+# github_copilot = "default"
+# Kimi Code CLI. Default: "default".
+# kimi = "default"
+# Kiro. Default: "default".
+# kiro = "default"
+# Droid is muted by default.
+# droid = "off"
+# Amp. Default: "default".
+# amp = "default"
+# Grok CLI. Default: "default".
+# grok = "default"
+# Hermes Agent. Default: "default".
+# hermes = "default"
+# Kilo Code CLI. Default: "default".
+# kilo = "default"
+# Qoder CLI. Default: "default".
+# qodercli = "default"
+# Maki. Default: "default".
+# maki = "default"
+
+# -----------------------------------------------------------------------------
+# Session restore
+# -----------------------------------------------------------------------------
+
 [session]
-# Resume supported coding agents when restoring sessions.
-resume_agents_on_restore = true
+# Resume supported AI-Agent panes into native conversations after restoring a
+# Herdr session. Requires an integration that reports native session refs.
+# Default: true.
+# resume_agents_on_restore = true
+
+# -----------------------------------------------------------------------------
+# Remote attach
+# -----------------------------------------------------------------------------
 
 [remote]
-manage_ssh_config = true
+# Add keepalive fallbacks and private connection reuse for `herdr --remote`.
+# False runs plain ssh using the user's SSH configuration unchanged.
+# Default: true.
+# manage_ssh_config = true
 
-[experimental]
-# Persist recent pane output to disk.
-# This persists recent pane output to disk; keep in mind it may include secrets.
-pane_history = true
-allow_nested = false
-kitty_graphics = true
+# -----------------------------------------------------------------------------
+# Advanced
+# -----------------------------------------------------------------------------
 
 [advanced]
-# Scrollback limit is byte-based.
+# Maximum scrollback bytes retained per pane terminal. `scrollback_lines` is
+# accepted as a legacy alias.
+# Default: 10000000.
 scrollback_limit_bytes = 52428800
+
+# -----------------------------------------------------------------------------
+# Experimental
+# -----------------------------------------------------------------------------
+
+[experimental]
+# Allow launching Herdr inside an existing Herdr pane.
+# Default: false.
+# allow_nested = false
+
+# Render local Kitty graphics for attached clients. Requires a compatible outer
+# terminal and remains experimental.
+# Default: false.
+kitty_graphics = true
+
+# Persist recent pane screen history to session-history.json. Saved output may
+# contain secrets.
+# Default: false.
+pane_history = true
+
+# Reveal a focused pane's hidden cursor anchor so macOS CJK input-method
+# candidate windows track TUIs that draw their own cursor. This may expose an
+# extra hardware cursor in apps that hide it without drawing a replacement.
+# Default: false.
+# reveal_hidden_cursor_for_cjk_ime = false
+
+# Limit hidden-cursor reveal to detected Agents (case-insensitive). Empty means
+# any focused pane. Accepted names: pi, claude, codex, gemini, cursor, devin,
+# cline, opencode, copilot, kimi, kiro, droid, amp, grok, hermes, kilo,
+# qodercli, qoder, and maki.
+# Default: [].
+# cjk_ime_agents = []
+
+# IME anchor cursor shape: block, steady_block, underline, steady_underline,
+# bar, or steady_bar.
+# Default: "steady_block".
+# cjk_ime_cursor_shape = "steady_block"
+
+# Temporarily switch macOS to an ASCII-capable input source while prefix mode
+# is active, then restore the previous source. No-op on other platforms.
+# Default: false.
+# switch_ascii_input_source_in_prefix = false
