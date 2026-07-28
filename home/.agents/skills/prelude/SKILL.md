@@ -1,7 +1,6 @@
 ---
 name: prelude
 description: Prelude bootstrapping for TypeScript. Use when creating or rebuilding a prelude.ts from ambient generic helpers and types.
-disable-model-invocation: true
 ---
 
 # Bootstrap a TypeScript Prelude

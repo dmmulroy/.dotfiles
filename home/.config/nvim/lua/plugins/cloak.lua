@@ -14,6 +14,11 @@ return {
 						cloak_pattern = "=.+",
 					},
 					{
+						file_pattern = "**/secrets.fish",
+						cloak_pattern = "^(%s*set%s+%-[%w]+%s+[%w_]+%s+).+",
+						replace = "%1",
+					},
+					{
 						file_pattern = "**/*.opencode.json",
 						cloak_pattern = '("apiKey":) .+',
 						replace = "%1 ",

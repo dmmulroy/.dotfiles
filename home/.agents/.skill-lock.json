@@ -131,16 +131,6 @@
       "installedAt": "2026-07-15T16:15:09.858Z",
       "updatedAt": "2026-07-15T16:15:09.858Z"
     },
-    "resolving-merge-conflicts": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/resolving-merge-conflicts/SKILL.md",
-      "skillFolderHash": "6aa1ed0b40fac0ebea5c0cf6f2addf82c99b6323",
-      "pluginName": "mattpocock-skills",
-      "installedAt": "2026-07-15T16:15:09.859Z",
-      "updatedAt": "2026-07-15T16:15:09.859Z"
-    },
     "setup-matt-pocock-skills": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -186,10 +176,9 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/mattpocock/skills.git",
       "skillPath": "skills/engineering/to-tickets/SKILL.md",
-      "skillFolderHash": "5467d7a37ef365ed43ebe6eb466d6e952be881b8",
-      "pluginName": "mattpocock-skills",
+      "skillFolderHash": "80c1bedbdaa72a4abd524055013accb4fe0ea8c4",
       "installedAt": "2026-07-15T16:15:09.861Z",
-      "updatedAt": "2026-07-15T16:15:09.861Z"
+      "updatedAt": "2026-07-25T16:12:07.729Z"
     },
     "triage": {
       "source": "mattpocock/skills",
@@ -220,6 +209,16 @@
       "pluginName": "mattpocock-skills",
       "installedAt": "2026-07-15T16:15:09.863Z",
       "updatedAt": "2026-07-15T16:15:09.863Z"
+    },
+    "write-discoverable-code": {
+      "source": "modem-dev/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/modem-dev/skills.git",
+      "ref": "main",
+      "skillPath": "write-discoverable-code/SKILL.md",
+      "skillFolderHash": "209109d21718bff6da3ebd65dfee8de582ced0ab",
+      "installedAt": "2026-07-25T16:29:39.293Z",
+      "updatedAt": "2026-07-25T16:29:39.293Z"
     }
   },
   "dismissed": {
