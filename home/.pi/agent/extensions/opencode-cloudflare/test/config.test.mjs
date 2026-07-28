@@ -118,8 +118,12 @@ test("local overlays augment built-in models and preserve typed options", () => 
 						id: "fixture-adaptive-model",
 						name: "Fixture Adaptive Model",
 						reasoning: true,
-						thinkingLevelMap: { xhigh: "xhigh" },
-						compat: { forceAdaptiveThinking: true },
+						thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+						compat: {
+							forceAdaptiveThinking: true,
+							supportsStrictTools: true,
+							supportsToolReferences: true,
+						},
 						limit: { context: 1000000, output: 128000 },
 					},
 				},
@@ -146,6 +150,9 @@ test("local overlays augment built-in models and preserve typed options", () => 
 
 	const adaptive = catalog.value.models.find((model) => model.id === "fixture-adaptive-model");
 	assert.equal(adaptive?.compat?.forceAdaptiveThinking, true);
+	assert.equal(adaptive?.compat?.supportsStrictTools, true);
+	assert.equal(adaptive?.compat?.supportsToolReferences, true);
+	assert.equal(adaptive?.thinkingLevelMap?.max, "max");
 	assert.equal(adaptive?.contextWindow, 1000000);
 	const openaiRoute = catalog.value.routes.get("custom-openai-responses-model");
 	assert.equal(openaiRoute?.backend, "openai");

@@ -105,7 +105,7 @@ const PROVIDER_ALIASES: Readonly<Record<string, Backend>> = {
 	"cloudflare-workers-ai": "workers-ai",
 };
 
-const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 const THINKING_FORMATS = [
 	"openai",
 	"openrouter",
@@ -248,6 +248,8 @@ interface ParsedCompatibility {
 	supportsCacheControlOnTools?: boolean;
 	supportsTemperature?: boolean;
 	forceAdaptiveThinking?: boolean;
+	supportsStrictTools?: boolean;
+	supportsToolReferences?: boolean;
 	allowEmptySignature?: boolean;
 	sendSessionIdHeader?: boolean;
 }
@@ -297,6 +299,8 @@ function parseCompatibility(input: unknown, path: string): Model<Api>["compat"] 
 		supportsCacheControlOnTools: optionalBoolean(record.supportsCacheControlOnTools, `${path}.supportsCacheControlOnTools`),
 		supportsTemperature: optionalBoolean(record.supportsTemperature, `${path}.supportsTemperature`),
 		forceAdaptiveThinking: optionalBoolean(record.forceAdaptiveThinking, `${path}.forceAdaptiveThinking`),
+		supportsStrictTools: optionalBoolean(record.supportsStrictTools, `${path}.supportsStrictTools`),
+		supportsToolReferences: optionalBoolean(record.supportsToolReferences, `${path}.supportsToolReferences`),
 		allowEmptySignature: optionalBoolean(record.allowEmptySignature, `${path}.allowEmptySignature`),
 		sendSessionIdHeader: optionalBoolean(record.sendSessionIdHeader, `${path}.sendSessionIdHeader`),
 	};
