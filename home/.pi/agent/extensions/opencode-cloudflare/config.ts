@@ -479,6 +479,18 @@ function normalizeHeaders(headers: Readonly<Record<string, string>> | undefined,
 	return resolved;
 }
 
+function mergeModelConfigs(
+	gatewayModels: Readonly<Record<string, GatewayModelConfig>>,
+	localModels: Readonly<Record<string, GatewayModelConfig>>,
+): Readonly<Record<string, GatewayModelConfig>> {
+	const models = { ...gatewayModels };
+	for (const [modelId, localModel] of Object.entries(localModels)) {
+		const overrides = Object.fromEntries(Object.entries(localModel).filter(([, value]) => value !== undefined));
+		models[modelId] = { ...gatewayModels[modelId], ...overrides };
+	}
+	return models;
+}
+
 function resolveRoute(
 	backend: Backend,
 	document: GatewayDocument | undefined,
@@ -500,7 +512,7 @@ function resolveRoute(
 	return {
 		baseUrl: localProvider?.baseUrl ?? gatewayProvider?.baseUrl ?? DEFAULT_ROUTE_URLS[backend],
 		headers: normalizeHeaders({ ...gatewayProvider?.headers, ...localProvider?.headers }, backend),
-		models: { ...gatewayModels, ...localModels },
+		models: mergeModelConfigs(gatewayModels, localModels),
 		whitelist,
 		blacklist: localProvider?.blacklist ?? gatewayProvider?.blacklist,
 		hasGatewayModels: Object.keys(gatewayModels).length > 0,

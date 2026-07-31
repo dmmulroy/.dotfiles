@@ -160,6 +160,40 @@ test("local overlays augment built-in models and preserve typed options", () => 
 	assert.equal(openaiRoute?.reasoningContext, "all_turns");
 });
 
+test("partial local model overlays preserve gateway limits", () => {
+	const document = parseGatewayDocument({
+		config: {
+			provider: {
+				"cloudflare-workers-ai": {
+					models: {
+						"@cf/deepseek-ai/deepseek-v4-pro": {
+							limit: { context: 393216, output: 32000 },
+						},
+					},
+				},
+			},
+		},
+	});
+	const overlay = parseGatewayLocalOverlay({
+		provider: {
+			"cloudflare-workers-ai": {
+				models: {
+					"@cf/deepseek-ai/deepseek-v4-pro": {
+						id: "workers-ai/@cf/deepseek-ai/deepseek-v4-pro",
+					},
+				},
+			},
+		},
+	});
+	assert.equal(document.ok, true);
+	assert.equal(overlay.ok, true);
+	const catalog = buildCatalog(resolveGatewayConfig(document.value, overlay.value));
+	assert.equal(catalog.ok, true);
+	const model = catalog.value.models.find((candidate) => candidate.id === "@cf/deepseek-ai/deepseek-v4-pro");
+	assert.equal(model?.contextWindow, 393216);
+	assert.equal(model?.maxTokens, 32000);
+});
+
 test("partial compatibility overrides preserve built-in safety flags", () => {
 	const overlay = parseGatewayLocalOverlay({
 		provider: {
