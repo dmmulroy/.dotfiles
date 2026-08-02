@@ -51,3 +51,9 @@
 
 [includeIf "gitdir:~/Code/work/"]
 	path = "~/.config/git/work_config"
+[credential "https://github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
