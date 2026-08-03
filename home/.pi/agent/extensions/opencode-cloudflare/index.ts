@@ -1,5 +1,9 @@
 import { spawnSync } from "node:child_process";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionCommandContext,
+	ProviderModelConfig,
+} from "@earendil-works/pi-coding-agent";
 import {
 	createProductionGatewayAuthService,
 	createProductionGatewayCredentialReader,
@@ -31,6 +35,48 @@ interface ExtensionServices {
 	readonly auth: GatewayAuthService;
 	readonly catalog: CatalogService;
 	readonly configStore: GatewayConfigStore;
+}
+
+function registerCloudflareProvider(
+	pi: ExtensionAPI,
+	services: ExtensionServices,
+	models: readonly ProviderModelConfig[],
+): void {
+	pi.registerProvider(PROVIDER_ID, {
+		name: PROVIDER_NAME,
+		baseUrl: GATEWAY_ORIGIN,
+		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
+		api: CUSTOM_API,
+		models: [...models],
+		refreshModels: async ({ credential, allowNetwork, force, signal }) => {
+			const authToken = credential?.type === "oauth" ? credential.access : credential?.key;
+			const refreshed = await services.catalog.refresh({
+				forceReload: force === true,
+				allowNetwork,
+				authToken,
+				signal,
+			});
+			if (!refreshed.ok) throw refreshed.error;
+			return [...refreshed.value.models];
+		},
+		oauth: {
+			name: PROVIDER_NAME,
+			login: (callbacks) => services.auth.login(callbacks),
+			refreshToken: (credentials) => services.auth.refresh(credentials),
+			getApiKey: (credentials) => credentials.access,
+		},
+		streamSimple: createGatewayStream(services),
+	});
+}
+
+async function refreshCloudflareProviderCatalog(
+	pi: ExtensionAPI,
+	services: ExtensionServices,
+	signal: AbortSignal,
+): Promise<void> {
+	const refreshed = await services.catalog.refresh({ allowNetwork: true, signal });
+	if (!refreshed.ok || signal.aborted) return;
+	registerCloudflareProvider(pi, services, refreshed.value.models);
 }
 
 function describeStoredCredential(auth: GatewayAuthService): string {
@@ -107,7 +153,7 @@ async function handleDoctor(services: ExtensionServices, ctx: ExtensionCommandCo
  * Register the OpenCode Cloudflare provider and diagnostics commands.
  *
  * @param pi - Pi extension API.
- * @returns Completion after initial gateway discovery and provider registration.
+ * @returns Completion after fallback provider registration.
  */
 export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Promise<void> {
 	const credentialReader = createProductionGatewayCredentialReader();
@@ -118,35 +164,20 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 	});
 	const auth = createProductionGatewayAuthService(configStore, tokenSource, credentialReader);
 	const catalog = createCatalogService(configStore);
-	const initialCatalog = await catalog.refresh({ allowNetwork: true });
+	const initialCatalog = await catalog.refresh({ allowNetwork: false });
 	if (!initialCatalog.ok) throw initialCatalog.error;
 	const services: ExtensionServices = { auth, catalog, configStore };
+	registerCloudflareProvider(pi, services, initialCatalog.value.models);
 
-	pi.registerProvider(PROVIDER_ID, {
-		name: PROVIDER_NAME,
-		baseUrl: GATEWAY_ORIGIN,
-		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
-		api: CUSTOM_API,
-		models: [...initialCatalog.value.models],
-		refreshModels: async ({ credential, allowNetwork, force, signal }) => {
-			const authToken = credential?.type === "oauth" ? credential.access : credential?.key;
-			const refreshed = await catalog.refresh({
-				forceReload: force === true,
-				allowNetwork,
-				authToken,
-				signal,
-			});
-			if (!refreshed.ok) throw refreshed.error;
-			return [...refreshed.value.models];
-		},
-		oauth: {
-			name: PROVIDER_NAME,
-			login: (callbacks) => auth.login(callbacks),
-			refreshToken: (credentials) => auth.refresh(credentials),
-			getApiKey: (credentials) => credentials.access,
-		},
-		streamSimple: createGatewayStream(services),
+	const catalogRefreshController = new AbortController();
+	pi.on("session_start", (_event, ctx) => {
+		void refreshCloudflareProviderCatalog(pi, services, catalogRefreshController.signal).catch(() => {
+			if (!catalogRefreshController.signal.aborted) {
+				ctx.ui.notify("Cloudflare model catalog refresh failed; using fallback models.", "warning");
+			}
+		});
 	});
+	pi.on("session_shutdown", () => catalogRefreshController.abort());
 
 	pi.registerCommand("opencode-cf-status", {
 		description: "Show OpenCode Cloudflare auth and catalog status",
