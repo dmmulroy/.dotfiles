@@ -22,7 +22,7 @@
       },
       "open-computer-use": {
         "type": "local",
-        "command": ["open-computer-use", "mcp"],
+        "command": ["local-codemode-open-computer-use"],
         "enabled": true,
         "timeout": 60000
       }
