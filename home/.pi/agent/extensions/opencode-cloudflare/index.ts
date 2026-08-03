@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import type { Api, Model, ProviderModelsStore } from "@earendil-works/pi-ai";
 import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
@@ -31,10 +32,66 @@ import {
 import { Redacted } from "./redacted.ts";
 import { createGatewayStream } from "./stream.ts";
 
+interface CloudflareModelCache {
+	store?: ProviderModelsStore;
+}
+
 interface ExtensionServices {
 	readonly auth: GatewayAuthService;
 	readonly catalog: CatalogService;
 	readonly configStore: GatewayConfigStore;
+	readonly modelCache: CloudflareModelCache;
+}
+
+function toProviderModelConfig(model: Model<Api>): ProviderModelConfig {
+	return {
+		id: model.id,
+		name: model.name,
+		api: model.api,
+		baseUrl: model.baseUrl,
+		reasoning: model.reasoning,
+		thinkingLevelMap: model.thinkingLevelMap,
+		input: [...model.input],
+		cost: structuredClone(model.cost),
+		contextWindow: model.contextWindow,
+		maxTokens: model.maxTokens,
+		headers: model.headers ? { ...model.headers } : undefined,
+		compat: model.compat ? { ...model.compat } : undefined,
+	};
+}
+
+async function readPersistedCloudflareModels(
+	store: ProviderModelsStore,
+): Promise<readonly ProviderModelConfig[] | undefined> {
+	const stored = await store.read();
+	if (!stored) return undefined;
+	const models = stored.models
+		.filter((model) => model.provider === PROVIDER_ID && model.api === CUSTOM_API)
+		.map(toProviderModelConfig);
+	return models.length > 0 ? models : undefined;
+}
+
+function toPersistedCloudflareModel(model: ProviderModelConfig): Model<Api> {
+	return {
+		...model,
+		api: model.api ?? CUSTOM_API,
+		provider: PROVIDER_ID,
+		baseUrl: model.baseUrl ?? GATEWAY_ORIGIN,
+		input: [...model.input],
+		cost: structuredClone(model.cost),
+		headers: model.headers ? { ...model.headers } : undefined,
+		compat: model.compat ? { ...model.compat } : undefined,
+	};
+}
+
+async function persistCloudflareModels(
+	store: ProviderModelsStore,
+	models: readonly ProviderModelConfig[],
+): Promise<void> {
+	await store.write({
+		models: models.map(toPersistedCloudflareModel),
+		checkedAt: Date.now(),
+	});
 }
 
 function registerCloudflareProvider(
@@ -48,7 +105,12 @@ function registerCloudflareProvider(
 		apiKey: `$${TOKEN_ENV_OVERRIDE}`,
 		api: CUSTOM_API,
 		models: [...models],
-		refreshModels: async ({ credential, allowNetwork, force, signal }) => {
+		refreshModels: async ({ credential, store, allowNetwork, force, signal }) => {
+			services.modelCache.store = store;
+			if (!allowNetwork) {
+				const persistedModels = await readPersistedCloudflareModels(store);
+				if (persistedModels) return [...persistedModels];
+			}
 			const authToken = credential?.type === "oauth" ? credential.access : credential?.key;
 			const refreshed = await services.catalog.refresh({
 				forceReload: force === true,
@@ -57,6 +119,9 @@ function registerCloudflareProvider(
 				signal,
 			});
 			if (!refreshed.ok) throw refreshed.error;
+			if (allowNetwork && !signal?.aborted && services.configStore.status().cacheSource === "live") {
+				await persistCloudflareModels(store, refreshed.value.models);
+			}
 			return [...refreshed.value.models];
 		},
 		oauth: {
@@ -77,6 +142,9 @@ async function refreshCloudflareProviderCatalog(
 	const refreshed = await services.catalog.refresh({ allowNetwork: true, signal });
 	if (!refreshed.ok || signal.aborted) return;
 	registerCloudflareProvider(pi, services, refreshed.value.models);
+	if (services.modelCache.store && services.configStore.status().cacheSource === "live") {
+		await persistCloudflareModels(services.modelCache.store, refreshed.value.models);
+	}
 }
 
 function describeStoredCredential(auth: GatewayAuthService): string {
@@ -166,7 +234,7 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 	const catalog = createCatalogService(configStore);
 	const initialCatalog = await catalog.refresh({ allowNetwork: false });
 	if (!initialCatalog.ok) throw initialCatalog.error;
-	const services: ExtensionServices = { auth, catalog, configStore };
+	const services: ExtensionServices = { auth, catalog, configStore, modelCache: {} };
 	registerCloudflareProvider(pi, services, initialCatalog.value.models);
 
 	if (process.env.PI_OFFLINE === undefined) {
@@ -175,7 +243,7 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 		pi.on("session_start", (_event, ctx) => {
 			pendingCatalogRefresh = refreshCloudflareProviderCatalog(pi, services, catalogRefreshController.signal).catch(() => {
 				if (!catalogRefreshController.signal.aborted) {
-					ctx.ui.notify("Cloudflare model catalog refresh failed; using fallback models.", "warning");
+					ctx.ui.notify("Cloudflare model catalog refresh or cache update failed; using available models.", "warning");
 				}
 			});
 		});

@@ -25,6 +25,21 @@ function createExtensionApiHarness() {
 	};
 }
 
+function createProviderModelsStore(initialEntry) {
+	let entry = initialEntry;
+	return {
+		async read() {
+			return structuredClone(entry);
+		},
+		async write(nextEntry) {
+			entry = structuredClone(nextEntry);
+		},
+		async delete() {
+			entry = undefined;
+		},
+	};
+}
+
 function restoreEnvironment(name, value) {
 	if (value === undefined) delete process.env[name];
 	else process.env[name] = value;
@@ -62,6 +77,8 @@ test("provider startup registers fallback models before refreshing the live cata
 		await registerOpencodeCloudflare(harness.api);
 		assert.equal(fetchCount, 0);
 		assert.equal(harness.providerRegistrations.length, 1);
+		const store = createProviderModelsStore();
+		await harness.providerRegistrations[0].config.refreshModels({ store, allowNetwork: false });
 
 		let resolveLiveRegistration;
 		const liveRegistration = new Promise((resolve) => {
@@ -112,6 +129,115 @@ test("provider startup registers fallback models before refreshing the live cata
 		);
 		assert.equal(refreshedModel?.contextWindow, 393216);
 		assert.equal(refreshedModel?.maxTokens, 32000);
+		const cached = await store.read();
+		const cachedModel = cached?.models.find((candidate) => candidate.id === "@cf/example/model");
+		assert.equal(cachedModel?.contextWindow, 393216);
+		assert.equal(cachedModel?.maxTokens, 32000);
+	} finally {
+		globalThis.fetch = originalFetch;
+		restoreCredentials();
+	}
+});
+
+test("live model refresh persists the discovered catalog", async () => {
+	const restoreCredentials = isolateProductionCredentials();
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => new Response(JSON.stringify({
+		config: {
+			provider: {
+				"cloudflare-workers-ai": {
+					models: {
+						"@cf/example/persisted-model": { limit: { context: 393216, output: 32000 } },
+					},
+				},
+			},
+		},
+	}), { status: 200, headers: { "content-type": "application/json" } });
+	try {
+		const store = createProviderModelsStore();
+		const harness = createExtensionApiHarness();
+		await registerOpencodeCloudflare(harness.api);
+		const refreshModels = harness.providerRegistrations[0].config.refreshModels;
+		await refreshModels({ store, allowNetwork: true });
+
+		const cached = await store.read();
+		const model = cached?.models.find((candidate) => candidate.id === "@cf/example/persisted-model");
+		assert.equal(model?.provider, "opencode.cloudflare.dev");
+		assert.equal(model?.contextWindow, 393216);
+		assert.equal(model?.maxTokens, 32000);
+		assert.equal(typeof cached?.checkedAt, "number");
+	} finally {
+		globalThis.fetch = originalFetch;
+		restoreCredentials();
+	}
+});
+
+test("cache-only model refresh restores a persisted catalog without network access", async () => {
+	const restoreCredentials = isolateProductionCredentials();
+	const originalFetch = globalThis.fetch;
+	let fetchCount = 0;
+	globalThis.fetch = async () => {
+		fetchCount += 1;
+		throw new Error("cache-only refresh must not use the network");
+	};
+	try {
+		const store = createProviderModelsStore({
+			models: [{
+				id: "@cf/example/persisted-model",
+				name: "Persisted Model",
+				api: "opencode-cloudflare",
+				provider: "opencode.cloudflare.dev",
+				baseUrl: "https://gateway.opencode.cloudflare.dev",
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 393216,
+				maxTokens: 32000,
+			}],
+			checkedAt: 123456789,
+		});
+		const harness = createExtensionApiHarness();
+		await registerOpencodeCloudflare(harness.api);
+		const refreshModels = harness.providerRegistrations[0].config.refreshModels;
+		const models = await refreshModels({ store, allowNetwork: false });
+
+		assert.equal(fetchCount, 0);
+		const model = models.find((candidate) => candidate.id === "@cf/example/persisted-model");
+		assert.equal(model?.contextWindow, 393216);
+		assert.equal(model?.maxTokens, 32000);
+	} finally {
+		globalThis.fetch = originalFetch;
+		restoreCredentials();
+	}
+});
+
+test("failed live refresh preserves the last persisted catalog", async () => {
+	const restoreCredentials = isolateProductionCredentials();
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => {
+		throw new Error("gateway unavailable");
+	};
+	try {
+		const persistedModel = {
+			id: "@cf/example/last-known-model",
+			name: "Last Known Model",
+			api: "opencode-cloudflare",
+			provider: "opencode.cloudflare.dev",
+			baseUrl: "https://gateway.opencode.cloudflare.dev",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 393216,
+			maxTokens: 32000,
+		};
+		const store = createProviderModelsStore({ models: [persistedModel], checkedAt: 123456789 });
+		const harness = createExtensionApiHarness();
+		await registerOpencodeCloudflare(harness.api);
+		const refreshModels = harness.providerRegistrations[0].config.refreshModels;
+		await refreshModels({ store, allowNetwork: true });
+
+		const cached = await store.read();
+		assert.deepEqual(cached, { models: [persistedModel], checkedAt: 123456789 });
 	} finally {
 		globalThis.fetch = originalFetch;
 		restoreCredentials();
