@@ -169,15 +169,21 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 	const services: ExtensionServices = { auth, catalog, configStore };
 	registerCloudflareProvider(pi, services, initialCatalog.value.models);
 
-	const catalogRefreshController = new AbortController();
-	pi.on("session_start", (_event, ctx) => {
-		void refreshCloudflareProviderCatalog(pi, services, catalogRefreshController.signal).catch(() => {
-			if (!catalogRefreshController.signal.aborted) {
-				ctx.ui.notify("Cloudflare model catalog refresh failed; using fallback models.", "warning");
-			}
+	if (process.env.PI_OFFLINE === undefined) {
+		const catalogRefreshController = new AbortController();
+		let pendingCatalogRefresh: Promise<void> | undefined;
+		pi.on("session_start", (_event, ctx) => {
+			pendingCatalogRefresh = refreshCloudflareProviderCatalog(pi, services, catalogRefreshController.signal).catch(() => {
+				if (!catalogRefreshController.signal.aborted) {
+					ctx.ui.notify("Cloudflare model catalog refresh failed; using fallback models.", "warning");
+				}
+			});
 		});
-	});
-	pi.on("session_shutdown", () => catalogRefreshController.abort());
+		pi.on("input", async () => {
+			await pendingCatalogRefresh;
+		});
+		pi.on("session_shutdown", () => catalogRefreshController.abort());
+	}
 
 	pi.registerCommand("opencode-cf-status", {
 		description: "Show OpenCode Cloudflare auth and catalog status",
