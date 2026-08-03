@@ -118,7 +118,7 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 	});
 	const auth = createProductionGatewayAuthService(configStore, tokenSource, credentialReader);
 	const catalog = createCatalogService(configStore);
-	const initialCatalog = await catalog.refresh({ allowNetwork: false });
+	const initialCatalog = await catalog.refresh({ allowNetwork: true });
 	if (!initialCatalog.ok) throw initialCatalog.error;
 	const services: ExtensionServices = { auth, catalog, configStore };
 

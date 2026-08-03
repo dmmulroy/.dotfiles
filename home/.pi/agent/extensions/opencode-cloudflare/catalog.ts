@@ -245,7 +245,7 @@ function toProviderModelConfigFromGateway(modelId: string, config: GatewayModelC
 			cacheRead: config.cacheReadCost ?? 0,
 			cacheWrite: config.cacheWriteCost ?? 0,
 		},
-		contextWindow: config.contextWindow ?? 128000,
+		contextWindow: config.contextWindow ?? 222000,
 		maxTokens: config.maxTokens ?? getOptionNumber(config, "max_tokens") ?? 16384,
 		compat: config.compat,
 	};

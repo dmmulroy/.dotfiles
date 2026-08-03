@@ -194,6 +194,25 @@ test("partial local model overlays preserve gateway limits", () => {
 	assert.equal(model?.maxTokens, 32000);
 });
 
+test("models without discovered limits use the fallback context window", () => {
+	const overlay = parseGatewayLocalOverlay({
+		provider: {
+			"cloudflare-workers-ai": {
+				models: {
+					"@cf/example/model": {
+						id: "workers-ai/@cf/example/model",
+					},
+				},
+			},
+		},
+	});
+	assert.equal(overlay.ok, true);
+	const catalog = buildCatalog(resolveGatewayConfig(undefined, overlay.value));
+	assert.equal(catalog.ok, true);
+	const model = catalog.value.models.find((candidate) => candidate.id === "@cf/example/model");
+	assert.equal(model?.contextWindow, 222000);
+});
+
 test("partial compatibility overrides preserve built-in safety flags", () => {
 	const overlay = parseGatewayLocalOverlay({
 		provider: {
