@@ -210,7 +210,7 @@ test("models without discovered limits use the fallback context window", () => {
 	const catalog = buildCatalog(resolveGatewayConfig(undefined, overlay.value));
 	assert.equal(catalog.ok, true);
 	const model = catalog.value.models.find((candidate) => candidate.id === "@cf/example/model");
-	assert.equal(model?.contextWindow, 222000);
+	assert.equal(model?.contextWindow, 128000);
 });
 
 test("partial compatibility overrides preserve built-in safety flags", () => {
