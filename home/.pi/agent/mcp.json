@@ -20,9 +20,12 @@
         },
         "oauth": false
       },
-      "open-computer-use": {
+      "computer": {
         "type": "local",
-        "command": ["local-codemode-open-computer-use"],
+        "command": [
+          "open-computer-use",
+          "mcp"
+        ],
         "enabled": true,
         "timeout": 60000
       }
