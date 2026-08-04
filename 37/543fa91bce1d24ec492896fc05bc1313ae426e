@@ -1,0 +1,25 @@
+home/.pi/agent/extensions/opencode-cloudflare/catalog.ts
+  s_0608c4151f3db8::t_a774c9a430ff0e 407,414
+home/.pi/agent/extensions/opencode-cloudflare/index.ts
+  s_0608c4151f3db8::t_d352de1c8b4230 242
+home/.pi/agent/extensions/opencode-cloudflare/test/config.test.mjs
+  s_0608c4151f3db8::t_b9002194e11c77 234-254
+home/.pi/agent/extensions/opencode-cloudflare/test/index.test.mjs
+  s_0608c4151f3db8::t_6b154f347cde8d 64,78,166,195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "37543fa91bce1d24ec492896fc05bc1313ae426e",
+  "prompts": {},
+  "sessions": {
+    "s_0608c4151f3db8": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019fcbba-099f-76ca-82d7-4d2bc8fdd081",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Alexey Shevchenko <thefelikz@gmail.com>"
+    }
+  }
+}
