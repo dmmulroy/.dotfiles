@@ -2,7 +2,7 @@
 // managed by herdr; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
 // HERDR_INTEGRATION_ID=pi
-// HERDR_INTEGRATION_VERSION=6
+// HERDR_INTEGRATION_VERSION=8
 // @ts-nocheck
 
 import net from "node:net";
@@ -142,29 +142,6 @@ function sendState(state: AgentState, message?: string, seq = nextReportSeq()): 
   });
 }
 
-function releaseAgent(): Promise<void> {
-  return sendRequest({
-    id: `${source}:release:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-    method: "pane.release_agent",
-    params: {
-      pane_id: paneId,
-      source,
-      agent: "pi",
-      seq: nextReportSeq(),
-    },
-  });
-}
-
-function shouldReleaseOnSessionShutdown(event: any): boolean {
-  // Pi tears down and rebinds extension runtimes for internal lifecycle actions
-  // such as /reload, /new, /resume, and /fork. Those do not mean the pane's
-  // agent process has exited, and releasing hook authority there can suppress
-  // legitimate reports from the replacement runtime. Only a user/process quit
-  // should release Herdr's full-lifecycle authority.
-  const reason = event?.reason;
-  return reason === "quit";
-}
-
 let sendInFlight = false;
 let queuedState: QueuedState | undefined;
 
@@ -246,7 +223,9 @@ export default function (pi) {
   });
 
   pi.on("session_start", async (event, ctx) => {
-    if (ctx?.hasUI !== true) {
+    // TUI only: RPC/JSON/print modes are headless (no PTY herdr can display),
+    // and RPC still reports hasUI=true, so mode is the reliable gate.
+    if (ctx?.mode !== "tui") {
       return;
     }
     rootSession = true;
@@ -274,14 +253,5 @@ export default function (pi) {
 
     agentActive = false;
     publishState();
-  });
-
-  pi.on("session_shutdown", async (event) => {
-    if (!rootSession) {
-      return;
-    }
-    if (shouldReleaseOnSessionShutdown(event)) {
-      await releaseAgent();
-    }
   });
 }
