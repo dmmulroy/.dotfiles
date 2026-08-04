@@ -1,0 +1,23 @@
+AGENTS.md
+  s_fdf87092e2eb41::t_47d4b6756a7d79 69
+README.md
+  s_fdf87092e2eb41::t_971bdbed21a924 93
+dot
+  s_fdf87092e2eb41::t_2056f68b90561a 764-790,2156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6b36976879b4dda9e1f53ccdb418873c655fb7ad",
+  "prompts": {},
+  "sessions": {
+    "s_fdf87092e2eb41": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f70e6-32ac-7d26-9f4c-27f39ed0810b",
+        "model": "grok-4.5"
+      },
+      "human_author": "Dillon Mulroy <dillon.mulroy@gmail.com>"
+    }
+  }
+}
