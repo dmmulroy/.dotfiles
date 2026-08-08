@@ -133,7 +133,7 @@ test("Anthropic uses bearer auth and native adaptive-thinking semantics", async 
 	}
 });
 
-test("Google delegates full conversation and tool conversion while keeping gateway auth separate", async () => {
+test("Google delegates conversations while preserving header deletion markers", async () => {
 	const captured = [];
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = async (input, init) => {
@@ -176,11 +176,13 @@ test("Google delegates full conversation and tool conversion while keeping gatew
 				parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
 			}],
 		};
-		const result = await consume(stream(visibleModel("gemini-2.5-flash"), context));
+		const result = await consume(stream(visibleModel("gemini-2.5-flash"), context, {
+			headers: { "cf-access-token": null },
+		}));
 		assert.equal(result.error, undefined);
 		assert.match(captured[0].url, /^https:\/\/gateway\.opencode\.cloudflare\.dev\/google-ai-studio\/v1beta\/models\/gemini-2\.5-flash:streamGenerateContent\?alt=sse/);
 		assert.equal(captured[0].headers.get("authorization"), `Bearer ${gatewayToken}`);
-		assert.equal(captured[0].headers.get("cf-access-token"), gatewayToken);
+		assert.equal(captured[0].headers.get("cf-access-token"), null);
 		assert.equal(captured[0].headers.get("x-goog-api-key"), "gateway-authenticated");
 		assert.equal(captured[0].body.contents.length, 3);
 		assert.equal(captured[0].body.systemInstruction.parts[0].text, "Be concise");

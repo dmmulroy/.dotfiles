@@ -190,12 +190,6 @@ function mergeHeaders(...sources: readonly (ProviderHeaders | Readonly<Record<st
 	return merged;
 }
 
-function mergeStringHeaders(...sources: readonly (ProviderHeaders | undefined)[]): Record<string, string> {
-	return Object.fromEntries(
-		sources.flatMap((source) => Object.entries(source ?? {}).filter((entry): entry is [string, string] => entry[1] !== null)),
-	);
-}
-
 function applyOpenAIResponsesPayloadOptions(
 	payload: unknown,
 	options: { readonly responseVerbosity?: ResponseVerbosity; readonly reasoningContext?: ReasoningContext },
@@ -249,7 +243,7 @@ function createDelegatedStream(
 			return streamSimpleByApi(model, context, {
 				...options,
 				apiKey: GOOGLE_GATEWAY_API_KEY_SENTINEL,
-				headers: mergeStringHeaders(options.headers, { Authorization: `Bearer ${value}` }),
+				headers: mergeHeaders(options.headers, { Authorization: `Bearer ${value}` }),
 			});
 		case "openai":
 			if (!hasApi(model, "openai-responses")) throw new Error("OpenAI route produced an invalid delegated model");

@@ -129,8 +129,8 @@ export interface GatewayAuthService {
 	getStoredCredential(): OAuthCredential | undefined;
 	/** Run Pi's OAuth login flow. */
 	login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials>;
-	/** Refresh Pi OAuth credentials from newer OpenCode authentication. */
-	refresh(credentials: OAuthCredentials): Promise<OAuthCredentials>;
+	/** Refresh Pi OAuth credentials from newer OpenCode authentication while honoring cancellation. */
+	refresh(credentials: OAuthCredentials, signal: AbortSignal): Promise<OAuthCredentials>;
 	/** Return whether an explicit environment token is configured. */
 	hasEnvironmentOverride(): boolean;
 }
@@ -429,7 +429,8 @@ export function createGatewayAuthService(dependencies: GatewayAuthDependencies):
 			callbacks.onProgress?.("Cloudflare Access token acquired.");
 			return createGatewayCredentials(token.value, dependencies.now());
 		},
-		async refresh(_credentials) {
+		async refresh(_credentials, signal) {
+			signal.throwIfAborted();
 			const imported = dependencies.tokenSource.readImportedToken();
 			if (!imported.ok) throw imported.error;
 			if (isUsableToken(imported.value?.token, dependencies.now())) {

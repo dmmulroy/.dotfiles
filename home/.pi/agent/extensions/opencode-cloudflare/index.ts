@@ -142,7 +142,7 @@ export default async function registerOpencodeCloudflare(pi: ExtensionAPI): Prom
 		oauth: {
 			name: PROVIDER_NAME,
 			login: (callbacks) => auth.login(callbacks),
-			refreshToken: (credentials) => auth.refresh(credentials),
+			refreshToken: (credentials, signal) => auth.refresh(credentials, signal),
 			getApiKey: (credentials) => credentials.access,
 		},
 		streamSimple: createGatewayStream(services),

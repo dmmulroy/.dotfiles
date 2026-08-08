@@ -1,6 +1,6 @@
 ---
 name: herdr
-description: "Control Herdr, a terminl multiplexer for coding agents. Use Herdr to inspect or control panes, tabs, workspaces, terminals, run commands, and or starting and monitoring background processes like dev servers. Use for subagent when the user or another skills explicitly asks for or requies subagents. Requires HERDR_ENV=1."
+description: "Control Herdr, a terminal multiplexer for coding agents. Use only when the user explicitly mentions Herdr or asks to use Herdr to inspect or control panes, tabs, workspaces, commands, or another agent. Do not use merely because a task could benefit from a background terminal, delegation, or parallel work. Requires HERDR_ENV=1."
 ---
 
 # Herdr

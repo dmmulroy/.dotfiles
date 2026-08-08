@@ -21,8 +21,17 @@ vim.opt.breakindent = true
 vim.opt.incsearch = true
 vim.opt.hlsearch = true
 
--- Disable text wrap
+-- Disable text wrap by default, but enable it for Markdown buffers
 vim.opt.wrap = false
+
+local wrap_group = vim.api.nvim_create_augroup("dmmulroy-filetype-wrap", { clear = true })
+
+vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+	group = wrap_group,
+	callback = function(args)
+		vim.opt_local.wrap = vim.bo[args.buf].filetype == "markdown"
+	end,
+})
 
 -- Set leader key to space
 vim.g.mapleader = " "

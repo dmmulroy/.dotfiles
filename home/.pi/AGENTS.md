@@ -14,16 +14,12 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 ├── agent/
 │   ├── settings.json     # Provider, model, theme, packages, interview config
 │   ├── cloak.json        # Secret masking patterns for agent output
-│   ├── extensions/       # TypeScript extensions (6 packages + 5 standalone)
+│   ├── extensions/       # Local TypeScript extensions
 │   │   ├── opencode-cloudflare/  # Cloudflare gateway provider (auth, catalog, dispatch)
-│   │   ├── web-tools/            # webfetch + websearch tools (Exa provider)
-│   │   ├── pi-mcp/               # MCP adapter with OAuth + panel UI
 │   │   ├── pi-skill-toggle/      # Skill discovery, toggle UI, frontmatter patching
+│   │   ├── save-md/              # Save assistant responses as Markdown
 │   │   ├── pi-cloak/             # Secret cloaking extension
-│   │   ├── todos/                # File-based todo management
-│   │   ├── answer.ts             # Standalone: answer formatting
 │   │   ├── git-interceptor.ts    # Standalone: git command interception
-│   │   ├── update.ts             # Standalone: self-update logic
 │   │   ├── whimsical.ts          # Standalone: whimsical diagram integration
 │   │   └── web-tools.json        # Helium browser profile config
 │   └── skills/           # 15 agent skills (SKILL.md + resources)
@@ -44,8 +40,8 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 | Create standalone extension | `agent/extensions/<name>.ts` |
 | Create skill | `agent/skills/<name>/SKILL.md` |
 | Secret masking | `agent/cloak.json` |
-| Run extension tests | `npm run test:web-tools` (from .pi root) |
-| Type-check | `npm run check` (from .pi root) |
+| Pi Web Tools source | `~/Code/personal/pi-web-tools` |
+| Type-check and test local packages | `npm run check` (from .pi root) |
 
 ## CONVENTIONS
 
@@ -87,7 +83,7 @@ Most of `agent/` is gitignored by default. Tracked files are explicitly un-ignor
 
 ## NOTES
 
-- `web-tools.json` is Helium browser profile config, not extension settings
+- Pi Web Tools is installed from `git:github.com/dmmulroy/pi-web-tools`; `web-tools.json` is only Helium browser profile config
 - opencode-cloudflare supports native pi `/login` + importing existing OpenCode auth
 - Treat model IDs supplied through local `opencode-cloudflare` overlays as private information: never expose them in version-controlled content.
 - pi-skill-toggle has a full UI layer (overlay, render, view-model)

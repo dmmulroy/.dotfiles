@@ -91,9 +91,23 @@ test("expired opaque Pi auth falls back to and refreshes identical imported auth
 	const resolved = auth.resolveToken();
 	assert.equal(resolved.ok, true);
 	assert.equal(Redacted.value(resolved.value), "same-token");
-	const refreshed = await auth.refresh({ refresh: "", access: "same-token", expires: 999 });
+	const refreshed = await auth.refresh(
+		{ refresh: "", access: "same-token", expires: 999 },
+		new AbortController().signal,
+	);
 	assert.equal(refreshed.access, "same-token");
 	assert.ok(refreshed.expires > 1000);
+});
+
+test("OAuth credential refresh honors cancellation", async () => {
+	const auth = createAuth();
+	const controller = new AbortController();
+	controller.abort();
+
+	await assert.rejects(
+		auth.refresh({ refresh: "", access: "expired-token", expires: 999 }, controller.signal),
+		(error) => error === controller.signal.reason,
+	);
 });
 
 test("auth file parsing rejects malformed storage instead of trusting it", () => {

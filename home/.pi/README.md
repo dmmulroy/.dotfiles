@@ -25,8 +25,11 @@ npm run check
 
 Current workspace-managed extensions live under:
 
-- `agent/extensions/web-tools`
-- `agent/extensions/pi-mcp`
+- `agent/extensions/codex-fast-variants`
 - `agent/extensions/opencode-cloudflare`
+- `agent/extensions/pi-skill-toggle`
+- `agent/extensions/save-md`
 
-After changing extension code, reload pi with `/reload`.
+Pi Web Tools is maintained at [dmmulroy/pi-web-tools](https://github.com/dmmulroy/pi-web-tools) and installed through `agent/settings.json` as a Git package.
+
+After changing extension code or package settings, reload pi with `/reload`.
