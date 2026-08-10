@@ -9,6 +9,7 @@ description: |
   language server, so every identifier is a search query and every search miss
   costs wasted reads.
 license: MIT
+disable-model-invocation: true
 ---
 
 # Write discoverable code

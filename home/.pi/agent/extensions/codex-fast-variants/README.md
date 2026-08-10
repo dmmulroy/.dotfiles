@@ -26,7 +26,7 @@ It also sends the official Codex routing hint:
 x-codex-routing-hint: model=<model>;tier=priority
 ```
 
-The selected model ID retains its `-fast` suffix in Pi's standard model display.
+The selected model ID retains its `-fast` suffix in Pi's standard model display. The provider stream wrapper applies the upstream ID, service tier, and routing hint to normal turns, automatic and manual compaction, and branch summaries.
 
 ## Codex installation
 

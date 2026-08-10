@@ -11,15 +11,11 @@ import {
 	fetchCodexFastModelCatalog,
 	fetchLatestCodexClientVersion,
 } from "./codex-fast-catalog.ts";
+import { createCodexFastStream } from "./codex-fast-stream.ts";
 import {
 	createCodexFastVariantModels,
-	resolveCodexFastUpstreamModelId,
 	restoreCodexFastVariantModels,
 } from "./codex-fast-variants.ts";
-import {
-	addCodexFastRoutingHint,
-	rewriteCodexFastRequestPayload,
-} from "./codex-fast-request.ts";
 type CodexModel = Model<"openai-codex-responses">;
 
 /** Runtime dependencies for Codex Fast Mode discovery. */
@@ -70,6 +66,7 @@ export function createCodexFastVariantsExtension(
 			api: "openai-codex-responses",
 			baseUrl,
 			models: buildProviderModelCatalog(baseModels, []),
+			streamSimple: createCodexFastStream(baseModels),
 			async refreshModels(context) {
 				const storedVariants = restoreCodexFastVariantModels(
 					baseModels,
@@ -105,16 +102,6 @@ export function createCodexFastVariantsExtension(
 			},
 		});
 
-		pi.on("before_provider_request", (event, ctx) => {
-			if (ctx.model?.provider !== "openai-codex") return;
-			if (!resolveCodexFastUpstreamModelId(ctx.model.id, baseModels)) return;
-			return rewriteCodexFastRequestPayload(event.payload, ctx.model.id, baseModels);
-		});
-
-		pi.on("before_provider_headers", (event, ctx) => {
-			if (ctx.model?.provider !== "openai-codex") return;
-			addCodexFastRoutingHint(event.headers, ctx.model.id, baseModels);
-		});
 	};
 }
 

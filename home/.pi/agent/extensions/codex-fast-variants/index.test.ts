@@ -12,18 +12,6 @@ import type {
 import { createCodexTestAccessToken } from "./codex-fast-test-fixtures.ts";
 import { createCodexFastVariantsExtension } from "./index.ts";
 
-type RegisteredHandler = (event: unknown, context: unknown) => unknown;
-
-function requireHandler(
-	handlers: ReadonlyMap<string, unknown>,
-	eventName: string,
-): RegisteredHandler {
-	const handler = handlers.get(eventName);
-	assert.equal(typeof handler, "function");
-	// SAFETY: The recording ExtensionAPI stores handlers unchanged, and the assertion above proves this value is callable. Tests supply the event/context shape registered for eventName.
-	return handler as RegisteredHandler;
-}
-
 function requireFastModel(
 	catalog: readonly ProviderModelConfig[],
 	baseModelId: string,
@@ -33,20 +21,16 @@ function requireFastModel(
 	return fastModel;
 }
 
-test("extension routes discovered Fast variants and preserves cached variants across discovery failures", async () => {
+test("extension discovers Fast variants and preserves cached variants across discovery failures", async () => {
 	let registeredProviderName: string | undefined;
 	let registeredProviderConfig: ProviderConfig | undefined;
-	const handlers = new Map<string, unknown>();
 	const recordingApi = {
 		registerProvider(providerName: string, providerConfig: ProviderConfig) {
 			registeredProviderName = providerName;
 			registeredProviderConfig = providerConfig;
 		},
-		on(eventName: string, handler: unknown) {
-			handlers.set(eventName, handler);
-		},
 	};
-	// SAFETY: createCodexFastVariantsExtension uses only registerProvider and on; recordingApi faithfully implements those ExtensionAPI operations for this integration test.
+	// SAFETY: createCodexFastVariantsExtension uses only registerProvider; recordingApi faithfully implements that ExtensionAPI operation for this integration test.
 	const pi = recordingApi as unknown as ExtensionAPI;
 	const builtInModel = getModels("openai-codex")[0];
 	assert.ok(builtInModel);
@@ -133,32 +117,5 @@ test("extension routes discovered Fast variants and preserves cached variants ac
 		},
 	});
 	assert.equal(requireFastModel(authenticationFailureFallback, builtInModel.id).id, fastModelConfig.id);
-
-	const fastModel = {
-		...fastModelConfig,
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		baseUrl: builtInModel.baseUrl,
-	};
-	const rewriteRequest = requireHandler(handlers, "before_provider_request");
-	const rewrittenPayload = await rewriteRequest(
-		{ type: "before_provider_request", payload: { model: fastModel.id } },
-		{ model: fastModel },
-	);
-	assert.deepEqual(rewrittenPayload, {
-		model: builtInModel.id,
-		service_tier: "priority",
-	});
-
-	const addHeaders = requireHandler(handlers, "before_provider_headers");
-	const headers: Record<string, string> = {};
-	await addHeaders(
-		{ type: "before_provider_headers", headers },
-		{ model: fastModel },
-	);
-	assert.equal(
-		headers["x-codex-routing-hint"],
-		`model=${builtInModel.id};tier=priority`,
-	);
 
 });
