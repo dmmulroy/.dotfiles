@@ -15,7 +15,7 @@ import {
 
 const CFPASTE_ORIGIN = new URL("https://paste.cfdata.org");
 
-/** Construction options for the `/cfpaste` Pi extension. */
+/** Construction options for the `/cf-paste` Pi extension. */
 export interface CfPasteExtensionOptions {
 	/** Paste client override for another composition root or a faithful test implementation. */
 	readonly markdownPasteClient?: MarkdownPasteClient;
@@ -63,7 +63,7 @@ async function createPasteAndNotify(
 	notify(`Created Markdown paste: ${result.value}`, "info");
 }
 
-/** Create the `/cfpaste <path>` and `/cfpaste last` command extension. */
+/** Create the `/cf-paste <path>` and `/cf-paste-last` command extension. */
 export function createCfPasteExtension(
 	options: CfPasteExtensionOptions = {},
 ): ExtensionFactory {
@@ -80,27 +80,13 @@ export function createCfPasteExtension(
 			options.markdownPasteClient ??
 			createMarkdownPasteClient(CFPASTE_ORIGIN, tokenProvider);
 
-		pi.registerCommand("cfpaste", {
-			description: "Paste a Markdown file or the latest agent message (usage: /cfpaste <path>|last)",
+		pi.registerCommand("cf-paste", {
+			description: "Paste a Markdown file (usage: /cf-paste <path>)",
 			handler: async (args, ctx) => {
 				await ctx.waitForIdle();
 				const target = args.trim();
 				if (!target) {
-					ctx.ui.notify("Usage: /cfpaste <markdown-file>|last", "warning");
-					return;
-				}
-
-				if (target === "last") {
-					const message = findLatestAssistantMessage(ctx.sessionManager.getBranch());
-					if (!message) {
-						ctx.ui.notify("No agent message is available to paste", "warning");
-						return;
-					}
-					await createPasteAndNotify(
-						client,
-						{ title: "Pi agent response", markdown: assistantMarkdown(message) },
-						(text, type) => ctx.ui.notify(text, type),
-					);
+					ctx.ui.notify("Usage: /cf-paste <markdown-file>", "warning");
 					return;
 				}
 
@@ -123,6 +109,23 @@ export function createCfPasteExtension(
 				await createPasteAndNotify(
 					client,
 					{ title: basename(path), markdown },
+					(text, type) => ctx.ui.notify(text, type),
+				);
+			},
+		});
+
+		pi.registerCommand("cf-paste-last", {
+			description: "Paste the latest agent message",
+			handler: async (_args, ctx) => {
+				await ctx.waitForIdle();
+				const message = findLatestAssistantMessage(ctx.sessionManager.getBranch());
+				if (!message) {
+					ctx.ui.notify("No agent message is available to paste", "warning");
+					return;
+				}
+				await createPasteAndNotify(
+					client,
+					{ title: "Pi agent response", markdown: assistantMarkdown(message) },
 					(text, type) => ctx.ui.notify(text, type),
 				);
 			},

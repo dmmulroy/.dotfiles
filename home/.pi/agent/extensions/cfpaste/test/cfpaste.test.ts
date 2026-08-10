@@ -97,14 +97,14 @@ async function createHarness(cwd: string, client: MarkdownPasteClient) {
 	return { notifications, runner, sessionManager };
 }
 
-test("/cfpaste reads a Markdown path and returns the rendered URL", async () => {
+test("/cf-paste reads a Markdown path and returns the rendered URL", async () => {
 	const cwd = await mkdtemp(join(tmpdir(), "pi-cfpaste-"));
 	try {
 		const markdown = "# Design\n\nPreserve **Markdown**.\n";
 		await writeFile(join(cwd, "design.md"), markdown, "utf8");
 		const client = new RecordingMarkdownPasteClient();
 		const { notifications, runner } = await createHarness(cwd, client);
-		const command = runner.getCommand("cfpaste");
+		const command = runner.getCommand("cf-paste");
 		assert.ok(command);
 
 		await command.handler("design.md", runner.createCommandContext());
@@ -120,7 +120,7 @@ test("/cfpaste reads a Markdown path and returns the rendered URL", async () => 
 	}
 });
 
-test("/cfpaste last pastes the latest agent message on the active branch", async () => {
+test("/cf-paste-last pastes the latest agent message on the active branch", async () => {
 	const cwd = await mkdtemp(join(tmpdir(), "pi-cfpaste-"));
 	try {
 		const client = new RecordingMarkdownPasteClient();
@@ -128,10 +128,10 @@ test("/cfpaste last pastes the latest agent message on the active branch", async
 		const activeId = sessionManager.appendMessage(assistantMessage("# Active"));
 		sessionManager.appendMessage(assistantMessage("# Abandoned"));
 		sessionManager.branch(activeId);
-		const command = runner.getCommand("cfpaste");
+		const command = runner.getCommand("cf-paste-last");
 		assert.ok(command);
 
-		await command.handler("last", runner.createCommandContext());
+		await command.handler("", runner.createCommandContext());
 
 		assert.deepEqual(client.inputs, [{
 			title: "Pi agent response",
@@ -143,12 +143,12 @@ test("/cfpaste last pastes the latest agent message on the active branch", async
 	}
 });
 
-test("/cfpaste rejects non-Markdown files before reading or uploading", async () => {
+test("/cf-paste rejects non-Markdown files before reading or uploading", async () => {
 	const cwd = await mkdtemp(join(tmpdir(), "pi-cfpaste-"));
 	try {
 		const client = new RecordingMarkdownPasteClient();
 		const { notifications, runner } = await createHarness(cwd, client);
-		const command = runner.getCommand("cfpaste");
+		const command = runner.getCommand("cf-paste");
 		assert.ok(command);
 
 		await command.handler("notes.txt", runner.createCommandContext());
