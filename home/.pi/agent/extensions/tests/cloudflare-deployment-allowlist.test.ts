@@ -140,6 +140,22 @@ test("fails closed for unknown and ambiguous Wrangler targets", () => {
 	}
 });
 
+test("always blocks destructive Wrangler Worker deletion", () => {
+	const cwd = makeJsonWorkerProject();
+	const policy = makePolicy({ "exa-mcp-proxy-poc": ["default"] });
+	for (const command of [
+		"npx wrangler delete exa-mcp-proxy-poc",
+		"npx wrangler delete exa-mcp-proxy-poc --force",
+		"npx wrangler delete --force exa-mcp-proxy-poc",
+		"pnpm exec wrangler delete exa-mcp-proxy-poc --force",
+	]) {
+		const decision = decide(command, cwd, policy);
+		assert.equal(decision._tag, "block", command);
+		if (decision._tag === "block") assert.match(decision.reason, /Worker deletion.*never authorized/);
+	}
+	assert.equal(decide("npx wrangler delete --help", cwd, policy)._tag, "unrelated");
+});
+
 test("allows genuine dry runs and unrelated read-only CLI commands", () => {
 	const cwd = makeJsonWorkerProject();
 	const emptyPolicy = makePolicy({});

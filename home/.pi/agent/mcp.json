@@ -12,6 +12,11 @@
         "url": "https://portal.mcp.cfdata.org/mcp?codemode=search_and_execute",
         "oauth": {}
       },
+      "workers-observability": {
+        "type": "remote",
+        "url": "https://observability.mcp.cloudflare.com/mcp",
+        "oauth": {}
+      },
       "uidotsh": {
         "type": "remote",
         "url": "https://ui.sh/mcp?agent=pi",

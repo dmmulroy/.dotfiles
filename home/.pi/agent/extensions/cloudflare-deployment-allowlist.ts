@@ -399,6 +399,21 @@ function hasAdjacentArguments(args: readonly string[], first: string, second: st
 	return args.some((argument, index) => argument === first && args[index + 1] === second);
 }
 
+function wranglerDeleteDecision(invocation: DeploymentInvocation): CloudflareDeploymentDecision | undefined {
+	if (invocation.cli !== "wrangler" || invocation.args.some((argument) => argument === "--help" || argument === "-h")) {
+		return undefined;
+	}
+	const positional = deploymentCommandWords(invocation);
+	if (positional[0] !== "delete") return undefined;
+	const worker = positional[1];
+	return {
+		_tag: "block",
+		reason: new CloudflareDeploymentBlocked(
+			`Wrangler Worker deletion${worker === undefined ? "" : ` for ${JSON.stringify(worker)}`} is destructive and is never authorized by the deployment allowlist.`,
+		).message,
+	};
+}
+
 function deploymentIntent(invocation: DeploymentInvocation): DeploymentIntent | undefined {
 	const positional = deploymentCommandWords(invocation);
 	if (invocation.cli === "wrangler") {
@@ -787,6 +802,8 @@ function evaluateCloudflareDeploymentCommandWithCache(
 			}
 			continue;
 		}
+		const deleteDecision = wranglerDeleteDecision(invocation);
+		if (deleteDecision !== undefined) return deleteDecision;
 		const intent = deploymentIntent(invocation);
 		if (intent === undefined) {
 			if (invocation.args.some(mentionsCloudflareDeployment)) {
