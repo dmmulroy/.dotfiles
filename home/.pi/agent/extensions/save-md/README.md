@@ -10,4 +10,4 @@ Pi extension that saves the latest assistant response on the active session bran
 
 This writes `name.md` relative to Pi's current working directory. Supplying the `.md` suffix is optional.
 
-The extension preserves the assistant's Markdown text, excludes thinking and tool-call blocks, and refuses to overwrite an existing file.
+The extension preserves the assistant's Markdown text, excludes thinking and tool-call blocks, and refuses to overwrite an existing file. After saving, it queues the saved path as a visible custom message in the agent's next-turn context.

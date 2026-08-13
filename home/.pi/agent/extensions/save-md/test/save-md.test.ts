@@ -40,6 +40,13 @@ async function createHarness(cwd: string) {
 	const sessionManager = SessionManager.inMemory(cwd);
 	const loaded = await discoverAndLoadExtensions([extensionPath], cwd, join(cwd, ".agent"));
 	assert.deepEqual(loaded.errors, []);
+	const sentMessages: Array<{
+		message: { customType: string; content: unknown; display: boolean };
+		options?: { deliverAs?: "steer" | "followUp" | "nextTurn" };
+	}> = [];
+	loaded.runtime.sendMessage = (message, options) => {
+		sentMessages.push({ message, options });
+	};
 	const modelRuntime = await ModelRuntime.create({
 		credentials: new InMemoryCredentialStore(),
 		modelsPath: null,
@@ -59,14 +66,15 @@ async function createHarness(cwd: string) {
 		notify: (message, type) => notifications.push({ message, type }),
 	});
 
-	return { notifications, runner, sessionManager };
+	return { notifications, runner, sentMessages, sessionManager };
 }
 
 test("user can save the latest assistant response as Markdown with /save-md", async () => {
 	const cwd = await mkdtemp(join(tmpdir(), "pi-save-md-"));
 
 	try {
-		const { notifications, runner, sessionManager } = await createHarness(cwd);
+		const { notifications, runner, sentMessages, sessionManager } =
+			await createHarness(cwd);
 		const markdown = "# Design\n\n- Preserve **Markdown**\n\n```ts\nconst ready = true;\n```";
 		sessionManager.appendMessage(assistantMessage(markdown));
 
@@ -78,6 +86,16 @@ test("user can save the latest assistant response as Markdown with /save-md", as
 		assert.equal(await readFile(path, "utf8"), `${markdown}\n`);
 		assert.deepEqual(notifications, [
 			{ message: `Saved Markdown to ${path}`, type: "info" },
+		]);
+		assert.deepEqual(sentMessages, [
+			{
+				message: {
+					customType: "save-md",
+					content: `Saved Markdown to ${path}`,
+					display: true,
+				},
+				options: { deliverAs: "nextTurn" },
+			},
 		]);
 	} finally {
 		await rm(cwd, { recursive: true, force: true });

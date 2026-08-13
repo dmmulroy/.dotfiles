@@ -1,7 +1,6 @@
 ---
 name: code-review
 description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
-disable-model-invocation: true
 ---
 
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
@@ -57,8 +56,6 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
 ### 4. Spawn both sub-agents in parallel
-
-Send a single message with two `Agent` tool calls. Use the `general-purpose` subagent for both.
 
 **Standards sub-agent prompt** — include:
 
