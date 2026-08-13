@@ -3,7 +3,7 @@
 **Generated:** 2026-05-09T00:00:00Z
 **Commit:** 871ce6f
 
-npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
+npm workspace for pi agent extensions. TypeScript, ESM-only.
 
 ## STRUCTURE
 
@@ -14,21 +14,17 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 ├── agent/
 │   ├── settings.json     # Provider, model, theme, packages, interview config
 │   ├── cloak.json        # Secret masking patterns for agent output
-│   ├── extensions/       # Local TypeScript extensions
-│   │   ├── opencode-cloudflare/  # Cloudflare gateway provider (auth, catalog, dispatch)
-│   │   ├── pi-skill-toggle/      # Skill discovery, toggle UI, frontmatter patching
-│   │   ├── save-md/              # Save assistant responses as Markdown
-│   │   ├── pi-cloak/             # Secret cloaking extension
-│   │   ├── git-interceptor.ts    # Standalone: git command interception
-│   │   ├── whimsical.ts          # Standalone: whimsical diagram integration
-│   │   └── web-tools.json        # Helium browser profile config
-│   └── skills/           # 15 agent skills (SKILL.md + resources)
-│       ├── tdd/          # Test-driven development
-│       ├── herdr/        # Herdr remote control
-│       ├── triage/       # Issue triage state machine
-│       ├── init-deep/    # AGENTS.md generation (this skill)
-│       └── ...           # grill-with-docs, to-issues, to-prd, write-a-skill, etc.
+│   └── extensions/       # Local TypeScript extensions
+│       ├── opencode-cloudflare/  # Cloudflare gateway provider (auth, catalog, dispatch)
+│       ├── pi-skill-toggle/      # Skill discovery, toggle UI, frontmatter patching
+│       ├── save-md/              # Save assistant responses as Markdown
+│       ├── pi-cloak/             # Secret cloaking extension
+│       ├── git-interceptor.ts    # Standalone: git command interception
+│       ├── whimsical.ts          # Standalone: whimsical diagram integration
+│       └── web-tools.json        # Helium browser profile config
 ```
+
+Skills live in `home/.agents/skills/` and stow to `~/.agents/skills/`. Do not copy them here.
 
 ## WHERE TO LOOK
 
@@ -38,7 +34,7 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 | Add pi package | `agent/settings.json` → `packages[]` |
 | Create extension | `agent/extensions/<name>/` with `package.json` |
 | Create standalone extension | `agent/extensions/<name>.ts` |
-| Create skill | `agent/skills/<name>/SKILL.md` |
+| Create skill | `home/.agents/skills/<name>/SKILL.md` |
 | Secret masking | `agent/cloak.json` |
 | Pi Web Tools source | `~/Code/personal/pi-web-tools` |
 | Type-check and test local packages | `npm run check` (from .pi root) |
@@ -47,7 +43,7 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 
 - Extensions as npm workspace packages: each has own `package.json`
 - Standalone extensions: single `.ts` file in `extensions/`
-- Skills: `SKILL.md` as entry, optional bundled resources (templates, patches)
+- Skills: `SKILL.md` as entry under `home/.agents/skills/`, optional bundled resources
 - ESM only: `"type": "module"` everywhere
 - Dependencies: `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`
 - TypeScript strict mode: `noUncheckedIndexedAccess`, `noImplicitOverride`
@@ -57,7 +53,8 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 - Installing deps at workspace root for extension-specific needs (use per-package)
 - Committing `node_modules/` (gitignored per-extension)
 - Editing `agent/settings.json` outside dotfiles repo (stow overwrites)
-- Adding runtime state files to git (most of `agent/*` is gitignored, only extensions/skills/settings un-ignored)
+- Adding runtime state files to git (most of `agent/*` is gitignored, only extensions/settings un-ignored)
+- Duplicating skills under `agent/skills/` — they belong in `home/.agents/skills/`
 - Writing any model ID from a local `opencode-cloudflare` overlay into tests, fixtures, docs, examples, source comments, tracked configuration, or any other version-controlled file. Overlay models are internal/private; use public catalog models or generic placeholders in tracked artifacts.
 
 ## KEY SETTINGS
@@ -78,7 +75,6 @@ npm workspace for pi agent extensions + skills. TypeScript, ESM-only.
 Most of `agent/` is gitignored by default. Tracked files are explicitly un-ignored:
 - `agent/settings.json`, `agent/cloak.json`, `agent/tsconfig.json`, `agent/package.json`
 - `agent/extensions/**` (but `node_modules/` within are re-ignored)
-- `agent/skills/**`
 - `agent/themes/*.json`
 
 ## NOTES

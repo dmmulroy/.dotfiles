@@ -18,9 +18,10 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 │   ├── ghostty/        # Terminal
 │   ├── starship.toml   # Prompt (custom.scm, 2s timeout for Vite+)
 │   └── ripgrep/        # rg config
+├── home/.agents/       # Shared agent skills (stowed to ~/.agents/)
+│   └── skills/         # SKILL.md packages for pi and other agents
 ├── home/.pi/           # Pi agent workspace (AGENTS.md)
-│   ├── agent/extensions/ # 6 TypeScript extensions
-│   └── agent/skills/   # 15 agent skills
+│   └── agent/extensions/ # TypeScript extensions
 ├── packages/
 │   ├── bundle          # Base Brewfile (32 formulas, 13 casks)
 │   └── bundle.work     # Work additions (formulas only)
@@ -39,8 +40,8 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
 | Herdr config | `home/.config/herdr/config.toml` |
 | Starship prompt | `home/.config/starship.toml` |
+| Agent skill | `home/.agents/skills/<name>/SKILL.md` |
 | Pi extension | `home/.pi/agent/extensions/<name>/` |
-| Pi skill | `home/.pi/agent/skills/<name>/SKILL.md` |
 | Pi settings | `home/.pi/agent/settings.json` |
 | Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
 
@@ -52,7 +53,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 - Git abbrs: ~180 oh-my-zsh style via `__git.init.fish`
 - Private helpers: prefix `__` (e.g., `__git.default_branch`)
 - Pi extensions: TypeScript, npm workspaces under `home/.pi/`
-- Pi skills: Markdown-first (`SKILL.md`) with optional bundled resources
+- Agent skills: Markdown-first (`SKILL.md`) under `home/.agents/skills/`, stowed to `~/.agents/skills/`
 
 ## ANTI-PATTERNS
 
@@ -61,6 +62,17 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 - Hardcode paths (use `$DOTFILES_DIR`, `$HOME`)
 - Nested git repos in stowed dirs (creates symlink issues)
 - node_modules in stowed dirs (pi extensions exception — gitignored)
+- Skill copies under `home/.pi/agent/skills/` or `~/.pi/agent/skills/`
+- Replacing `~/.agents/skills/<name>` stow symlinks with real directories
+
+## IF YOU NOTICE SKILL LAYOUT DRIFT — FIX IT
+
+Canonical skills live in `home/.agents/skills/<name>/` and stow to `~/.agents/skills/<name>` as a symlink. If you see any of these, fix them without being asked:
+
+- A skill under `home/.pi/agent/skills/` or `~/.pi/agent/skills/`: move unique content into `home/.agents/skills/`, then delete the `.pi` copy/symlink.
+- `~/.agents/skills/<name>` is a real directory instead of a symlink: copy it back into `home/.agents/skills/<name>/`, remove the live dir, restore the stow symlink.
+- `skills` / `vpx skills add|update` wrote copies into `~/.agents` or `~/.pi`: fold the content into the repo copy, restore stow symlinks, do not leave a second tree.
+- Do not restore skills the user deleted from `home/.agents/skills/`.
 
 ## COMMANDS
 
@@ -100,5 +112,5 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 - `dot update` handles WARP VPN brew API issues automatically
 - Starship `command_timeout = 2000` because Vite+ node shims are slow
 - `secrets.fish` is gitignored — contains env tokens for work services
-- `.pi/agent/*` mostly gitignored; extensions + skills explicitly un-ignored
+- `.pi/agent/*` mostly gitignored; extensions explicitly un-ignored
 - jj was removed; repo now uses git only
