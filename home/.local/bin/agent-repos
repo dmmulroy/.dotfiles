@@ -237,6 +237,13 @@ has_tracked_worktree_changes() {
     [[ -n "$(git status --porcelain --untracked-files=no)" ]]
 }
 
+ensure_repository_has_initial_commit() {
+    git rev-parse --verify HEAD >/dev/null 2>&1 && return 0
+
+    echo "Creating an initial commit because git subtree requires HEAD."
+    git commit --allow-empty -m "Initialize repository" || die "failed to create the initial commit required by git subtree"
+}
+
 run_with_clean_worktree() {
     local reason="$1"
     shift
@@ -563,6 +570,7 @@ cmd_add() {
 
     [[ ! -e "$prefix" ]] || die "prefix already exists: $prefix"
 
+    ensure_repository_has_initial_commit
     run_with_clean_worktree "git subtree add" run_subtree_add "$prefix" "$url" "$branch" "$squash"
     manifest_upsert "$root" "$name" "$prefix" "$url" "$branch" "$squash"
 
