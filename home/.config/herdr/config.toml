@@ -477,6 +477,7 @@ prompt_new_workspace_name = true
 # Default: "cyan".
 accent = "#c6a0f6"
 
+agent_panel_sort = "priority"
 [ui.sidebar.agents]
 # Blank rows between expanded Agent entries. At most 16 rows and 16 tokens per
 # row. Consecutive indented worktree children remain packed together.
