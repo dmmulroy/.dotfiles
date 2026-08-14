@@ -1,15 +1,15 @@
 ---
-name: use-computer-mcp
+name: computer-use-mcp
 description: Computer use through Open Computer Use MCP. Use when a task requires interacting with a desktop app or authenticated browser UI, choosing a Helium work/personal profile, or recovering a failed Computer interaction.
 ---
 
-# Use Computer MCP
+# Computer Use MCP
 
-Drive the UI with a **tight loop**: choose the right identity, snapshot once, chain only against fresh state, and verify the outcome.
+Use the most efficient available interface for the task. Prefer a purpose-built tool, API, CLI, or MCP server when it can complete the work more directly or reliably. Use Computer only for auth-bound, desktop-only, or genuinely visual work, including UI verification after a deterministic change.
 
-## 1. Choose the channel and identity
+When Computer is the right interface, drive the UI with a **tight loop**: choose the right identity, snapshot once, chain only against fresh state, and verify the outcome.
 
-Use an API or CLI for deterministic structured reads and writes. Use Computer for auth-bound, desktop-only, or genuinely visual work; it may verify the UI after a deterministic change.
+## 1. Choose the identity
 
 For Helium, resolve the browser profile before navigation:
 
