@@ -38,6 +38,7 @@ brew "tree-sitter-cli"
 brew "wget"
 brew "zoxide"
 
+cask "1password"
 cask "cleanshot"
 cask "discord"
 cask "elgato-camera-hub"
