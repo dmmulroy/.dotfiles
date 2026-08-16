@@ -1,13 +1,7 @@
-import type { Api, Model, ProviderStreams, StreamOptions } from "@earendil-works/pi-ai";
-// Pi's extension loader aliases `@earendil-works/pi-ai` to the compat entry and
-// breaks `@earendil-works/pi-ai/api/*` subpaths. Compat re-exports the same lazy
-// factories; this is not the legacy streamSimple/getModels API.
-import {
-	anthropicMessagesApi,
-	googleGenerativeAIApi,
-	openAICompletionsApi,
-	openAIResponsesApi,
-} from "@earendil-works/pi-ai/compat";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { lazyApi, type Api, type Model, type ProviderStreams, type StreamOptions } from "@earendil-works/pi-ai";
 
 const GOOGLE_GATEWAY_API_KEY_SENTINEL = "gateway-authenticated";
 
@@ -25,6 +19,27 @@ function wrapStreams(
 	};
 }
 
+function findPiAiPackageRoot(): string {
+	let directory = dirname(fileURLToPath(import.meta.url));
+	while (true) {
+		const candidate = join(directory, "node_modules", "@earendil-works", "pi-ai");
+		if (existsSync(join(candidate, "package.json"))) return candidate;
+		const parent = dirname(directory);
+		if (parent === directory) {
+			throw new Error("Unable to locate the @earendil-works/pi-ai package for native API loading");
+		}
+		directory = parent;
+	}
+}
+
+function nativeApi(fileName: string): ProviderStreams {
+	// Pi's extension loader aliases `@earendil-works/pi-ai` to compat.js and
+	// breaks static `@earendil-works/pi-ai/api/*` imports. Walk to the real
+	// installed package and lazy-load the native API file from disk.
+	const href = pathToFileURL(join(findPiAiPackageRoot(), "dist", "api", fileName)).href;
+	return lazyApi(() => import(href));
+}
+
 /**
  * Native mixed-API streamers with the smallest wrappers the work gateway requires.
  *
@@ -33,7 +48,7 @@ function wrapStreams(
  */
 export function createGatewayApiStreams(): Partial<Record<Api, ProviderStreams>> {
 	return {
-		"anthropic-messages": wrapStreams(anthropicMessagesApi(), (_model, options) => ({
+		"anthropic-messages": wrapStreams(nativeApi("anthropic-messages.js"), (_model, options) => ({
 			...options,
 			apiKey: undefined,
 			headers: {
@@ -41,11 +56,11 @@ export function createGatewayApiStreams(): Partial<Record<Api, ProviderStreams>>
 				"x-api-key": null,
 			},
 		})),
-		"google-generative-ai": wrapStreams(googleGenerativeAIApi(), (_model, options) => ({
+		"google-generative-ai": wrapStreams(nativeApi("google-generative-ai.js"), (_model, options) => ({
 			...options,
 			apiKey: GOOGLE_GATEWAY_API_KEY_SENTINEL,
 		})),
-		"openai-responses": openAIResponsesApi(),
-		"openai-completions": openAICompletionsApi(),
+		"openai-responses": nativeApi("openai-responses.js"),
+		"openai-completions": nativeApi("openai-completions.js"),
 	};
 }
