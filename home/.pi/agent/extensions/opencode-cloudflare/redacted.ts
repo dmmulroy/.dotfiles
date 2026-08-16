@@ -19,7 +19,7 @@ export interface Redacted<A> {
 	toJSON(): string;
 }
 
-const registry = new WeakMap<object, unknown>();
+const registry = new WeakMap<Redacted<never>, never>();
 
 const proto = {
 	toString() {
@@ -34,18 +34,21 @@ const proto = {
 };
 
 function makeRedacted<A>(value: A): Redacted<A> {
-	const redacted: Redacted<A> = Object.create(proto) as Redacted<A>;
-	registry.set(redacted, value);
+	// SAFETY: Object.create(proto) yields the Redacted methods; the brand is
+	// established only here, and callers cannot construct Redacted except through make.
+	const redacted = Object.create(proto) as Redacted<A>;
+	// SAFETY: WeakMap cannot express a generic brand; make and value are the only accessors.
+	registry.set(redacted as Redacted<never>, value as never);
 	return redacted;
 }
 
-function readRedactedValue<A>(self: Redacted<A>): A;
-function readRedactedValue(self: unknown): unknown;
-function readRedactedValue(self: unknown): unknown {
-	if (typeof self !== "object" || self === null || !registry.has(self)) {
+function readRedactedValue<A>(self: Redacted<A>): A {
+	// SAFETY: WeakMap cannot express a generic brand; only values created by make are stored.
+	const stored = registry.get(self as Redacted<never>);
+	if (stored === undefined && !registry.has(self as Redacted<never>)) {
 		throw new Error("Redacted value was not in registry");
 	}
-	return registry.get(self);
+	return stored as A;
 }
 
 /** Constructors and safe unwrap operation for Redacted values. */

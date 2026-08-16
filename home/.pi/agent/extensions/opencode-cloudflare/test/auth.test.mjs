@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-	createGatewayAuthService,
-	createGatewayTokenSource,
+	createGatewayOAuthAuth,
+	createGatewayProviderAuth,
+	createOpenCodeAuthSource,
 	describeTokenState,
 	GatewayToken,
 	getGatewayTokenExpiry,
+	isUsableGatewayToken,
+	toGatewayModelAuth,
 	validateGatewayAuthCommand,
 } from "../auth.ts";
 import { Redacted } from "../redacted.ts";
@@ -15,15 +18,10 @@ function jwt(exp) {
 	return `${encode({ alg: "none" })}.${encode({ exp })}.signature`;
 }
 
-function createAuth(overrides = {}) {
+function createAuthSource(overrides = {}) {
 	const environment = new Map(Object.entries(overrides.environment ?? {}));
 	const files = new Map(Object.entries(overrides.files ?? {}));
-	const now = () => overrides.now ?? 1000;
-	const credential = overrides.credential;
-	const credentialReader = overrides.credentialReader ?? {
-		get: () => credential,
-	};
-	const tokenSource = createGatewayTokenSource({
+	return createOpenCodeAuthSource({
 		environment: (name) => environment.get(name),
 		homeDirectory: () => "/home/tester",
 		fileExists: (path) => files.has(path),
@@ -32,10 +30,8 @@ function createAuth(overrides = {}) {
 			if (value === undefined) throw new Error("missing test file");
 			return value;
 		},
-		credentialReader,
-		now,
+		now: () => overrides.now ?? 1000,
 	});
-	return createGatewayAuthService({ configStore: overrides.configStore ?? {}, tokenSource, credentialReader, now });
 }
 
 test("GatewayToken uses the Redacted primitive and reports JWT expiry", () => {
@@ -45,78 +41,33 @@ test("GatewayToken uses the Redacted primitive and reports JWT expiry", () => {
 	assert.equal(Redacted.value(token), value);
 	assert.equal(getGatewayTokenExpiry(token), 700000);
 	assert.match(describeTokenState(token, 1000), /present \(expires/);
+	assert.equal(isUsableGatewayToken(token, 1000), true);
+	assert.equal(isUsableGatewayToken(token, 700000), false);
 });
 
-test("resolves explicit environment auth before imported OpenCode auth", () => {
+test("imports a usable OpenCode auth-file token", () => {
 	const authPath = "/tmp/opencode-auth.json";
-	const auth = createAuth({
-		environment: {
-			OPENCODE_CLOUDFLARE_AUTH_FILE: authPath,
-			OPENCODE_CLOUDFLARE_TOKEN: "environment-token",
-		},
+	const source = createAuthSource({
+		environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
 		files: {
 			[authPath]: JSON.stringify({
 				"https://opencode.cloudflare.dev": { type: "oauth", token: "imported-token" },
 			}),
 		},
 	});
-	const imported = auth.readImportedToken();
+	const imported = source.readImportedToken();
 	assert.equal(imported.ok, true);
 	assert.equal(imported.value?.authPath, authPath);
-	const resolved = auth.resolveToken();
-	assert.equal(resolved.ok, true);
-	assert.equal(Redacted.value(resolved.value), "environment-token");
-});
-
-test("resolves stored Pi auth before imported OpenCode auth", () => {
-	const authPath = "/tmp/opencode-auth.json";
-	const auth = createAuth({
-		environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
-		files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "imported-token" } }) },
-		credential: { type: "oauth", refresh: "", access: "stored-token", expires: 5000 },
-	});
-	const resolved = auth.resolveToken();
-	assert.equal(resolved.ok, true);
-	assert.equal(Redacted.value(resolved.value), "stored-token");
-});
-
-test("expired opaque Pi auth falls back to and refreshes identical imported auth", async () => {
-	const authPath = "/tmp/opencode-auth.json";
-	const auth = createAuth({
-		now: 1000,
-		environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
-		files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "same-token" } }) },
-		credential: { type: "oauth", refresh: "", access: "same-token", expires: 999 },
-	});
-	const resolved = auth.resolveToken();
-	assert.equal(resolved.ok, true);
-	assert.equal(Redacted.value(resolved.value), "same-token");
-	const refreshed = await auth.refresh(
-		{ refresh: "", access: "same-token", expires: 999 },
-		new AbortController().signal,
-	);
-	assert.equal(refreshed.access, "same-token");
-	assert.ok(refreshed.expires > 1000);
-});
-
-test("OAuth credential refresh honors cancellation", async () => {
-	const auth = createAuth();
-	const controller = new AbortController();
-	controller.abort();
-
-	await assert.rejects(
-		auth.refresh({ refresh: "", access: "expired-token", expires: 999 }, controller.signal),
-		(error) => error === controller.signal.reason,
-	);
+	assert.equal(Redacted.value(imported.value.token), "imported-token");
 });
 
 test("auth file parsing rejects malformed storage instead of trusting it", () => {
 	const authPath = "/tmp/opencode-auth.json";
-	const auth = createAuth({
+	const source = createAuthSource({
 		environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
 		files: { [authPath]: "[]" },
 	});
-	const imported = auth.readImportedToken();
+	const imported = source.readImportedToken();
 	assert.equal(imported.ok, false);
 	assert.equal(imported.error.reason, "invalid-auth-file");
 });
@@ -148,4 +99,113 @@ test("only accepts the exact shell-free Cloudflare Access login command", () => 
 		assert.equal(result.ok, false);
 		assert.equal(result.error.reason, "untrusted-auth-command");
 	}
+});
+
+test("native credential resolution prefers a stored token over OpenCode import", async () => {
+	const authPath = "/tmp/opencode-auth.json";
+	const auth = createGatewayProviderAuth(
+		createAuthSource({
+			environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
+			files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "imported-token" } }) },
+		}),
+		async () => undefined,
+		() => 1000,
+	);
+	const resolved = await auth.apiKey.resolve({
+		ctx: { env: async () => undefined, fileExists: async () => false },
+		credential: { type: "api_key", key: "stored-token" },
+		signal: new AbortController().signal,
+	});
+	assert.equal(resolved?.source, "stored credential");
+	assert.equal(resolved?.auth.apiKey, "stored-token");
+	assert.equal(resolved?.auth.headers["cf-access-token"], "stored-token");
+	assert.equal(resolved?.auth.headers.Authorization, "Bearer stored-token");
+	assert.equal(resolved?.auth.headers["x-api-key"], null);
+});
+
+test("environment override and OpenCode import remain usable when nothing is stored", async () => {
+	const authPath = "/tmp/opencode-auth.json";
+	const auth = createGatewayProviderAuth(
+		createAuthSource({
+			environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
+			files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "imported-token" } }) },
+		}),
+		async () => undefined,
+		() => 1000,
+	);
+	const fromEnv = await auth.apiKey.resolve({
+		ctx: { env: async (name) => name === "OPENCODE_CLOUDFLARE_TOKEN" ? "environment-token" : undefined, fileExists: async () => false },
+		signal: new AbortController().signal,
+	});
+	assert.equal(fromEnv?.source, "OPENCODE_CLOUDFLARE_TOKEN");
+	assert.equal(fromEnv?.auth.apiKey, "environment-token");
+
+	const fromImport = await auth.apiKey.resolve({
+		ctx: { env: async () => undefined, fileExists: async () => false },
+		signal: new AbortController().signal,
+	});
+	assert.equal(fromImport?.source, "OpenCode auth file");
+	assert.equal(fromImport?.auth.apiKey, "imported-token");
+});
+
+test("expired JWT tokens are not treated as usable credentials", async () => {
+	const expired = jwt(1);
+	const auth = createGatewayProviderAuth(
+		createAuthSource(),
+		async () => undefined,
+		() => 10_000,
+	);
+	const resolved = await auth.apiKey.resolve({
+		ctx: { env: async () => undefined, fileExists: async () => false },
+		credential: { type: "api_key", key: expired },
+		signal: new AbortController().signal,
+	});
+	assert.equal(resolved, undefined);
+});
+
+test("OAuth login reuses a usable imported token", async () => {
+	const authPath = "/tmp/opencode-auth.json";
+	const oauth = createGatewayOAuthAuth(
+		createAuthSource({
+			environment: { OPENCODE_CLOUDFLARE_AUTH_FILE: authPath },
+			files: { [authPath]: JSON.stringify({ "https://opencode.cloudflare.dev": { token: "imported-token" } }) },
+		}),
+		async () => {
+			throw new Error("login command should not run");
+		},
+		() => 1000,
+	);
+	const events = [];
+	const credential = await oauth.login({
+		signal: new AbortController().signal,
+		prompt: async () => {
+			throw new Error("prompt should not run");
+		},
+		notify: (event) => events.push(event),
+	});
+	assert.equal(credential.type, "oauth");
+	assert.equal(credential.access, "imported-token");
+	assert.ok(events.some((event) => event.type === "progress"));
+});
+
+test("OAuth refresh honors cancellation and expired imported tokens", async () => {
+	const oauth = createGatewayOAuthAuth(createAuthSource(), async () => undefined, () => 1000);
+	const controller = new AbortController();
+	controller.abort();
+	await assert.rejects(
+		oauth.refresh({ type: "oauth", refresh: "", access: "expired-token", expires: 999 }, controller.signal),
+		(error) => error === controller.signal.reason,
+	);
+
+	await assert.rejects(
+		oauth.refresh({ type: "oauth", refresh: "", access: "expired-token", expires: 999 }, new AbortController().signal),
+		(error) => error.reason === "expired-token",
+	);
+});
+
+test("toAuth never returns a token in object stringification", () => {
+	const token = GatewayToken.parse("super-secret-access-token");
+	const auth = toGatewayModelAuth(token);
+	assert.doesNotMatch(JSON.stringify(token), /super-secret-access-token/);
+	assert.equal(auth.headers["cf-access-token"], "super-secret-access-token");
 });

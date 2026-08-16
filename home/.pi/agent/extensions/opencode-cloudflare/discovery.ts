@@ -2,17 +2,25 @@ import type { Api, Model, ThinkingLevelMap } from "@earendil-works/pi-ai";
 import {
 	AUTH_ORIGIN,
 	BACKENDS,
-	DEFAULT_ROUTE_HEADERS,
 	DEFAULT_ROUTE_URLS,
+	DISCOVERY_TIMEOUT_MS,
 	GATEWAY_ORIGIN,
 	type Backend,
 } from "./constants.ts";
+import {
+	isJsonBoolean,
+	isJsonNumber,
+	isJsonObject,
+	isJsonString,
+	parseJsonObject,
+	parseJsonValue,
+	type JsonObject,
+	type JsonValue,
+} from "./json-value.ts";
+import { Redacted, type Redacted as RedactedValue } from "./redacted.ts";
 import { failure, type Result, success } from "./result.ts";
 
-/** JSON value accepted in gateway model options. */
-export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
-
-/** Parsed model metadata supplied by gateway discovery or a local overlay. */
+/** Parsed model metadata supplied by gateway discovery. */
 export interface GatewayModelConfig {
 	readonly requestModelId?: string;
 	readonly name?: string;
@@ -27,22 +35,27 @@ export interface GatewayModelConfig {
 	readonly cacheWriteCost?: number;
 	readonly thinkingLevelMap?: ThinkingLevelMap;
 	readonly compat?: Model<Api>["compat"];
-	readonly options?: Readonly<Record<string, JsonValue>>;
 }
+
+/** Model identifier to parsed model metadata. */
+export type GatewayModelConfigMap = { readonly [modelId: string]: GatewayModelConfig };
+
+/** HTTP header name to header value. */
+export type GatewayHeaderMap = { readonly [headerName: string]: string };
 
 /** Parsed backend metadata from gateway discovery. */
 export interface GatewayProviderConfig {
 	readonly baseUrl?: string;
-	readonly headers?: Readonly<Record<string, string>>;
+	readonly headers?: GatewayHeaderMap;
 	readonly whitelist?: readonly string[];
 	readonly blacklist?: readonly string[];
-	readonly models: Readonly<Record<string, GatewayModelConfig>>;
+	readonly models: GatewayModelConfigMap;
 }
 
 /** Authenticated remote configuration referenced by gateway discovery. */
 export interface GatewayRemoteConfig {
 	readonly url: string;
-	readonly headers: Readonly<Record<string, string>>;
+	readonly headers: GatewayHeaderMap;
 }
 
 /** Parsed gateway discovery or remote configuration document. */
@@ -54,35 +67,26 @@ export interface GatewayDocument {
 	readonly providers: Readonly<Partial<Record<Backend, GatewayProviderConfig>>>;
 }
 
-/** Parsed local model overlay. */
-export interface GatewayLocalOverlay {
-	readonly providers: Readonly<Partial<Record<Backend, GatewayProviderConfig>>>;
-}
-
-/** Fully resolved route configuration consumed by catalog and stream adapters. */
+/** Fully resolved route configuration consumed by model projection. */
 export interface GatewayRouteConfig {
 	readonly baseUrl: string;
-	readonly headers: Readonly<Record<string, string>>;
-	readonly models: Readonly<Record<string, GatewayModelConfig>>;
+	readonly headers: GatewayHeaderMap;
+	readonly models: GatewayModelConfigMap;
 	readonly whitelist?: readonly string[];
 	readonly blacklist?: readonly string[];
 	readonly hasGatewayModels: boolean;
 }
 
-/** Origin of the active gateway configuration. */
-export type GatewayConfigSource = "live" | "fallback";
-
 /** Fully resolved gateway configuration. */
 export interface GatewayConfig {
 	readonly origin: typeof GATEWAY_ORIGIN;
-	readonly source: GatewayConfigSource;
 	readonly authEnv: string;
 	readonly authCommand?: string | readonly string[];
 	readonly enabledBackends: readonly Backend[];
 	readonly routes: Readonly<Record<Backend, GatewayRouteConfig>>;
 }
 
-/** Structured parse failure for gateway or overlay configuration. */
+/** Structured parse failure for gateway configuration. */
 export class GatewayConfigParseError extends Error {
 	readonly _tag = "GatewayConfigParseError" as const;
 
@@ -90,7 +94,7 @@ export class GatewayConfigParseError extends Error {
 	 * Create a configuration parse failure.
 	 *
 	 * @param path - JSON path containing the invalid value.
-	 * @param expected - Safe description of the expected shape.
+	 * @param expected - Safe description of the expected value.
 	 */
 	constructor(
 		readonly path: string,
@@ -101,9 +105,30 @@ export class GatewayConfigParseError extends Error {
 	}
 }
 
-const PROVIDER_ALIASES: Readonly<Record<string, Backend>> = {
+/** Classified configuration loading failure. */
+export class GatewayConfigLoadError extends Error {
+	readonly _tag = "GatewayConfigLoadError" as const;
+
+	/**
+	 * Create a safe configuration loading failure.
+	 *
+	 * @param reason - Stable failure classification.
+	 * @param detail - Safe detail suitable for diagnostics.
+	 * @param cause - Original unclassified cause retained internally.
+	 */
+	constructor(
+		readonly reason: "http" | "network" | "remote-auth" | "remote-json" | "remote-document",
+		readonly detail: string,
+		override readonly cause?: unknown,
+	) {
+		super(detail);
+		this.name = "GatewayConfigLoadError";
+	}
+}
+
+const PROVIDER_ALIASES = {
 	"cloudflare-workers-ai": "workers-ai",
-};
+} as const satisfies { readonly [alias: string]: Backend };
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 const THINKING_FORMATS = [
@@ -119,29 +144,25 @@ const THINKING_FORMATS = [
 	"ant-ling",
 ] as const;
 
-function isRecord(input: unknown): input is Record<string, unknown> {
-	return input !== null && typeof input === "object" && !Array.isArray(input);
-}
-
-function requireRecord(input: unknown, path: string): Record<string, unknown> {
-	if (!isRecord(input)) throw new GatewayConfigParseError(path, "an object");
+function requireObject(input: JsonValue, path: string): JsonObject {
+	if (!isJsonObject(input)) throw new GatewayConfigParseError(path, "an object");
 	return input;
 }
 
-function optionalRecord(input: unknown, path: string): Record<string, unknown> | undefined {
+function optionalObject(input: JsonValue | undefined, path: string): JsonObject | undefined {
 	if (input === undefined) return undefined;
-	return requireRecord(input, path);
+	return requireObject(input, path);
 }
 
-function optionalString(input: unknown, path: string): string | undefined {
+function optionalString(input: JsonValue | undefined, path: string): string | undefined {
 	if (input === undefined) return undefined;
-	if (typeof input !== "string") throw new GatewayConfigParseError(path, "a string");
+	if (!isJsonString(input)) throw new GatewayConfigParseError(path, "a string");
 	const value = input.trim();
 	if (!value) throw new GatewayConfigParseError(path, "a non-empty string");
 	return value;
 }
 
-function optionalTrustedUrl(input: unknown, path: string, trustedOrigin: string): string | undefined {
+function optionalTrustedUrl(input: JsonValue | undefined, path: string, trustedOrigin: string): string | undefined {
 	const value = optionalString(input, path);
 	if (value === undefined) return undefined;
 	try {
@@ -156,21 +177,21 @@ function optionalTrustedUrl(input: unknown, path: string, trustedOrigin: string)
 	}
 }
 
-function optionalBoolean(input: unknown, path: string): boolean | undefined {
+function optionalBoolean(input: JsonValue | undefined, path: string): boolean | undefined {
 	if (input === undefined) return undefined;
-	if (typeof input !== "boolean") throw new GatewayConfigParseError(path, "a boolean");
+	if (!isJsonBoolean(input)) throw new GatewayConfigParseError(path, "a boolean");
 	return input;
 }
 
-function optionalNonNegativeNumber(input: unknown, path: string): number | undefined {
+function optionalNonNegativeNumber(input: JsonValue | undefined, path: string): number | undefined {
 	if (input === undefined) return undefined;
-	if (typeof input !== "number" || !Number.isFinite(input) || input < 0) {
+	if (!isJsonNumber(input) || input < 0) {
 		throw new GatewayConfigParseError(path, "a non-negative finite number");
 	}
 	return input;
 }
 
-function optionalPositiveInteger(input: unknown, path: string): number | undefined {
+function optionalPositiveInteger(input: JsonValue | undefined, path: string): number | undefined {
 	const value = optionalNonNegativeNumber(input, path);
 	if (value === undefined) return undefined;
 	if (!Number.isInteger(value) || value <= 0) {
@@ -179,7 +200,7 @@ function optionalPositiveInteger(input: unknown, path: string): number | undefin
 	return value;
 }
 
-function optionalStringArray(input: unknown, path: string): readonly string[] | undefined {
+function optionalStringArray(input: JsonValue | undefined, path: string): readonly string[] | undefined {
 	if (input === undefined) return undefined;
 	if (!Array.isArray(input)) throw new GatewayConfigParseError(path, "an array of strings");
 	return input.map((value, index) => {
@@ -189,38 +210,26 @@ function optionalStringArray(input: unknown, path: string): readonly string[] | 
 	});
 }
 
-function parseJsonValue(input: unknown, path: string): JsonValue {
-	if (input === null || typeof input === "string" || typeof input === "boolean") return input;
-	if (typeof input === "number" && Number.isFinite(input)) return input;
-	if (Array.isArray(input)) return input.map((value, index) => parseJsonValue(value, `${path}[${index}]`));
-	if (isRecord(input)) {
-		return Object.fromEntries(
-			Object.entries(input).map(([key, value]) => [key, parseJsonValue(value, `${path}.${key}`)]),
-		);
-	}
-	throw new GatewayConfigParseError(path, "a JSON value");
-}
-
-function parseHeaders(input: unknown, path: string): Readonly<Record<string, string>> | undefined {
-	const record = optionalRecord(input, path);
+function parseHeaders(input: JsonValue | undefined, path: string): GatewayHeaderMap | undefined {
+	const record = optionalObject(input, path);
 	if (!record) return undefined;
-	return Object.fromEntries(
-		Object.entries(record).map(([name, value]) => {
-			const parsed = optionalString(value, `${path}.${name}`);
-			if (parsed === undefined) throw new GatewayConfigParseError(`${path}.${name}`, "a non-empty string");
-			return [name, parsed];
-		}),
-	);
+	const headers: { [headerName: string]: string } = {};
+	for (const [name, value] of Object.entries(record)) {
+		const parsed = optionalString(value, `${path}.${name}`);
+		if (parsed === undefined) throw new GatewayConfigParseError(`${path}.${name}`, "a non-empty string");
+		headers[name] = parsed;
+	}
+	return headers;
 }
 
-function parseThinkingLevelMap(input: unknown, path: string): ThinkingLevelMap | undefined {
-	const record = optionalRecord(input, path);
+function parseThinkingLevelMap(input: JsonValue | undefined, path: string): ThinkingLevelMap | undefined {
+	const record = optionalObject(input, path);
 	if (!record) return undefined;
 	const parsed: ThinkingLevelMap = {};
 	for (const level of THINKING_LEVELS) {
 		const value = record[level];
 		if (value === undefined) continue;
-		if (value !== null && typeof value !== "string") {
+		if (value !== null && !isJsonString(value)) {
 			throw new GatewayConfigParseError(`${path}.${level}`, "a string or null");
 		}
 		parsed[level] = value;
@@ -251,16 +260,15 @@ interface ParsedCompatibility {
 	supportsStrictTools?: boolean;
 	supportsToolReferences?: boolean;
 	allowEmptySignature?: boolean;
-	sendSessionIdHeader?: boolean;
 }
 
 function parseOptionalEnum<Value extends string>(
-	input: unknown,
+	input: JsonValue | undefined,
 	path: string,
 	values: readonly Value[],
 ): Value | undefined {
 	if (input === undefined) return undefined;
-	const value = typeof input === "string" ? values.find((candidate) => candidate === input) : undefined;
+	const value = isJsonString(input) ? values.find((candidate) => candidate === input) : undefined;
 	if (value === undefined) {
 		throw new GatewayConfigParseError(path, `one of ${values.join(", ")}`);
 	}
@@ -268,13 +276,14 @@ function parseOptionalEnum<Value extends string>(
 }
 
 function compactCompatibility(input: ParsedCompatibility): Model<Api>["compat"] {
+	const entries = Object.entries(input).filter(([, value]) => value !== undefined);
 	// SAFETY: ParsedCompatibility contains only keys and values admitted by Pi's
 	// compatibility union; filtering removes absent properties before projection.
-	return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as Model<Api>["compat"];
+	return Object.fromEntries(entries) as Model<Api>["compat"];
 }
 
-function parseCompatibility(input: unknown, path: string): Model<Api>["compat"] | undefined {
-	const record = optionalRecord(input, path);
+function parseCompatibility(input: JsonValue | undefined, path: string): Model<Api>["compat"] | undefined {
+	const record = optionalObject(input, path);
 	if (!record) return undefined;
 	const parsed: ParsedCompatibility = {
 		supportsStore: optionalBoolean(record.supportsStore, `${path}.supportsStore`),
@@ -302,21 +311,15 @@ function parseCompatibility(input: unknown, path: string): Model<Api>["compat"] 
 		supportsStrictTools: optionalBoolean(record.supportsStrictTools, `${path}.supportsStrictTools`),
 		supportsToolReferences: optionalBoolean(record.supportsToolReferences, `${path}.supportsToolReferences`),
 		allowEmptySignature: optionalBoolean(record.allowEmptySignature, `${path}.allowEmptySignature`),
-		sendSessionIdHeader: optionalBoolean(record.sendSessionIdHeader, `${path}.sendSessionIdHeader`),
 	};
 	return compactCompatibility(parsed);
 }
 
-function parseModel(input: unknown, path: string): GatewayModelConfig {
-	const record = requireRecord(input, path);
-	const modalities = optionalRecord(record.modalities, `${path}.modalities`);
-	const limit = optionalRecord(record.limit, `${path}.limit`);
-	const cost = optionalRecord(record.cost, `${path}.cost`);
-	const optionsValue = optionalRecord(record.options, `${path}.options`);
-	const options = optionsValue
-		? Object.fromEntries(Object.entries(optionsValue).map(([key, value]) => [key, parseJsonValue(value, `${path}.options.${key}`)]))
-		: undefined;
-
+function parseModel(input: JsonValue, path: string): GatewayModelConfig {
+	const record = requireObject(input, path);
+	const modalities = optionalObject(record.modalities, `${path}.modalities`);
+	const limit = optionalObject(record.limit, `${path}.limit`);
+	const cost = optionalObject(record.cost, `${path}.cost`);
 	return {
 		requestModelId: optionalString(record.id, `${path}.id`),
 		name: optionalString(record.name, `${path}.name`),
@@ -331,19 +334,22 @@ function parseModel(input: unknown, path: string): GatewayModelConfig {
 		cacheWriteCost: optionalNonNegativeNumber(cost?.cache_write, `${path}.cost.cache_write`),
 		thinkingLevelMap: parseThinkingLevelMap(record.thinkingLevelMap, `${path}.thinkingLevelMap`),
 		compat: parseCompatibility(record.compat, `${path}.compat`),
-		options,
 	};
 }
 
-function parseModels(input: unknown, path: string): Readonly<Record<string, GatewayModelConfig>> {
-	const record = optionalRecord(input, path);
+function parseModels(input: JsonValue | undefined, path: string): GatewayModelConfigMap {
+	const record = optionalObject(input, path);
 	if (!record) return {};
-	return Object.fromEntries(Object.entries(record).map(([modelId, value]) => [modelId, parseModel(value, `${path}.${modelId}`)]));
+	const models: { [modelId: string]: GatewayModelConfig } = {};
+	for (const [modelId, value] of Object.entries(record)) {
+		models[modelId] = parseModel(value, `${path}.${modelId}`);
+	}
+	return models;
 }
 
-function parseProvider(input: unknown, path: string): GatewayProviderConfig {
-	const record = requireRecord(input, path);
-	const options = optionalRecord(record.options, `${path}.options`);
+function parseProvider(input: JsonValue, path: string): GatewayProviderConfig {
+	const record = requireObject(input, path);
+	const options = optionalObject(record.options, `${path}.options`);
 	return {
 		baseUrl: optionalTrustedUrl(options?.baseURL ?? options?.baseUrl, `${path}.options.baseURL`, GATEWAY_ORIGIN),
 		headers: parseHeaders(options?.headers, `${path}.options.headers`),
@@ -354,13 +360,12 @@ function parseProvider(input: unknown, path: string): GatewayProviderConfig {
 }
 
 function normalizeBackend(input: string): Backend | undefined {
-	const alias = PROVIDER_ALIASES[input];
-	if (alias) return alias;
+	if (input === "cloudflare-workers-ai") return PROVIDER_ALIASES[input];
 	return BACKENDS.find((backend) => backend === input);
 }
 
-function parseProviders(input: unknown, path: string): Readonly<Partial<Record<Backend, GatewayProviderConfig>>> {
-	const record = optionalRecord(input, path);
+function parseProviders(input: JsonValue | undefined, path: string): Readonly<Partial<Record<Backend, GatewayProviderConfig>>> {
+	const record = optionalObject(input, path);
 	if (!record) return {};
 	const providers: Partial<Record<Backend, GatewayProviderConfig>> = {};
 	for (const [providerName, value] of Object.entries(record)) {
@@ -374,7 +379,7 @@ function parseProviders(input: unknown, path: string): Readonly<Partial<Record<B
 	return providers;
 }
 
-function parseEnabledBackends(input: unknown, path: string): readonly Backend[] | undefined {
+function parseEnabledBackends(input: JsonValue | undefined, path: string): readonly Backend[] | undefined {
 	const providers = optionalStringArray(input, path);
 	if (!providers) return undefined;
 	const enabled = new Set<Backend>();
@@ -385,9 +390,9 @@ function parseEnabledBackends(input: unknown, path: string): readonly Backend[] 
 	return BACKENDS.filter((backend) => enabled.has(backend));
 }
 
-function parseAuthCommand(input: unknown, path: string): string | readonly string[] | undefined {
+function parseAuthCommand(input: JsonValue | undefined, path: string): string | readonly string[] | undefined {
 	if (input === undefined) return undefined;
-	if (typeof input === "string") return optionalString(input, path);
+	if (isJsonString(input)) return optionalString(input, path);
 	return optionalStringArray(input, path);
 }
 
@@ -399,10 +404,14 @@ function parseAuthCommand(input: unknown, path: string): string | readonly strin
  */
 export function parseGatewayDocument(input: unknown): Result<GatewayDocument, GatewayConfigParseError> {
 	try {
-		const root = requireRecord(input, "$");
-		const auth = optionalRecord(root.auth, "$.auth");
-		const remoteConfig = optionalRecord(root.remote_config, "$.remote_config");
-		const nestedConfig = optionalRecord(root.config, "$.config");
+		const decoded = parseJsonObject(input, "$");
+		if (!decoded.ok) {
+			return failure(new GatewayConfigParseError(decoded.error.path, decoded.error.expected));
+		}
+		const root = decoded.value;
+		const auth = optionalObject(root.auth, "$.auth");
+		const remoteConfig = optionalObject(root.remote_config, "$.remote_config");
+		const nestedConfig = optionalObject(root.config, "$.config");
 		const config = nestedConfig ?? root;
 		const configPath = nestedConfig ? "$.config" : "$";
 		const remoteUrl = optionalTrustedUrl(remoteConfig?.url, "$.remote_config.url", AUTH_ORIGIN);
@@ -451,90 +460,38 @@ export function mergeGatewayDocuments(discovery: GatewayDocument, remote: Gatewa
 	};
 }
 
-/**
- * Parse an untrusted local overlay payload.
- *
- * @param input - Decoded JSON or JSONC value from the local file.
- * @returns Parsed overlay or a path-specific failure.
- */
-export function parseGatewayLocalOverlay(input: unknown): Result<GatewayLocalOverlay, GatewayConfigParseError> {
-	try {
-		const root = requireRecord(input, "$");
-		const nestedConfig = optionalRecord(root.config, "$.config");
-		return success({ providers: parseProviders(root.provider ?? nestedConfig?.provider, "$.provider") });
-	} catch (error) {
-		if (Error.isError(error) && error instanceof GatewayConfigParseError) return failure(error);
-		throw error;
-	}
-}
-
-function normalizeHeaders(headers: Readonly<Record<string, string>> | undefined, backend: Backend): Readonly<Record<string, string>> {
-	const resolved: Record<string, string> = { ...DEFAULT_ROUTE_HEADERS[backend], ...headers };
-	if (backend === "anthropic" && resolved["anthropic-beta"]) {
-		const values = new Set(resolved["anthropic-beta"].split(",").map((value) => value.trim()).filter(Boolean));
-		values.add("interleaved-thinking-2025-05-14");
-		values.add("fine-grained-tool-streaming-2025-05-14");
-		resolved["anthropic-beta"] = Array.from(values).join(",");
-	}
-	return resolved;
-}
-
-function resolveRoute(
-	backend: Backend,
-	document: GatewayDocument | undefined,
-	overlay: GatewayLocalOverlay | undefined,
-): GatewayRouteConfig {
-	const gatewayProvider = document?.providers[backend];
-	const localProvider = overlay?.providers[backend];
-	const gatewayModels = gatewayProvider?.models ?? {};
-	const localModels = localProvider?.models ?? {};
-	let whitelist = gatewayProvider?.whitelist;
-	if (backend === "workers-ai" && whitelist && Object.keys(localModels).length > 0) {
-		const allowed = new Set(whitelist);
-		for (const [modelId, model] of Object.entries(localModels)) {
-			allowed.add(modelId);
-			if (model.requestModelId) allowed.add(stripRoutePrefix(model.requestModelId, backend));
-		}
-		whitelist = Array.from(allowed);
-	}
+function resolveRoute(backend: Backend, document: GatewayDocument): GatewayRouteConfig {
+	const provider = document.providers[backend];
+	const models = provider?.models ?? {};
 	return {
-		baseUrl: localProvider?.baseUrl ?? gatewayProvider?.baseUrl ?? DEFAULT_ROUTE_URLS[backend],
-		headers: normalizeHeaders({ ...gatewayProvider?.headers, ...localProvider?.headers }, backend),
-		models: { ...gatewayModels, ...localModels },
-		whitelist,
-		blacklist: localProvider?.blacklist ?? gatewayProvider?.blacklist,
-		hasGatewayModels: Object.keys(gatewayModels).length > 0,
+		baseUrl: provider?.baseUrl ?? DEFAULT_ROUTE_URLS[backend],
+		headers: provider?.headers ?? {},
+		models,
+		whitelist: provider?.whitelist,
+		blacklist: provider?.blacklist,
+		hasGatewayModels: Object.keys(models).length > 0,
 	};
 }
 
 /**
- * Resolve parsed discovery and overlay data into an immutable runtime configuration.
+ * Resolve a parsed discovery document into an immutable runtime configuration.
  *
- * @param document - Parsed live discovery document, or undefined for fallback defaults.
- * @param overlay - Optional parsed local model overlay.
+ * @param document - Parsed live discovery document.
  * @returns Runtime gateway configuration.
  */
-export function resolveGatewayConfig(
-	document: GatewayDocument | undefined,
-	overlay?: GatewayLocalOverlay,
-	source: GatewayConfigSource = document ? "live" : "fallback",
-): GatewayConfig {
-	const enabled = new Set<Backend>(document?.enabledBackends ?? BACKENDS);
-	for (const backend of BACKENDS) {
-		if (overlay?.providers[backend]) enabled.add(backend);
-	}
+export function resolveGatewayConfig(document: GatewayDocument): GatewayConfig {
+	const enabled = new Set<Backend>(document.enabledBackends ?? BACKENDS);
 	return {
 		origin: GATEWAY_ORIGIN,
-		source,
-		authEnv: document?.authEnv ?? "TOKEN",
-		authCommand: document?.authCommand,
+		authEnv: document.authEnv ?? "TOKEN",
+		authCommand: document.authCommand,
 		enabledBackends: BACKENDS.filter((backend) => enabled.has(backend)),
 		routes: {
-			anthropic: resolveRoute("anthropic", document, overlay),
-			openai: resolveRoute("openai", document, overlay),
-			google: resolveRoute("google", document, overlay),
-			xai: resolveRoute("xai", document, overlay),
-			"workers-ai": resolveRoute("workers-ai", document, overlay),
+			anthropic: resolveRoute("anthropic", document),
+			openai: resolveRoute("openai", document),
+			google: resolveRoute("google", document),
+			xai: resolveRoute("xai", document),
+			"workers-ai": resolveRoute("workers-ai", document),
 		},
 	};
 }
@@ -557,4 +514,94 @@ export function stripRoutePrefix(modelId: string, backend: Backend): string {
 		case "xai":
 			return modelId;
 	}
+}
+
+function createRequestSignal(signal: AbortSignal | undefined): AbortSignal {
+	const timeout = AbortSignal.timeout(DISCOVERY_TIMEOUT_MS);
+	return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+async function fetchJson(
+	url: string,
+	headers: GatewayHeaderMap,
+	signal: AbortSignal | undefined,
+	fetchImpl: typeof fetch,
+): Promise<Result<JsonValue, GatewayConfigLoadError>> {
+	try {
+		const response = await fetchImpl(url, {
+			method: "GET",
+			headers: { Accept: "application/json", ...headers },
+			signal: createRequestSignal(signal),
+		});
+		if (!response.ok) {
+			return failure(new GatewayConfigLoadError(
+				"http",
+				`Gateway configuration request failed with HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`,
+			));
+		}
+		try {
+			const parsed = parseJsonValue(await response.json());
+			return parsed.ok
+				? success(parsed.value)
+				: failure(new GatewayConfigLoadError("remote-json", "Gateway configuration returned invalid JSON", parsed.error));
+		} catch (cause) {
+			return failure(new GatewayConfigLoadError("remote-json", "Gateway configuration returned invalid JSON", cause));
+		}
+	} catch (cause) {
+		return failure(new GatewayConfigLoadError("network", "Gateway configuration request failed", cause));
+	}
+}
+
+function resolveRemoteHeaders(
+	document: GatewayDocument,
+	token: RedactedValue<string> | undefined,
+): Result<GatewayHeaderMap, GatewayConfigLoadError> {
+	const remote = document.remoteConfig;
+	if (!remote) return success({});
+	const placeholder = `{env:${document.authEnv ?? "TOKEN"}}`;
+	const needsToken = Object.values(remote.headers).some((value) => value.includes(placeholder));
+	if (needsToken && !token) {
+		return failure(new GatewayConfigLoadError("remote-auth", "Gateway remote configuration requires authentication"));
+	}
+	const value = token ? Redacted.value(token) : undefined;
+	const headers: { [headerName: string]: string } = {};
+	for (const [name, header] of Object.entries(remote.headers)) {
+		headers[name] = value ? header.replaceAll(placeholder, value) : header;
+	}
+	return success(headers);
+}
+
+/**
+ * Fetch and validate the trusted discovery document and optional authenticated remote config.
+ *
+ * @param options - Network, token, and cancellation inputs.
+ * @returns Resolved gateway configuration or a classified load failure.
+ */
+export async function fetchGatewayConfig(options: {
+	readonly token?: RedactedValue<string>;
+	readonly signal?: AbortSignal;
+	readonly fetch?: typeof fetch;
+	readonly wellKnownUrl?: string;
+}): Promise<Result<GatewayConfig, GatewayConfigLoadError>> {
+	const fetchImpl = options.fetch ?? fetch;
+	const wellKnownUrl = options.wellKnownUrl ?? `${AUTH_ORIGIN}/.well-known/opencode`;
+	const discoveryResponse = await fetchJson(wellKnownUrl, {}, options.signal, fetchImpl);
+	if (!discoveryResponse.ok) return discoveryResponse;
+	const parsedDiscovery = parseGatewayDocument(discoveryResponse.value);
+	if (!parsedDiscovery.ok) {
+		return failure(new GatewayConfigLoadError("remote-document", parsedDiscovery.error.message, parsedDiscovery.error));
+	}
+	let document = parsedDiscovery.value;
+	if (document.remoteConfig) {
+		const headers = resolveRemoteHeaders(document, options.token);
+		if (!headers.ok) return headers;
+		const remoteResponse = await fetchJson(document.remoteConfig.url, headers.value, options.signal, fetchImpl);
+		if (!remoteResponse.ok) return remoteResponse;
+		const parsedRemote = parseGatewayDocument(remoteResponse.value);
+		if (!parsedRemote.ok) {
+			return failure(new GatewayConfigLoadError("remote-document", parsedRemote.error.message, parsedRemote.error));
+		}
+		document = mergeGatewayDocuments(document, parsedRemote.value);
+	}
+	return success(resolveGatewayConfig(document));
 }
