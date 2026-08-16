@@ -57,6 +57,8 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 ### 4. Spawn both sub-agents in parallel
 
+Add this guardrail to both prompts: "Complete the review directly using your own context and tools. Do not spawn or delegate to additional sub-agents."
+
 **Standards sub-agent prompt** — include:
 
 - The full diff command and commit list.
