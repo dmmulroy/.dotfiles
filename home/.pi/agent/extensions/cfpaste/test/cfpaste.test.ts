@@ -191,6 +191,56 @@ test("Cloudflare Access provider invokes cloudflared without a shell and redacts
 	}]);
 });
 
+test("Cloudflare Access login requests a JWT-only stdout response", async () => {
+	const calls: Array<readonly string[]> = [];
+	const executor: CloudflaredExecutor = {
+		async execute(args) {
+			calls.push([...args]);
+			return args.includes("--no-verbose")
+				? { stdout: "refreshed-token\n", stderr: "", code: 0 }
+				: { stdout: "", stderr: "Login completed", code: 0 };
+		},
+	};
+	const provider = createCloudflareAccessTokenProvider(
+		executor,
+		"https://paste.cfdata.org",
+	);
+
+	const result = await provider.refreshToken();
+
+	assert.equal(result.ok, true);
+	assert.deepEqual(calls, [[
+		"access",
+		"login",
+		"--no-verbose",
+		"-app=https://paste.cfdata.org",
+	]]);
+});
+
+test("Cloudflare Access provider logs in when no cached token is available", async () => {
+	const calls: Array<readonly string[]> = [];
+	const executor: CloudflaredExecutor = {
+		async execute(args) {
+			calls.push([...args]);
+			return args[1] === "token"
+				? { stdout: "", stderr: "Unable to find token", code: 1 }
+				: { stdout: "new-token\n", stderr: "", code: 0 };
+		},
+	};
+	const provider = createCloudflareAccessTokenProvider(
+		executor,
+		"https://paste.cfdata.org",
+	);
+
+	const result = await provider.resolveToken();
+
+	assert.equal(result.ok, true);
+	assert.deepEqual(calls, [
+		["access", "token", "-app=https://paste.cfdata.org"],
+		["access", "login", "--no-verbose", "-app=https://paste.cfdata.org"],
+	]);
+});
+
 test("HTTP client posts form-encoded Markdown and appends /markdown to the result URL", async () => {
 	let requestBody = "";
 	let accessHeader = "";

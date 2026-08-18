@@ -45,10 +45,10 @@ async function runCloudflaredTokenCommand(
 ): Promise<Result<CloudflareAccessToken, CloudflaredAccessError>> {
 	let result: Awaited<ReturnType<CloudflaredExecutor["execute"]>>;
 	try {
-		result = await executor.execute(
-			["access", command, `-app=${origin}`],
-			{ timeout: AUTH_TIMEOUT_MS },
-		);
+		const commandArgs = command === "login"
+			? ["access", "login", "--no-verbose", `-app=${origin}`]
+			: ["access", "token", `-app=${origin}`];
+		result = await executor.execute(commandArgs, { timeout: AUTH_TIMEOUT_MS });
 	} catch (cause) {
 		return failure(
 			new CloudflaredAccessError(
@@ -87,7 +87,11 @@ export function createCloudflareAccessTokenProvider(
 	origin: string,
 ): CloudflareAccessTokenProvider {
 	return {
-		resolveToken: () => runCloudflaredTokenCommand(executor, origin, "token"),
+		async resolveToken() {
+			const cachedToken = await runCloudflaredTokenCommand(executor, origin, "token");
+			if (cachedToken.ok || cachedToken.error.reason === "missing") return cachedToken;
+			return runCloudflaredTokenCommand(executor, origin, "login");
+		},
 		refreshToken: () => runCloudflaredTokenCommand(executor, origin, "login"),
 	};
 }
