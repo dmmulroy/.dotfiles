@@ -32,6 +32,8 @@ onboarding = false
 # Default: unset; Herdr uses the configured theme's light sibling if available.
 # light_name = "catppuccin-latte"
 
+name = "catppuccin"
+auto_switch = false
 [theme.custom]
 # Override individual tokens from the base theme. Colors accept #rrggbb, named
 # colors, rgb(r,g,b), or reset aliases such as reset, default, none, and
@@ -478,6 +480,8 @@ prompt_new_workspace_name = true
 accent = "#c6a0f6"
 
 agent_panel_sort = "priority"
+show_agent_labels_on_pane_borders = false
+status_indicators = "symbols"
 [ui.sidebar.agents]
 # Blank rows between expanded Agent entries. At most 16 rows and 16 tokens per
 # row. Consecutive indented worktree children remain packed together.

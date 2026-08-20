@@ -12,6 +12,27 @@ const DEFAULT_ENVIRONMENT = "default";
 const SHELL_SEPARATORS = new Set(["&&", "||", ";", "|", "\n"]);
 const SHELL_META_TOKENS = new Set(["<", ">", ">>", "<<", "&"]);
 const WRANGLER_DEPLOY_COMMANDS = new Set(["deploy", "publish"]);
+const WRANGLER_VALUE_FLAGS = new Set(["--cwd", "--config", "-c", "--env", "-e", "--name"]);
+const CF_VALUE_FLAGS = new Set([
+	"--mode",
+	"-m",
+	"--tag",
+	"--message",
+	"--profile",
+	"--zone",
+	"-z",
+	"--local-endpoint",
+]);
+const ALCHEMY_VALUE_FLAGS = new Set([
+	"--stage",
+	"--profile",
+	"--env-file",
+	"--log-level",
+	"--completions",
+]);
+const GUARDED_COMMAND_WORD_PATTERN =
+	/\b(?:wrangler|cf|alchemy|npx|pnpx|bunx|vpx|npm|pnpm|yarn|bun|vp|vpr)\b/;
+const NODE_SCRIPT_PATH_PATTERN = /[.](?:[cm]?[jt]s)(?=["'\s]|$|[;&|])/;
 const MAX_PACKAGE_SCRIPT_DEPTH = 12;
 const MAX_WORKSPACE_PACKAGES = 1_000;
 const DIRECT_MUTATION_COMMANDS = new Set(["rm", "tee", "touch", "truncate"]);
@@ -103,6 +124,7 @@ type CachedPackageScripts = {
 
 type DeploymentEvaluationCache = {
 	readonly packageScripts: Map<string, CachedPackageScripts>;
+	readonly policyRepositoryRoots: WeakMap<CloudflareDeploymentPolicy, ReadonlySet<string>>;
 };
 
 type PackageTaskCommandResolution = {
@@ -173,6 +195,42 @@ function canonicalExistingPath(path: string): Result<string, CloudflareDeploymen
 			`project resolution cannot canonicalize ${JSON.stringify(path)}: ${cause instanceof Error ? cause.message : String(cause)}.`,
 		);
 	}
+}
+
+function findCanonicalRepositoryRoot(path: string): string | undefined {
+	let current: string;
+	try {
+		const canonicalPath = realpathSync(path);
+		current = statSync(canonicalPath).isDirectory() ? canonicalPath : dirname(canonicalPath);
+	} catch {
+		return undefined;
+	}
+	while (true) {
+		if (existsSync(join(current, ".git"))) return current;
+		const parent = dirname(current);
+		if (parent === current) return undefined;
+		current = parent;
+	}
+}
+
+function isAllowlistedRepositoryWorkingDirectory(
+	cwd: string,
+	policy: CloudflareDeploymentPolicy,
+	cache: DeploymentEvaluationCache | undefined,
+): boolean {
+	if (policy.version !== 2 || policy.alchemy.length === 0) return false;
+	let allowlistedRepositoryRoots = cache?.policyRepositoryRoots.get(policy);
+	if (allowlistedRepositoryRoots === undefined) {
+		const roots = new Set<string>();
+		for (const entry of policy.alchemy) {
+			const repositoryRoot = findCanonicalRepositoryRoot(entry.project);
+			if (repositoryRoot !== undefined) roots.add(repositoryRoot);
+		}
+		allowlistedRepositoryRoots = roots;
+		cache?.policyRepositoryRoots.set(policy, roots);
+	}
+	const commandRepository = findCanonicalRepositoryRoot(cwd);
+	return commandRepository !== undefined && allowlistedRepositoryRoots.has(commandRepository);
 }
 
 /** Parses the versioned global policy; malformed and unknown policy shapes are errors. */
@@ -329,7 +387,8 @@ function parseEnvironmentAssignments(tokens: readonly string[]): {
 }
 
 function executableName(token: string): string {
-	return token.split("/").at(-1) ?? token;
+	const slashIndex = token.lastIndexOf("/");
+	return slashIndex === -1 ? token : token.slice(slashIndex + 1);
 }
 
 function mentionsCloudflareDeployment(command: string): boolean {
@@ -776,43 +835,59 @@ function resolveStaticViteTaskCommand(
 }
 
 function resolvePackageTaskCommand(
-	segment: readonly string[],
-	cwd: string,
+	task: PackageTask,
 	cache: DeploymentEvaluationCache | undefined,
 ): Result<PackageTaskCommandResolution | undefined, CloudflareDeploymentBlocked> {
-	const task = parsePackageTask(segment, cwd);
-	if (task._tag === "err") return task;
-	if (task.value === undefined) return { _tag: "ok", value: undefined };
 	let packagePath: string | undefined;
-	if (task.value.filter === undefined)
-		packagePath = findFileUpward(task.value.packageCwd, ["package.json"]);
+	if (task.filter === undefined)
+		packagePath = findFileUpward(task.packageCwd, ["package.json"]);
 	else {
-		const workspacePackage = resolveWorkspacePackagePath(
-			task.value.packageCwd,
-			task.value.filter,
-			cache,
-		);
+		const workspacePackage = resolveWorkspacePackagePath(task.packageCwd, task.filter, cache);
 		if (workspacePackage._tag === "err") return workspacePackage;
 		packagePath = workspacePackage.value;
 	}
 	if (packagePath === undefined)
-		return blocked(`script resolution found no package.json from ${task.value.packageCwd}.`);
-	if (task.value.runner === "vp" || task.value.runner === "vpr") {
-		const viteTask = resolveStaticViteTaskCommand(dirname(packagePath), task.value.taskName);
+		return blocked(`script resolution found no package.json from ${task.packageCwd}.`);
+	if (task.runner === "vp" || task.runner === "vpr") {
+		const viteTask = resolveStaticViteTaskCommand(dirname(packagePath), task.taskName);
 		if (viteTask._tag === "err" || viteTask.value !== undefined) return viteTask;
 	}
 	const manifest = loadCachedPackageScripts(packagePath, cache);
 	if (manifest.unreadable) return blocked(`script resolution cannot read or parse ${packagePath}.`);
-	const script = manifest.scripts?.[task.value.taskName];
+	const script = manifest.scripts?.[task.taskName];
 	if (script === undefined) return { _tag: "ok", value: undefined };
 	if (typeof script !== "string" || script.trim().length === 0)
 		return blocked(
-			`script resolution requires ${JSON.stringify(task.value.taskName)} in ${packagePath} to be one static non-empty string.`,
+			`script resolution requires ${JSON.stringify(task.taskName)} in ${packagePath} to be one static non-empty string.`,
 		);
 	return {
 		_tag: "ok",
-		value: { sourcePath: packagePath, taskName: task.value.taskName, command: script },
+		value: { sourcePath: packagePath, taskName: task.taskName, command: script },
 	};
+}
+
+function findStaticNodeDeploymentScript(
+	segment: readonly string[],
+	cwd: string,
+): string | undefined {
+	const assignment = parseEnvironmentAssignments(segment);
+	if (executableName(assignment.rest[0] ?? "") !== "node") return undefined;
+	const scriptArgument = assignment.rest[1];
+	if (
+		scriptArgument === undefined ||
+		scriptArgument.startsWith("-") ||
+		!/[.](?:[cm]?[jt]s)$/.test(scriptArgument)
+	)
+		return undefined;
+	let scriptPath: string;
+	let contents: string;
+	try {
+		scriptPath = realpathSync(resolve(cwd, scriptArgument));
+		contents = readFileSync(scriptPath, "utf8");
+	} catch {
+		return undefined;
+	}
+	return mentionsCloudflareDeployment(contents) ? scriptPath : undefined;
 }
 
 function parseDeploymentInvocation(
@@ -835,19 +910,10 @@ function hasEnabledBooleanFlag(args: readonly string[], longName: string): boole
 function deploymentCommandWords(invocation: DeploymentInvocation): readonly string[] {
 	const valueFlags =
 		invocation.cli === "wrangler"
-			? new Set(["--cwd", "--config", "-c", "--env", "-e", "--name"])
+			? WRANGLER_VALUE_FLAGS
 			: invocation.cli === "cf"
-				? new Set([
-						"--mode",
-						"-m",
-						"--tag",
-						"--message",
-						"--profile",
-						"--zone",
-						"-z",
-						"--local-endpoint",
-					])
-				: new Set(["--stage", "--profile", "--env-file", "--log-level", "--completions"]);
+				? CF_VALUE_FLAGS
+				: ALCHEMY_VALUE_FLAGS;
 	const words: string[] = [];
 	for (let index = 0; index < invocation.args.length; index += 1) {
 		const argument = invocation.args[index];
@@ -1581,6 +1647,13 @@ function evaluateCloudflareDeploymentCommandWithCache(
 	cache: DeploymentEvaluationCache | undefined,
 	resolution: ScriptResolutionContext = { depth: 0, activeScripts: new Set() },
 ): CloudflareDeploymentDecision {
+	if (isAllowlistedRepositoryWorkingDirectory(options.cwd, options.policy, cache)) {
+		return {
+			_tag: "allow",
+			reason: "Cloudflare deployment guard exempted this canonical allowlisted repository.",
+		};
+	}
+
 	const tokenized = tokenizeShell(command);
 	if (tokenized._tag === "err") {
 		return mentionsCloudflareDeployment(command) || /\b(?:deploy|destroy)\b/i.test(command)
@@ -1659,7 +1732,7 @@ function evaluateCloudflareDeploymentCommandWithCache(
 				return { _tag: "block", reason: packageTask.error.message };
 			}
 		} else if (packageTask.value !== undefined) {
-			const packageTaskCommand = resolvePackageTaskCommand(segment, currentCwd, cache);
+			const packageTaskCommand = resolvePackageTaskCommand(packageTask.value, cache);
 			if (packageTaskCommand._tag === "err")
 				return { _tag: "block", reason: packageTaskCommand.error.message };
 			if (packageTaskCommand.value === undefined) {
@@ -1714,6 +1787,16 @@ function evaluateCloudflareDeploymentCommandWithCache(
 				};
 			}
 			continue;
+		}
+
+		const staticNodeDeploymentScript = findStaticNodeDeploymentScript(segment, currentCwd);
+		if (staticNodeDeploymentScript !== undefined) {
+			return {
+				_tag: "block",
+				reason: new CloudflareDeploymentBlocked(
+					`script resolution found Cloudflare deployment logic in static Node entrypoint ${JSON.stringify(staticNodeDeploymentScript)}.`,
+				).message,
+			};
 		}
 
 		const segmentCommand = segment.join(" ");
@@ -1896,19 +1979,36 @@ export function findsCloudflarePolicyMutation(command: string, cwd: string): boo
 function mayNeedCloudflareDeploymentGuard(command: string): boolean {
 	return (
 		command.includes(POLICY_FILE_NAME) ||
-		/\b(?:wrangler|cf|alchemy|npx|pnpx|bunx|vpx|npm|pnpm|yarn|bun|vp|vpr)\b/.test(command)
+		GUARDED_COMMAND_WORD_PATTERN.test(command) ||
+		(command.includes("node") && NODE_SCRIPT_PATH_PATTERN.test(command))
 	);
 }
 
 /** Installs the global Pi tool_call guard for Cloudflare deployments and policy mutation. */
 export default function cloudflareDeploymentAllowlistExtension(pi: ExtensionAPI): void {
 	let cachedPolicy: CachedGlobalPolicy | undefined;
-	const evaluationCache: DeploymentEvaluationCache = { packageScripts: new Map() };
+	const evaluationCache: DeploymentEvaluationCache = {
+		packageScripts: new Map(),
+		policyRepositoryRoots: new WeakMap(),
+	};
 	const canonicalPolicyPath = normalizedToolPath(POLICY_FILE_PATH, process.cwd());
+	const ambientEnvironment: Readonly<Record<string, string>> = {
+		...(process.env.CLOUDFLARE_ENV === undefined
+			? {}
+			: { CLOUDFLARE_ENV: process.env.CLOUDFLARE_ENV }),
+		...(process.env.STAGE === undefined ? {} : { STAGE: process.env.STAGE }),
+	};
 
 	pi.on("tool_call", (event, ctx) => {
-		if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
-			if (normalizedToolPath(event.input.path, ctx.cwd) !== canonicalPolicyPath) return;
+		if (
+			(event.toolName === "write" || event.toolName === "edit") &&
+			(isToolCallEventType("write", event) || isToolCallEventType("edit", event))
+		) {
+			if (
+				!event.input.path.includes(POLICY_FILE_NAME) ||
+				normalizedToolPath(event.input.path, ctx.cwd) !== canonicalPolicyPath
+			)
+				return;
 			return {
 				block: true,
 				reason: new CloudflareDeploymentBlocked(
@@ -1916,7 +2016,7 @@ export default function cloudflareDeploymentAllowlistExtension(pi: ExtensionAPI)
 				).message,
 			};
 		}
-		if (!isToolCallEventType("bash", event)) return;
+		if (event.toolName !== "bash" || !isToolCallEventType("bash", event)) return;
 		const command = event.input.command;
 		if (!mayNeedCloudflareDeploymentGuard(command)) return;
 		if (command.includes(POLICY_FILE_NAME) && findsCloudflarePolicyMutation(command, ctx.cwd)) {
@@ -1928,12 +2028,6 @@ export default function cloudflareDeploymentAllowlistExtension(pi: ExtensionAPI)
 			};
 		}
 
-		const ambientEnvironment: Readonly<Record<string, string>> = {
-			...(process.env.CLOUDFLARE_ENV === undefined
-				? {}
-				: { CLOUDFLARE_ENV: process.env.CLOUDFLARE_ENV }),
-			...(process.env.STAGE === undefined ? {} : { STAGE: process.env.STAGE }),
-		};
 		const preflightDecision = evaluateCloudflareDeploymentCommandWithCache(
 			command,
 			{

@@ -19,7 +19,13 @@ When the check passes, the `herdr` binary in `PATH` talks to the current session
 
 ## Learn the current CLI
 
-Use the common commands documented below directly. The installed binary remains the authority when an operation is not covered here or documented syntax fails. Inspect the relevant command group by running it without a subcommand, or use `herdr --help` when the group is unknown:
+The installed binary is the authority for command syntax. Start with:
+
+```bash
+herdr --help
+```
+
+Then print the relevant command group by running the group without a subcommand:
 
 ```bash
 herdr agent
@@ -33,7 +39,7 @@ herdr integration
 herdr session
 ```
 
-Use `herdr --help` or a top-level command group for discovery. Bare `herdr` launches or attaches the TUI, while mutating nested commands such as `herdr workspace create` may execute with defaults when arguments are omitted.
+Do not run bare `herdr` for discovery; it launches or attaches the TUI. Do not probe a mutating nested command by omitting arguments. Commands such as `herdr workspace create` are valid with defaults and will execute.
 
 Most control commands return JSON. Read identifiers and state from those responses instead of predicting them.
 
@@ -83,12 +89,7 @@ Creation responses expose the IDs to use next. `workspace create` returns `.resu
 
 ## Start and coordinate an agent
 
-Choose the completion mode that matches the request:
-
-- **Launch and hand off:** start the agent and wait for Herdr to report it ready. Then report its name and pane ID to the user and leave subsequent interaction to them.
-- **Delegate and return:** start the agent, submit the work, and wait for a settled response. Completion means the response was captured, or a blocked state was inspected and reported with the input it needs.
-
-Default to a sibling pane in the current tab and the current working directory. Create a workspace, tab, worktree, or different cwd only when the user explicitly requests that topology or location.
+Default to a sibling pane in the current tab and the current working directory. Do not create a workspace, tab, worktree, or different cwd unless the user explicitly requests that topology or location.
 
 Honor a direction requested by the user. Otherwise inspect the caller pane:
 
@@ -116,15 +117,15 @@ Use the kind requested by the user. Run `herdr agent` to inspect the installed k
 herdr agent start reviewer --kind codex --pane <returned-pane-id> -- <agent-args...>
 ```
 
-`agent start` returns only after Herdr detects the expected agent in the same pane and considers it ready for interactive input. It defaults to a 30-second startup timeout.
+A successful `agent start` returns only after Herdr detects the expected agent in the same pane and considers it ready for interactive input. If the agent is blocked during startup, the command returns `agent_not_ready` immediately but keeps the name available for `agent read` and `agent send-keys`. Wait until the agent becomes idle before prompting it. Startup defaults to a 30-second timeout.
 
-For delegate-and-return work, submit the prompt through the agent surface:
+Submit work through the agent surface:
 
 ```bash
 herdr agent prompt reviewer "Review the current diff and report only actionable findings." --wait --timeout 120000
 ```
 
-`agent prompt` atomically submits text and encoded Enter while honoring the pane's live bracketed-paste mode. For normal agent work, `--wait` is enough: it waits for the first settled `idle`, `done`, or `blocked` state. Rely on those defaults rather than repeating them with `--until`.
+`agent prompt` honors the pane's live bracketed-paste mode and sends text followed by encoded Enter after a short delay. It rejects an agent already waiting at an approval or question dialog with `agent_blocked` before sending any input. Inspect the blocked UI and ask the user before answering it. For normal agent work, `--wait` is enough: it waits for the first settled `idle`, `done`, or `blocked` state. Do not repeat those defaults with `--until`.
 
 A prompt sent from a non-working state must produce an observed lifecycle change within five seconds. Otherwise Herdr returns `agent_prompt_stalled` instead of waiting indefinitely. This wait tracks lifecycle state, not an individual turn; if the agent is already working, completion of the active turn may satisfy it.
 
@@ -152,7 +153,7 @@ herdr agent read reviewer --source recent-unwrapped --lines 120
 
 If a wait fails or returns `blocked`, inspect `agent get` and `agent read` before deciding what input to send. Use the pane surface only when raw terminal control is intentional.
 
-## Run a command or dev server in another pane
+## Run an ordinary command in another pane
 
 Create a sibling pane with the same geometry rule, preserve the caller's working directory, and keep user focus unchanged:
 
@@ -160,7 +161,7 @@ Create a sibling pane with the same geometry rule, preserve the caller's working
 herdr pane split --current --direction right --cwd "$PWD" --no-focus
 ```
 
-Read the new pane ID from `.result.pane.pane_id`. For a finite command, run it and verify its expected completion output:
+Read the new pane ID from `.result.pane.pane_id`, then run and inspect the command:
 
 ```bash
 herdr pane run <returned-pane-id> "just test"
@@ -168,17 +169,7 @@ herdr pane wait-output <returned-pane-id> --match "test result" --timeout 120000
 herdr pane read <returned-pane-id> --source recent-unwrapped --lines 120
 ```
 
-For a dev server or another background process, wait for its actual readiness marker instead:
-
-```bash
-herdr pane run <returned-pane-id> "npm run dev"
-herdr pane wait-output <returned-pane-id> --match "ready" --timeout 120000
-herdr pane read <returned-pane-id> --source recent-unwrapped --lines 120
-```
-
-For launch-and-handoff work, readiness plus reporting the pane ID completes the task. For agent-managed work, continue monitoring the pane for as long as the task requires.
-
-`pane run` atomically sends command text and Enter. `pane wait-output` searches the selected snapshot immediately, so output that already exists can match. Use `--match <text>` for a literal substring or `--regex <pattern>` for a Rust regular expression. Match output specific to the launched command so stale pane output cannot satisfy readiness. Omitting `--timeout` allows an indefinite wait.
+`pane run` atomically sends command text and Enter. `pane wait-output` searches the selected snapshot immediately, so output that already exists can match. Use `--match <text>` for a literal substring or `--regex <pattern>` for a Rust regular expression. Omitting `--timeout` allows an indefinite wait.
 
 Use the read source that matches the task:
 
@@ -191,14 +182,14 @@ Use `--format ansi` when colors and terminal styling are evidence. Otherwise use
 
 `--lines` asks Herdr for more rows from the pane's available screen and host scrollback. If increasing it does not reveal more of a completed response, the pane is probably running the agent on the terminal's alternate screen. Rows that leave the alternate screen do not enter Herdr's host scrollback, so a larger line count cannot recover them.
 
-After that failed read, ask the agent to write its complete response as Markdown in a temporary directory and reply only with the file path, then read the file directly. Reserve file output for this fallback after a normal pane read fails.
+After that failed read, ask the agent to write its complete response as Markdown in a temporary directory and reply only with the file path, then read the file directly. Use this only as a fallback; do not request file output in the initial prompt.
 
 ## Safety and coordination rules
 
 - Use `--no-focus` for background work unless the user asked to switch context.
-- Target work with `--current`, an explicit pane ID, or a unique agent name rather than another client's focused pane.
-- Parse IDs from JSON responses rather than deriving them from sidebar order or examples.
-- Leave workspaces, tabs, panes, and sessions you did not create open unless the user explicitly asks to close them.
-- Run `herdr server stop` from an active session only when the user explicitly intends to stop the server and its pane processes.
-- Keep the main Herdr process running. Use named test sessions for experiments that need an isolated server.
+- Use `--current`, an explicit pane ID, or a unique agent name. Do not rely on another client's focused pane.
+- Parse IDs from JSON responses. Do not derive them from sidebar order or examples.
+- Do not close workspaces, tabs, panes, or sessions you did not create unless the user explicitly asked.
+- Never run `herdr server stop` from an active session unless the user explicitly intends to stop the server and its pane processes.
+- Never kill the main Herdr process. Use named test sessions for experiments that need an isolated server.
 - CLI server errors are JSON on stderr with exit status 1. CLI syntax errors exit with status 2.

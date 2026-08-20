@@ -81,6 +81,48 @@ function makeAlchemyWorkspace(): {
 	return { root, designSystem, introKit };
 }
 
+function makeRepositoryExemptionWorkspace(): {
+	readonly root: string;
+	readonly api: string;
+	readonly policy: CloudflareDeploymentPolicy;
+} {
+	const root = mkdtempSync(join(tmpdir(), "cloudflare-repository-exemption-"));
+	const api = join(root, "apps", "api");
+	mkdirSync(join(root, ".git"));
+	mkdirSync(join(api, "scripts"), { recursive: true });
+	writeFileSync(join(root, "pnpm-workspace.yaml"), 'packages:\n  - "apps/*"\n');
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({
+			name: "overseer-fixture",
+			scripts: {
+				"test:e2e:deployed": "vp run --no-cache @overseer/api#test:e2e:deployed",
+				"deploy:malformed": 42,
+				"deploy:unsupported": "vp run --unknown @overseer/api#test:e2e:deployed",
+			},
+		}),
+	);
+	writeFileSync(
+		join(api, "package.json"),
+		JSON.stringify({
+			name: "@overseer/api",
+			scripts: { "test:e2e:deployed": "node scripts/run-e2e.ts deployed" },
+		}),
+	);
+	writeFileSync(
+		join(api, "scripts", "run-e2e.ts"),
+		'ChildProcess.make("alchemy", ["destroy", "--stage", "test-stage"]);\n',
+	);
+	writeFileSync(join(api, "alchemy.run.ts"), 'export default Alchemy.Stack("Overseer");\n');
+	return {
+		root,
+		api,
+		policy: makeAlchemyPolicy([
+			{ project: join(api, "alchemy.run.ts"), stages: ["production"], stack: "Overseer" },
+		]),
+	};
+}
+
 function makeJsonWorkerProject(): string {
 	const cwd = mkdtempSync(join(tmpdir(), "cloudflare-deployment-guard-"));
 	writeFileSync(
@@ -493,6 +535,39 @@ test("resolves complete pnpm workspace deployment script chains", () => {
 		assert.equal(decision._tag, "block", command);
 		if (decision._tag === "block")
 			assert.match(decision.reason, /script resolution.*workspace package/);
+	}
+});
+
+test("exempts every canonical working directory in an allowlisted repository before script resolution", () => {
+	const workspace = makeRepositoryExemptionWorkspace();
+	const repositoryAlias = join(tmpdir(), `cloudflare-repository-alias-${Date.now()}`);
+	symlinkSync(workspace.root, repositoryAlias);
+
+	for (const [command, cwd] of [
+		["pnpm test:e2e:deployed", workspace.root],
+		["pnpm --filter @overseer/api test:e2e:deployed", workspace.root],
+		["node scripts/run-e2e.ts deployed", workspace.api],
+		["pnpm test:e2e:deployed", repositoryAlias],
+		["node scripts/run-e2e.ts deployed", join(repositoryAlias, "apps", "api")],
+	] as const) {
+		assert.equal(decide(command, cwd, workspace.policy)._tag, "allow", `${cwd}: ${command}`);
+	}
+});
+
+test("keeps deployment script resolution fail-closed outside allowlisted repositories", () => {
+	const allowlisted = makeRepositoryExemptionWorkspace();
+	const unlisted = makeRepositoryExemptionWorkspace();
+
+	for (const [command, cwd] of [
+		["pnpm test:e2e:deployed", unlisted.root],
+		["pnpm --filter @overseer/api test:e2e:deployed", unlisted.root],
+		["node scripts/run-e2e.ts deployed", unlisted.api],
+		["pnpm deploy:malformed", unlisted.root],
+		["pnpm deploy:unsupported", unlisted.root],
+	] as const) {
+		const decision = decide(command, cwd, allowlisted.policy);
+		assert.equal(decision._tag, "block", `${cwd}: ${command}`);
+		if (decision._tag === "block") assert.match(decision.reason, /script resolution/);
 	}
 });
 
