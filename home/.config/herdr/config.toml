@@ -43,6 +43,12 @@ auto_switch = false
 accent = "#c6a0f6"
 # Sidebar and panel background.
 panel_bg = "#24273a"
+# Desktop sidebar background, independent of other panel surfaces.
+# sidebar_bg = "#24273a"
+# Background of the active Space and focused Agent sidebar rows.
+# active_row_bg = "#363a4f"
+# Background of the Navigate-mode cursor row in the sidebar.
+# selection_bg = "#494d64"
 # Lowest elevated surface color.
 # surface0 = "#363a4f"
 # Higher elevated surface color.
@@ -236,6 +242,14 @@ rename_tab = "prefix+comma"
 # Default: "prefix+n".
 # next_tab = "prefix+n"
 
+# Move the active tab one position toward the front.
+# Default: unset.
+# move_tab_previous = ""
+
+# Move the active tab one position toward the back.
+# Default: unset.
+# move_tab_next = ""
+
 # Switch to tab 1-9.
 # Default: "prefix+1..9".
 # switch_tab = "prefix+1..9"
@@ -324,6 +338,22 @@ zoom = "prefix+m"
 # Default: "prefix+r".
 resize_mode = "prefix+shift+r"
 
+# Resize the focused pane toward the left without entering resize mode.
+# Default: unset.
+# resize_pane_left = ""
+
+# Resize the focused pane downward without entering resize mode.
+# Default: unset.
+# resize_pane_down = ""
+
+# Resize the focused pane upward without entering resize mode.
+# Default: unset.
+# resize_pane_up = ""
+
+# Resize the focused pane toward the right without entering resize mode.
+# Default: unset.
+# resize_pane_right = ""
+
 # Toggle sidebar collapse.
 # Default: "prefix+b".
 # toggle_sidebar = "prefix+b"
@@ -371,6 +401,21 @@ description = "Navigate right (Vim/Herdr)"
 # Modifier combo making 1-9 focus Agent panel entries directly.
 # Default: unset.
 # agents = ""
+
+# -----------------------------------------------------------------------------
+# Server
+# -----------------------------------------------------------------------------
+
+# [server]
+# Virtual terminal width used for layout and new panes while no client is
+# attached. Attached clients always use their own terminal size. Must be > 0.
+# Default: 120.
+# headless_cols = 120
+
+# Virtual terminal height used for layout and new panes while no client is
+# attached. Attached clients always use their own terminal size. Must be > 0.
+# Default: 40.
+# headless_rows = 40
 
 # -----------------------------------------------------------------------------
 # Worktrees
@@ -457,6 +502,16 @@ prompt_new_workspace_name = true
 # Default: true.
 # pane_borders = true
 
+# Draw borders along the outside edge of the pane area. Disable this and pane
+# gaps for tmux-style internal splitters without an outside frame.
+# Default: true.
+# pane_outer_borders = true
+
+# Draw interactive scrollbars beside panes. Disable to reclaim their column and
+# keep scrollbars out of terminal-native selections.
+# Default: true.
+# pane_scrollbars = true
+
 # Visually separate split panes instead of sharing divider borders.
 # Default: true.
 # pane_gaps = true
@@ -468,6 +523,24 @@ prompt_new_workspace_name = true
 # Hide the tab row when the workspace has exactly one tab.
 # Default: false.
 # hide_tab_bar_when_single_tab = false
+
+# Desktop tab-row placement: "top" or "bottom".
+# Default: "top".
+# tab_bar_position = "top"
+
+# Ordered right-aligned tab-bar entries. Supported types are zoom, hostname,
+# datetime, text, and command; see the configuration guide for entry fields.
+# Default: [].
+# tab_bar_right = []
+
+# Text inserted between visible right-aligned tab-bar entries.
+# Default: " ".
+# tab_bar_right_separator = " "
+
+# Outer terminal title. Tokens are {hostname}, {workspace}, {tab}, {pane}, and
+# {terminal_title}; doubled braces produce literal braces. Empty leaves it alone.
+# Default: "{hostname}: {workspace}".
+# window_title = "{hostname}: {workspace}"
 
 # Agent sidebar ordering: "spaces" groups by workspace; "priority" creates an
 # attention queue. "workspaces" is accepted as an alias for "spaces".
@@ -481,6 +554,10 @@ accent = "#c6a0f6"
 
 agent_panel_sort = "priority"
 show_agent_labels_on_pane_borders = false
+
+# Agent-state markers: "dots" uses compact colored marks; "symbols" uses
+# distinct static glyphs for blocked, working, done, idle, and unknown states.
+# Default: "dots".
 status_indicators = "symbols"
 [ui.sidebar.agents]
 # Blank rows between expanded Agent entries. At most 16 rows and 16 tokens per
@@ -603,6 +680,8 @@ enabled = false
 # kilo = "default"
 # Qoder CLI. Default: "default".
 # qodercli = "default"
+# Qwen Code. Default: "default".
+# qwen = "default"
 # Maki. Default: "default".
 # maki = "default"
 
@@ -664,7 +743,7 @@ pane_history = true
 # Limit hidden-cursor reveal to detected Agents (case-insensitive). Empty means
 # any focused pane. Accepted names: pi, claude, codex, gemini, cursor, devin,
 # cline, opencode, copilot, kimi, kiro, droid, amp, grok, hermes, kilo,
-# qodercli, qoder, and maki.
+# qodercli, qoder, qwen, qwen-code, and maki.
 # Default: [].
 # cjk_ime_agents = []
 
