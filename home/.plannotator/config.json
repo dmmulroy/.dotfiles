@@ -1,6 +1,6 @@
 {
   "diffOptions": {
-    "diffStyle": "split",
+    "diffStyle": "unified",
     "defaultDiffType": "since-base",
     "hideWhitespace": true,
     "diffIndicators": "bars",
