@@ -43,7 +43,7 @@ export const layerFromEnvironment = Layer.effect(
 - Use `ConfigProvider.constantCase` when camelCase schema keys should read `SCREAMING_SNAKE_CASE` env vars.
 - Use `ConfigProvider.nested(...)` to scope a provider under a prefix.
 
-For tests that supply configuration, follow [`effect-testing.md#config-in-tests`](effect-testing.md#config-in-tests).
+For tests that supply configuration, follow [`effect-testing.md#configuration`](effect-testing.md#configuration).
 
 ## Layer Config Helpers
 

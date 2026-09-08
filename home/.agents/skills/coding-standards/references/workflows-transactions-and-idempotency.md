@@ -19,6 +19,12 @@ Require an explicit idempotency strategy when an operation has a real duplicate-
 
 For every retried side effect, state the guarantee that makes repeated execution safe, such as stable-key deduplication, a uniqueness constraint, or a guarded state transition.
 
+## Uncertain outcomes and compensation
+
+A timeout, interruption, or lost response does not establish that a remote mutation failed. Model the uncertainty explicitly when the provider cannot prove the outcome; choose reconciliation, operator disposition, or a safe retry from actual idempotency evidence.
+
+Persist identity and recovery intent before an external mutation when required to undo a remote commit whose response can be lost. Preserve receipts, outboxes, leases, checkpoints, and compensation tombstones that carry this evidence. Define the operation's point of no return: required post-commit publication failure must not accidentally trigger an invalid compensation. A smaller workflow or fewer writes is not sufficient evidence to remove a checkpoint.
+
 ## Completion check
 
-Every changed operation is assigned to an ordinary call, database transaction, or durable workflow using the criteria above; every database transaction closes before network or long-running work; every retry's owner and durability match the operation's authority, side-effect safety, and required lifetime; every retried side effect has a stated repeated-execution guarantee; and every real duplicate-execution path has a recorded idempotency strategy at the layer that owns it.
+Every changed operation is assigned to an ordinary call, database transaction, or durable workflow using the criteria above; every database transaction closes before network or long-running work; every retry's owner and durability match the operation's authority, side-effect safety, and required lifetime; every retried side effect has a stated repeated-execution guarantee; and every real duplicate-execution path has a recorded idempotency strategy at the layer that owns it; ambiguous remote outcomes retain explicit uncertainty and a recovery policy; and compensation preserves durable intent, delayed-write safety, and the defined point of no return.

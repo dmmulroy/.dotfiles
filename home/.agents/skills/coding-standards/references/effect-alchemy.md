@@ -6,7 +6,7 @@ Also apply [`effect-services.md`](effect-services.md) for service and Layer owne
 
 ## Verify the pinned Alchemy model
 
-Read the pinned Alchemy documentation and source before choosing a composition shape. In particular, verify the Effectful Constructor, init/runtime phases, Layers, bindings, and the relevant runtime class. Prefer the repository's vendored Alchemy checkout over remembered APIs.
+Read the pinned Alchemy documentation and source before choosing a composition shape. In particular, verify the Effectful Constructor, init/runtime phases, Layers, bindings, and the relevant runtime class. Use installed source as the API authority; vendored documentation is useful when its revision matches. A class/resource name, physical identity, and serialized-state contract are separate facts to verify.
 
 ## Compose through the outer Effect
 
@@ -46,6 +46,14 @@ Alchemy evaluates a Durable Object's outer Effect during planning with mock stat
 
 Describe state-backed Layers outside when useful, then acquire them only inside the returned runtime Effect. Database migrations, SQL clients, and storage-backed services complete before handlers become available at runtime.
 
+## Invocation-owned clients
+
+Resolve stable bindings during init while deferring runtime I/O to the invocation that owns it. A Durable Object namespace's canonical key selects the remote instance; it does not let a caller-side stub or generated HTTP client escape its Cloudflare I/O context.
+
+Use the pinned Alchemy execution-memo facility to acquire suspended stub-backed clients in the current invocation. Add keyed caching only when multiple targets require it, with an intentional capacity and request-owned lifetime. Suspension alone delays acquisition; an isolate-scoped Layer or cache still has the wrong lifetime. Ready application Layers leave implementation selection at its existing owner rather than exporting client resolvers to callers.
+
+Verify planning without native storage access and repeated invocations without stale client reuse. Local runtime tests do not authorize production deployments, resource adoption, or namespace transfers.
+
 ## Completion check
 
-Every changed Alchemy constructor follows the pinned two-phase model; infrastructure-backed application Layers are provided to the outer Effect; stable services are yielded by tag and closed over; no composition root bypasses an existing Layer through its `make` Effect; inner runtime Layers receive captured services through value Layers when necessary; deploy-time bindings remain discoverable during planning; and state-backed resources execute only in the runtime phase.
+Every changed Alchemy constructor follows the pinned two-phase model; infrastructure-backed application Layers are provided to the outer Effect; stable services are yielded by tag and closed over; no composition root bypasses an existing Layer through its `make` Effect; inner runtime Layers receive captured services through value Layers when necessary; deploy-time bindings remain discoverable during planning; state-backed resources execute only in the runtime phase; invocation-bound clients remain within their actual I/O context; and identity, storage compatibility, runtime evidence, and production authorization are verified separately.

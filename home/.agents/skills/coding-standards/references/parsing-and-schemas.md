@@ -2,7 +2,20 @@
 
 ## Parse boundary data
 
-Boundary code turns unknown or less-structured input into application or domain types before it enters inner code.
+Boundary code turns external representations into application or domain types. Select parsing from provenance, not a function's name or a decoder-count target.
+
+## Provenance
+
+| Evidence supplied by the producer | Handling |
+| --- | --- |
+| Raw body, SQL row, native storage, or untyped callback | Parse at the owning boundary into the strongest meaningful type. |
+| Known encoded representation, such as a string or schema-derived record | Preserve that input type while validating contents with a compatible typed decoder. |
+| Already-parsed domain/application value | Pass it through with its established type. |
+| Newly computed constrained value or patched state | Establish remaining range, cross-field, or transition invariants with the owning constructor/refinement. |
+
+A SQL generic or library declaration describes a representation; it does not prove runtime integrity. A typed decoder is appropriate only when the actual input is assignable to its encoded type. When it is not, retain an honest boundary parser rather than casting or widening to force a decoder choice. Field types and `satisfies` provide compile-time evidence, not runtime proof of relationships among fields.
+
+For each parsing change, identify the producer, established invariants, remaining invariants, and validation removed, retained, or moved. Replacing an unknown decoder with a typed decoder preserves validation work; eliminating a redundant parse is a separate semantic change. Encoding an established domain value merely to decode it again adds a representation round trip rather than preserving provenance.
 
 ## Boundary representations
 
@@ -29,7 +42,13 @@ Use names that preserve meaning:
 - `isX(value): value is X` for true predicates;
 - `assertX(...)` at tests or framework boundaries whose API requires throwing.
 
-Functions that refine untrusted or less-structured input are parsers named `parseX`. `validateX` and `normalizeX` are prohibited aliases for parsers.
+Name parsers `parseX`; reserve predicates and transformations for their actual roles rather than using `validateX` or `normalizeX` as parser aliases.
+
+## Parser APIs
+
+Keep reusable codecs private beside their owning schema/boundary. Export an application parser only for an intended consumer, with its actual representation-specific input and the smallest useful signature: normally unary, with additional domain inputs only when callers need them. Library parse options belong to the codec owner unless they are deliberately part of the public low-level contract.
+
+For Effect decoder selection and private-codec/unary-wrapper examples, read [`effect-schema-and-data.md#decoder-selection-and-public-parsers`](effect-schema-and-data.md#decoder-selection-and-public-parsers). A genuinely unknown schema-owned boundary remains legitimate; the goal is to preserve provenance, not disguise unknown input to satisfy syntax-only lint.
 
 ## Schema choices
 
@@ -49,4 +68,4 @@ On a measured performance-critical path, a documented trust invariant may replac
 
 ## Completion check
 
-Every external or serialized input path in the changed behavior has an owning schema or parser; every value passed into inner application code is an application or domain type; every parsing failure is typed; boundary representations remain inside their owning boundaries; and every path that relies on a trust invariant instead of read-time parsing has measured evidence, documentation, and containment.
+Every changed input has documented provenance and remaining invariants; every external or serialized path has an owning parser and typed failure; established domain values retain their types; computed and translated values receive any additional refinement they require; each exported parser has a real consumer and an intentional input/options surface; boundary representations remain private; and every trust-based exception to read-time parsing has measured evidence, documentation, and containment.

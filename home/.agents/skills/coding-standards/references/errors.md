@@ -55,7 +55,7 @@ Expected failures use custom tagged errors, generally extending:
 
 - `Error`;
 - `TaggedError` from `better-result`;
-- `Schema.TaggedErrorClass` in Effect codebases.
+- the pinned Effect Schema tagged-error constructor; see [Effect schema errors](effect-schema-and-data.md#errors) for version-specific naming.
 
 A custom error includes:
 
@@ -93,6 +93,12 @@ Result<User, UserNotFound | UserStoreUnavailable>
 
 Broad `AppError`-style types belong near entrypoints, orchestration, logging, and rendering layers.
 
+## Boundary translation
+
+Translate only at the owner that knows the protocol or recovery policy. For a tagged Effect error union, prefer explicit `Effect.catchTag` / `Effect.catchTags` cases: pass already-correct application errors through unchanged and map each boundary failure by its known meaning. Leaving a new tag in the inferred error channel makes an unchosen policy visible to the compiler.
+
+Use `Effect.mapError` or a shared error mapper when the complete input error channel intentionally has one meaning. A generic helper must preserve safe context and concrete error/requirement types, rather than collapsing distinct failures for convenience. Defects and interruption remain distinct from expected failures; cause-level recovery belongs to an explicit supervision boundary. A lost mutation response carries uncertainty, not proof of failure; apply [workflow safety](workflows-transactions-and-idempotency.md#uncertain-outcomes-and-compensation).
+
 ## Completion check
 
-Every applicable rule above has been checked: each known failure is represented by a granular typed error or explicitly classified as a defect; throws and rejections are reserved for defects; absence has the intended optional or typed not-found meaning; error types own stable, searchable literal message prefixes and safe structured context; operation error unions remain precise; third-party rejections are translated by their owner; outer boundaries translate expected failures into valid outcomes; and failure classification uses tags and fields.
+Every applicable rule above has been checked: each known failure is represented by a granular typed error or explicitly classified as a defect; throws and rejections are reserved for defects; absence has the intended optional or typed not-found meaning; error types own stable, searchable literal message prefixes and safe structured context; operation error unions remain precise; third-party rejections are translated by their owner; outer boundaries translate expected failures into valid outcomes; failure classification uses tags and fields; translation preserves already-correct errors and handles each known source meaning explicitly; and defects, interruption, and uncertain remote outcomes retain their distinctions.

@@ -130,7 +130,15 @@ Before creating an Adapter or service:
 4. Extend an Adapter when the new method fits its owner and reason to change.
 5. Create an Adapter when it hides meaningful translation or mechanics, serves multiple owners, or supports real implementation variation.
 
-Create an ADR for a lasting architectural boundary, shared pattern, provider strategy, or deliberate exception. For each new service or Adapter, record which existing owners were checked and why reuse or extension did not fit.
+Record lasting boundary, provider, or exception rationale with its owning code or existing architecture documentation. For each new service or Adapter, report which owners were checked and why reuse or extension did not fit; a new abstraction does not require a new document.
+
+## Cohesive complexity reduction
+
+Use the repository's active complexity policy, preserving visible domain decisions and effect order. Extract a helper when it gives one calculation, translation, persistence operation, or policy a clearer owner. Retain exact domain inputs, expected-error unions, Effect requirements, and transaction/resource scopes.
+
+Evaluate a refactor by the reasoning burden left at both definition and call sites. Fewer branches alone do not justify forwarding helpers, speculative generic machinery, option bags, or dispatch indirection. Remove duplicated reads or validation only after tracing their producers and distinct invariants; compare runtime work separately from type-only API substitutions.
+
+**Complete when:** every extraction passes the deletion test, every moved effect retains its ordering/lifetime/failure semantics, and each removed operation has consumer and invariant evidence. Improve the design rather than weakening lint or partitioning one operation merely to fit a metric.
 
 ## Authentication and authorization
 
@@ -148,6 +156,6 @@ Complete when every changed operation has been traced and accounted for against 
 - each concern has one owner, Domain Modules remain pure, and authentication and authorization follow the stated allocation;
 - each meaningful service starts from an explicit interface, broader services compose smaller cohesive capabilities only after those seams earn their place, and orchestration keeps sequence and policy visible while delegating owned calculations and mechanisms;
 - protocol, framework, persistence, runtime, and vendor details stop at their owning Adapter or private service implementation;
-- each new abstraction passes the deletion test and existing-owner check, with required evidence or ADR recorded;
+- each new abstraction passes the deletion test and existing-owner check, with evidence reported and lasting rationale co-located; complexity refactors satisfy the cohesion check above;
 - capability names use ordinary vocabulary that stays stable across callers, operation names remain clear at call sites and definition-site searches, stale names change with their behavior or audience, and implementation qualifiers preserve only meaningful distinctions; and
 - each entrypoint parses protocol input, invokes the owning application or pure domain operation, and renders the protocol result.

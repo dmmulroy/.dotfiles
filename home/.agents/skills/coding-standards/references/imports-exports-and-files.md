@@ -17,7 +17,7 @@ Use `import type` and `export type` for type-only imports and exports.
 
 Use static imports for ordinary dependencies. Use dynamic `import()` at lazy-loading, optional-runtime, plugin, or code-splitting boundaries. Resolve ordinary dependency timing and cycles through the static module structure.
 
-Export only what callers should use. Keep internal helpers private and test through public interfaces. When changed behavior makes an exported name inaccurate or changes its audience, rename it in the same change and update every caller.
+Export only what intended callers should use. Keep internal helpers private and test through public interfaces. Review consumers before adding, renaming, or deleting an export: account for public package entrypoints, re-exports, type-only and dynamic uses, and consumers outside a published repository. A test-only search hit does not establish application demand, while no local hit does not establish that an SDK API is dead. Apply the repository's compatibility/versioning policy to public changes; private stale names change with their behavior and callers.
 
 Use ES modules for application-owned grouping. Reserve a TypeScript `namespace` for required interop.
 
@@ -46,4 +46,4 @@ A file owns one cohesive concept or capability. It may contain related operation
 
 ## Completion check
 
-Complete when every applicable rule above has been checked: imports point directly to owners and exported operations remain self-describing unless an established canonical namespace carries ownership; re-exports serve intentional public entrypoints; type-only edges use type-only syntax; dynamic imports serve a loading or runtime boundary; exports expose only caller-facing behavior and stale names change with their behavior or audience; internal helpers are tested through public interfaces; TypeScript namespaces satisfy a required interop constraint; files and shared helpers have searchable stable subjects; domain and application policy remain with their owners; and each changed file owns one cohesive concept or capability.
+Complete when every applicable rule above has been checked: imports point directly to owners and exported operations remain self-describing unless an established canonical namespace carries ownership; re-exports serve intentional public entrypoints; type-only edges use type-only syntax; dynamic imports serve a loading or runtime boundary; exports have intentional consumer/public-entrypoint evidence, stale names change with their behavior or audience, and public changes respect compatibility policy; internal helpers are tested through public interfaces; TypeScript namespaces satisfy a required interop constraint; files and shared helpers have searchable stable subjects; domain and application policy remain with their owners; and each changed file owns one cohesive concept or capability.

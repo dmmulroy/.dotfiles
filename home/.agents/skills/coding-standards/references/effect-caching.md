@@ -35,7 +35,7 @@ const makeResolver = Effect.gen(function* () {
 
 ## Acquire Expensive Clients Once
 
-Construct or authenticate clients while building the owning Layer, then close over the yielded service or client in the cache lookup. Each cache miss then pays only for the provider operation. When this changes service or Layer construction, also read [`effect-services.md`](effect-services.md).
+Acquire stable clients once in their owning Layer or Scope, then reuse them only while that runtime context remains valid. A request-bound handle belongs to the current invocation, not an isolate-wide Layer/cache; a canonical cache key does not extend its I/O lifetime. When Alchemy bindings or Durable Object clients are involved, read [invocation-owned clients](effect-alchemy.md#invocation-owned-clients). Also apply [`effect-services.md`](effect-services.md) when construction changes.
 
 ## Request Batching (`Effect.request` + `RequestResolver`)
 

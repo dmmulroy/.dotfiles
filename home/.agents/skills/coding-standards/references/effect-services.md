@@ -116,7 +116,7 @@ const readAttachment = Effect.fn("Attachment.read")(
 )
 ```
 
-For operation-labelled boundary errors, prefer a shared curried `mapError` helper over repeated wrappers:
+For operation-labelled boundary errors, a shared curried mapper earns its place when callers share the complete error meaning and it retains exact error/requirement types. Apply [boundary translation](errors.md#boundary-translation) before choosing it; use explicit tagged cases when failures need distinct policies:
 
 ```ts
 const persistenceError = operationError(PersistenceError.make)
@@ -126,7 +126,7 @@ const row = yield* query.pipe(
 )
 ```
 
-Name the helper for the error it creates. Pair structured error fields with `Effect.fn` boundaries and spans for observability.
+Name an earned helper for the error it creates. Pair structured error fields with `Effect.fn` boundaries and spans for observability. Keep a direct pipeable transform direct; an `(effect) => effect.pipe(...)` wrapper is useful only when it combines policies or needs original arguments.
 
 ## Test Layers
 
@@ -145,5 +145,5 @@ Complete when:
 - stable runtime capabilities and implementation dependencies are captured during Layer construction, operation-specific capability values remain explicit inputs, scoped context is yielded where used, and requirements remain visible until the module that selects an implementation provides them;
 - each Layer constructor matches acquisition, each provided dependency is an implementation the provider truthfully owns, and long-lived work is scoped;
 - public and non-trivial service operations have named boundaries, with whole-operation concerns applied at those boundaries;
-- the module surface exposes only service API intended for callers and uses canonical role names consistently; and
+- the module surface exposes only service API intended for callers, follows local naming conventions, and preserves complete error/requirement channels through extracted helpers; and
 - the test strategy exercises the production interface at the fidelity required by the observable contract.
