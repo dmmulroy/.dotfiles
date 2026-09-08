@@ -1,6 +1,7 @@
 ---
 name: plannotator-tui
 description: Open a Markdown plan or document for the human to review and annotate in a Herdr pane; their feedback arrives as your next message. Use when you have written a plan, spec, or design document that needs human review before you act on it.
+disable-model-invocation: true
 ---
 
 # plannotator-tui: hand a document to the human for review

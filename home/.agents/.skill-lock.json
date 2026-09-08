@@ -128,6 +128,16 @@
       "skillFolderHash": "0bdb821a21e793a4f6f82a7078c052154447e5cc",
       "installedAt": "2026-08-13T19:24:43.796Z",
       "updatedAt": "2026-08-13T19:24:43.796Z"
+    },
+    "cua-driver": {
+      "source": "trycua/cua",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/trycua/cua.git",
+      "ref": "cua-driver-rs-v0.24.0",
+      "skillPath": "libs/cua-driver/rust/Skills/cua-driver/SKILL.md",
+      "skillFolderHash": "58e3cdf81557d0af108d69441f5bb31f703f9ad1",
+      "installedAt": "2026-09-08T13:06:55.301Z",
+      "updatedAt": "2026-09-08T13:06:55.301Z"
     }
   },
   "dismissed": {

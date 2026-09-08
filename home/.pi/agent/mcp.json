@@ -23,7 +23,7 @@
       "computer": {
         "type": "local",
         "command": [
-          "open-computer-use",
+          "cua-driver",
           "mcp"
         ],
         "enabled": true,
