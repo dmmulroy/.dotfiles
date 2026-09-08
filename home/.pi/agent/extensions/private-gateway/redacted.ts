@@ -48,6 +48,7 @@ function readRedactedValue<A>(self: Redacted<A>): A {
 	if (stored === undefined && !registry.has(self as Redacted<never>)) {
 		throw new Error("Redacted value was not in registry");
 	}
+	// SAFETY: the registry only ever stores the `A` passed to make for this exact Redacted<A> key.
 	return stored as A;
 }
 

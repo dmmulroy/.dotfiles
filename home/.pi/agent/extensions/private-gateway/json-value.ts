@@ -40,7 +40,7 @@ function isString(value: unknown): value is string {
 	return typeof value === "string";
 }
 
-function isPlainObject(value: unknown): value is { readonly [key: string]: unknown } {
+function isPlainObject(value: unknown): value is object {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

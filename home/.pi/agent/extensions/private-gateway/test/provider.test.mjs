@@ -86,6 +86,202 @@ test("native provider projects models and uses backend-specific APIs", async () 
 	assert.ok(catalog.every((model) => model.provider === "opencode.cloudflare.dev"));
 });
 
+test("native provider discovers gateway models absent from Pi's built-in catalog", async () => {
+	const requests = [];
+	const provider = createPrimaryProvider({
+		fetch: createFetch(async (url, init) => {
+			requests.push({ url, headers: new Headers(init.headers) });
+			if (url.endsWith("/.well-known/opencode")) {
+				return new Response(JSON.stringify({
+					enabled_providers: ["openai"],
+					provider: {
+						openai: { options: { baseURL: `${FIXTURE_PRIMARY_GATEWAY.gatewayOrigin}/openai` } },
+					},
+				}), { status: 200 });
+			}
+			if (url === `${FIXTURE_PRIMARY_GATEWAY.gatewayOrigin}/openai/models`) {
+				return new Response(JSON.stringify({
+					object: "list",
+					data: [{ id: "placeholder-future-openai-model", object: "model" }],
+				}), { status: 200 });
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		}),
+	});
+	const models = createModels({
+		credentials: new InMemoryCredentialStore(),
+		modelsStore: new InMemoryModelsStore(),
+		authContext: {
+			env: async () => gatewayToken,
+			fileExists: async () => false,
+		},
+	});
+	models.setProvider(provider);
+	await models.login("opencode.cloudflare.dev", "api_key", {
+		signal: new AbortController().signal,
+		prompt: async () => gatewayToken,
+		notify() {},
+	});
+
+	const refreshed = await models.refresh({ force: true });
+
+	assert.equal(refreshed.errors.size, 0);
+	const discovered = models.getModel("opencode.cloudflare.dev", "placeholder-future-openai-model");
+	assert.ok(discovered);
+	assert.equal(discovered.api, "openai-responses");
+	assert.equal(discovered.baseUrl, `${FIXTURE_PRIMARY_GATEWAY.gatewayOrigin}/openai`);
+	const catalogRequest = requests.find(({ url }) => url.endsWith("/openai/models"));
+	assert.ok(catalogRequest);
+	assert.equal(catalogRequest.headers.get("authorization"), `Bearer ${gatewayToken}`);
+	assert.equal(catalogRequest.headers.get("cf-access-token"), gatewayToken);
+});
+
+test("native provider applies public metadata to a newly discovered OpenAI model", async () => {
+	const provider = createPrimaryProvider({
+		fetch: createFetch(async (url) => {
+			if (url.endsWith("/.well-known/opencode")) {
+				return new Response(JSON.stringify({ enabled_providers: ["openai"] }), { status: 200 });
+			}
+			if (url.endsWith("/openai/models")) {
+				return new Response(JSON.stringify({ data: [{ id: "gpt-6-astra" }] }), { status: 200 });
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		}),
+	});
+	const models = createModels({
+		credentials: new InMemoryCredentialStore(),
+		modelsStore: new InMemoryModelsStore(),
+		authContext: {
+			env: async () => gatewayToken,
+			fileExists: async () => false,
+		},
+	});
+	models.setProvider(provider);
+	await models.login("opencode.cloudflare.dev", "api_key", {
+		signal: new AbortController().signal,
+		prompt: async () => gatewayToken,
+		notify() {},
+	});
+
+	await models.refresh({ force: true });
+
+	const discovered = models.getModel("opencode.cloudflare.dev", "gpt-6-astra");
+	assert.ok(discovered);
+	assert.equal(discovered.contextWindow, 1_050_000);
+	assert.equal(discovered.maxTokens, 128_000);
+	assert.deepEqual(discovered.input, ["text", "image"]);
+	assert.equal(discovered.thinkingLevelMap?.off, null);
+	assert.equal(discovered.thinkingLevelMap?.max, "max");
+});
+
+test("native provider discovers models with an imported token when Pi has no stored credential", async () => {
+	const authPath = "/home/tester/.local/share/opencode/auth.json";
+	const provider = createPrimaryProvider({
+		authSource: createAuthSource({
+			[authPath]: JSON.stringify({
+				[FIXTURE_PRIMARY_GATEWAY.authOrigin]: { token: gatewayToken },
+			}),
+		}),
+		fetch: createFetch(async (url, init) => {
+			if (url.endsWith("/.well-known/opencode")) {
+				return new Response(JSON.stringify({ enabled_providers: ["openai"] }), { status: 200 });
+			}
+			if (url.endsWith("/openai/models")) {
+				assert.equal(new Headers(init.headers).get("cf-access-token"), gatewayToken);
+				return new Response(JSON.stringify({ data: [{ id: "placeholder-imported-token-model" }] }), { status: 200 });
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		}),
+	});
+	const models = createModels({
+		credentials: new InMemoryCredentialStore(),
+		modelsStore: new InMemoryModelsStore(),
+		authContext: {
+			env: async () => undefined,
+			fileExists: async () => false,
+		},
+	});
+	models.setProvider(provider);
+
+	const refreshed = await models.refresh({ force: true });
+
+	assert.equal(refreshed.errors.size, 0);
+	assert.ok(models.getModels("opencode.cloudflare.dev").some(({ id }) => id === "placeholder-imported-token-model"));
+});
+
+test("native provider discovers each enabled backend model-list format", async () => {
+	const provider = createPrimaryProvider({
+		fetch: createFetch(async (url, init) => {
+			if (url.endsWith("/.well-known/opencode")) {
+				return new Response(JSON.stringify({
+					enabled_providers: ["anthropic", "google", "xai", "cloudflare-workers-ai"],
+				}), { status: 200 });
+			}
+			if (url.endsWith("/anthropic/v1/models")) {
+				assert.equal(new Headers(init.headers).get("anthropic-version"), "2023-06-01");
+				return new Response(JSON.stringify({ data: [{
+					id: "placeholder-future-anthropic-model",
+					display_name: "Placeholder Future Anthropic Model",
+					max_input_tokens: 1_000_000,
+					max_tokens: 128_000,
+					capabilities: {
+						image_input: { supported: true },
+						thinking: { supported: true, types: { enabled: { supported: false }, adaptive: { supported: true } } },
+						effort: { supported: true, low: { supported: true }, max: { supported: true } },
+					},
+				}] }), { status: 200 });
+			}
+			if (url.endsWith("/google-ai-studio/v1beta/models")) {
+				return new Response(JSON.stringify({ models: [{ name: "models/placeholder-future-google-model" }] }), { status: 200 });
+			}
+			if (url.endsWith("/grok/models")) {
+				return new Response(JSON.stringify({ data: [{ id: "placeholder-future-xai-model" }] }), { status: 200 });
+			}
+			if (url.endsWith("/compat/models")) {
+				return new Response(JSON.stringify({ data: [
+					{ id: "openai/placeholder-unrelated-model" },
+					{ id: "workers-ai/placeholder-future-workers-model" },
+				] }), { status: 200 });
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		}),
+	});
+	const models = createModels({
+		credentials: new InMemoryCredentialStore(),
+		modelsStore: new InMemoryModelsStore(),
+		authContext: {
+			env: async () => gatewayToken,
+			fileExists: async () => false,
+		},
+	});
+	models.setProvider(provider);
+	await models.login("opencode.cloudflare.dev", "api_key", {
+		signal: new AbortController().signal,
+		prompt: async () => gatewayToken,
+		notify() {},
+	});
+
+	const refreshed = await models.refresh({ force: true });
+
+	assert.equal(refreshed.errors.size, 0);
+	const catalog = models.getModels("opencode.cloudflare.dev");
+	const anthropic = catalog.find(({ id }) => id === "placeholder-future-anthropic-model");
+	assert.equal(anthropic?.api, "anthropic-messages");
+	assert.equal(anthropic?.name, "Placeholder Future Anthropic Model");
+	assert.equal(anthropic?.contextWindow, 1_000_000);
+	assert.equal(anthropic?.maxTokens, 128_000);
+	assert.deepEqual(anthropic?.input, ["text", "image"]);
+	assert.equal(anthropic?.thinkingLevelMap?.off, null);
+	assert.equal(anthropic?.thinkingLevelMap?.low, "low");
+	assert.equal(anthropic?.thinkingLevelMap?.medium, null);
+	assert.equal(anthropic?.thinkingLevelMap?.max, "max");
+	assert.equal(anthropic?.compat?.forceAdaptiveThinking, true);
+	assert.ok(catalog.some(({ id, api }) => id === "placeholder-future-google-model" && api === "google-generative-ai"));
+	assert.ok(catalog.some(({ id, api }) => id === "placeholder-future-xai-model" && api === "openai-completions"));
+	assert.ok(catalog.some(({ id, api }) => id === "workers-ai/placeholder-future-workers-model" && api === "openai-completions"));
+	assert.ok(!catalog.some(({ id }) => id === "openai/placeholder-unrelated-model"));
+});
+
 test("native credential resolution and Access headers reach inference", async () => {
 	const captured = [];
 	const fetchImpl = createFetch(async (url, init) => {
@@ -256,6 +452,26 @@ test("doctor reports health without leaking tokens", async () => {
 	assert.match(report, /Enabled backends:/);
 	assert.match(report, /Models available: /);
 	assert.doesNotMatch(report, new RegExp(gatewayToken));
+});
+
+test("doctor includes models discovered from the gateway model-list endpoint", async () => {
+	const report = await buildDoctorReport({
+		profiles: FIXTURE_PROFILES,
+		now: 1000,
+		environment: (name) => name === "PRIVATE_GATEWAY_PRIMARY_TOKEN" ? gatewayToken : undefined,
+		authSource: createAuthSource(),
+		fetch: createFetch(async (url) => {
+			if (url.endsWith("/.well-known/opencode")) {
+				return new Response(JSON.stringify({ enabled_providers: ["openai"] }), { status: 200 });
+			}
+			if (url.endsWith("/openai/models")) {
+				return new Response(JSON.stringify({ data: [{ id: "placeholder-future-openai-model" }] }), { status: 200 });
+			}
+			throw new Error(`unexpected fetch ${url}`);
+		}),
+	});
+
+	assert.match(report, /Models available: 1/);
 });
 
 test("doctor stays clean when live discovery is unavailable", async () => {

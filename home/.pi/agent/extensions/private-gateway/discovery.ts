@@ -411,7 +411,7 @@ function parseAuthCommand(input: JsonValue | undefined, path: string): string | 
  * @returns Parsed document or a path-specific failure.
  */
 export function parseGatewayDocument(
-	input: unknown,
+	input: JsonValue,
 	profile: GatewayProfile,
 ): Result<GatewayDocument, GatewayConfigParseError> {
 	try {

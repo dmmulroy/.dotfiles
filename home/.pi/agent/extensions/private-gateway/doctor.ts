@@ -9,6 +9,7 @@ import {
 } from "./auth.ts";
 import { gatewayWellKnownUrl } from "./constants.ts";
 import { fetchGatewayConfig } from "./discovery.ts";
+import { discoverGatewayCatalogModels } from "./gateway-model-catalog.ts";
 import { excludeDuplicateGatewayModels, projectGatewayModels, summarizeGatewayModels } from "./models.ts";
 import { type GatewayProfile } from "./private-gateway-profiles.ts";
 
@@ -48,21 +49,25 @@ async function loadProfileDoctorCatalog(
 	const imported = options.authSource.readImportedToken(profile.authOrigin);
 	const importedToken = imported.ok ? imported.value?.token : undefined;
 	const environmentToken = GatewayToken.parse(options.environment(profile.tokenEnv));
+	const token = isUsableGatewayToken(environmentToken, options.now)
+		? environmentToken
+		: isUsableGatewayToken(importedToken, options.now)
+			? importedToken
+			: undefined;
 	const loaded = await fetchGatewayConfig({
 		profile,
-		token: isUsableGatewayToken(environmentToken, options.now)
-			? environmentToken
-			: isUsableGatewayToken(importedToken, options.now)
-				? importedToken
-				: undefined,
+		token,
 		fetch: options.fetch,
 	});
+	const catalogConfig = loaded.ok
+		? await discoverGatewayCatalogModels({ config: loaded.value, token, fetch: options.fetch })
+		: undefined;
 	return {
 		profile,
 		environmentToken,
 		imported,
 		loaded,
-		models: loaded.ok ? projectGatewayModels(loaded.value) : undefined,
+		models: catalogConfig ? projectGatewayModels(catalogConfig) : undefined,
 	};
 }
 

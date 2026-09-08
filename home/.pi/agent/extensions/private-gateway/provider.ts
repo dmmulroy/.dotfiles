@@ -7,6 +7,7 @@ import {
 	type OpenCodeAuthSource,
 } from "./auth.ts";
 import { fetchGatewayConfig } from "./discovery.ts";
+import { discoverGatewayCatalogModels } from "./gateway-model-catalog.ts";
 import { createGatewayApiStreams } from "./gateway-streams.ts";
 import { excludeDuplicateGatewayModels, projectGatewayModels } from "./models.ts";
 import { findPrimaryGatewayProfile, type GatewayProfile } from "./private-gateway-profiles.ts";
@@ -57,7 +58,13 @@ async function omitPrimaryGatewayDuplicates(
 	});
 	options.signal?.throwIfAborted();
 	if (!primaryLoaded.ok) return secondaryModels;
-	return excludeDuplicateGatewayModels(secondaryModels, projectGatewayModels(primaryLoaded.value));
+	const primaryConfig = await discoverGatewayCatalogModels({
+		config: primaryLoaded.value,
+		token: primaryToken,
+		signal: options.signal,
+		fetch: options.fetchImpl,
+	});
+	return excludeDuplicateGatewayModels(secondaryModels, projectGatewayModels(primaryConfig));
 }
 
 /**
@@ -76,14 +83,21 @@ export function createPrivateGatewayProvider(
 	const primary = findPrimaryGatewayProfile(options.profiles);
 
 	const fetchModels = async (context: RefreshModelsContext) => {
+		const token = credentialToken(context.credential);
 		const loaded = await fetchGatewayConfig({
 			profile,
-			token: credentialToken(context.credential),
+			token,
 			signal: context.signal,
 			fetch: fetchImpl,
 		});
 		if (!loaded.ok) throw loaded.error;
-		let models = projectGatewayModels(loaded.value);
+		const config = await discoverGatewayCatalogModels({
+			config: loaded.value,
+			token,
+			signal: context.signal,
+			fetch: fetchImpl,
+		});
+		let models = projectGatewayModels(config);
 		if (profile.slot === "secondary" && primary) {
 			models = await omitPrimaryGatewayDuplicates(models, {
 				primary,

@@ -9,7 +9,7 @@ Thin Pi providers for identity-protected inference gateways. Origins are read fr
 
 Optional display names: `PRIVATE_GATEWAY_PRIMARY_NAME`, `PRIVATE_GATEWAY_SECONDARY_NAME`.
 
-Pi provider ids are the auth-origin hostnames. Shared model ids stay on the primary catalog; the secondary catalog omits those ids.
+Pi provider ids are the auth-origin hostnames. Shared model ids stay on the primary catalog; the secondary catalog omits those ids. When discovery does not declare backend models, the extension queries each authenticated backend model-list endpoint and falls back to Pi's built-in catalog if that endpoint is unavailable.
 
 ## Authentication
 
