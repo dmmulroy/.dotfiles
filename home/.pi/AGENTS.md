@@ -62,8 +62,8 @@ Skills live in `home/.agents/skills/` and stow to `~/.agents/skills/`. Do not co
 ```jsonc
 // agent/settings.json
 {
-  "defaultProvider": "opencode.cloudflare.dev",
-  "defaultModel": "claude-opus-4-6",
+  "defaultProvider": "<private-provider-id>",
+  "defaultModel": "<private-model-id>",
   "defaultThinkingLevel": "high",
   "theme": "catppuccin-macchiato",
   "packages": ["npm:pi-extmgr", "npm:@plannotator/pi-extension"]

@@ -95,7 +95,7 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 | Herdr | `config.toml` | Prefix `C-;`, workspaces/tabs/panes |
 | Git | `config` | SSH signing, `pull.rebase`, conditional include |
 | Starship | `starship.toml` | 2s timeout (Vite+ shims), custom.scm after dir |
-| Pi | `settings.json` | Default provider: opencode.cloudflare.dev, Catppuccin theme |
+| Pi | `settings.json` | Private gateway provider, Catppuccin theme |
 
 ## UNIQUE STYLES
 

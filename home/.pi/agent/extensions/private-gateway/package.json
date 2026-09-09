@@ -4,15 +4,20 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "clean": "echo 'nothing to clean'",
-    "build": "echo 'nothing to build'",
     "typecheck": "tsc --project tsconfig.json --pretty false",
-    "test": "node --import tsx --test test/*.test.mjs",
-    "check": "npm run typecheck && npm test"
+    "test": "node --import tsx --test *.test.ts",
+    "check": "npm run typecheck && npm test",
+    "models": "node --import tsx gateway-cli.ts"
   },
   "pi": {
     "extensions": [
       "./index.ts"
     ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "^0.85.1",
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@earendil-works/pi-tui": "^0.85.1",
+    "typebox": "^1.3.7"
   }
 }

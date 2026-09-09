@@ -1,0 +1,22 @@
+{
+  "profiles": [
+    {
+      "id": "gateway-a",
+      "name": "Example Gateway A",
+      "authOrigin": "https://login-a.example.com",
+      "inferenceOrigin": "https://gateway-a.example.com",
+      "models": {
+        "exclude": ["example-model-b"]
+      }
+    },
+    {
+      "id": "gateway-b",
+      "name": "Example Gateway B",
+      "authOrigin": "https://login-b.example.com",
+      "inferenceOrigin": "https://gateway-b.example.com",
+      "models": {
+        "include": ["example-model-b"]
+      }
+    }
+  ]
+}
