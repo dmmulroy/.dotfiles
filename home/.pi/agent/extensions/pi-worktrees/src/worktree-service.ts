@@ -15,7 +15,6 @@ import {
   type CreateWorktreeOutcome,
   type RemoveWorktreeInput,
   type RemoveWorktreeOutcome,
-  type WorktreeError,
   type WorktreeInventory,
   type WorktreeRecord,
   type WorktreeResult,
@@ -56,9 +55,9 @@ export type GitWorktreeServiceOptions = {
 /** Implements canonical worktree policy through argument-safe Git commands. */
 export class GitWorktreeService implements IWorktreeService {
   constructor(
-    private readonly commands: WorktreeCommandRunner,
+    private readonly runner: WorktreeCommandRunner,
     private readonly options: GitWorktreeServiceOptions,
-  ) {}
+  ) { }
 
   /** Discover the canonical root and list every linked checkout. */
   async listWorktrees(cwd: string, signal?: AbortSignal): Promise<WorktreeResult<WorktreeInventory>> {
@@ -284,7 +283,7 @@ export class GitWorktreeService implements IWorktreeService {
   ): Promise<WorktreeResult<ExecResult, GitWorktreeCommandFailed>> {
     const options: ExecOptions = { cwd, ...(signal === undefined ? {} : { signal }) };
     try {
-      const result = await this.commands.run(command, args, options);
+      const result = await this.runner.run(command, args, options);
       if (result.code !== 0) {
         return worktreeFailure(new GitWorktreeCommandFailed(operation, result.stderr || result.stdout, result.code));
       }

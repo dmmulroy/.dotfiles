@@ -93,9 +93,9 @@ function completeDraft(draft: WorktreeDraft): WorktreeResult<ParsedGitWorktree, 
     head: draft.head ?? "",
     isBare: draft.isBare,
     isDetached: draft.isDetached,
-    ...(draft.branch === undefined ? {} : { branch: draft.branch }),
-    ...(draft.lockedReason === undefined ? {} : { lockedReason: draft.lockedReason }),
-    ...(draft.prunableReason === undefined ? {} : { prunableReason: draft.prunableReason }),
+    branch: draft.branch ?? "",
+    lockedReason: draft.lockedReason ?? "",
+    prunableReason: draft.prunableReason ?? "",
   };
   return worktreeSuccess(record);
 }
