@@ -1,34 +1,18 @@
 {
-  "mcp": {
-    "toolMode": "proxy",
-    "startup": "lazy",
-    "servers": {
-      "executor": {
-        "type": "remote",
-        "url": "https://exe.mulroy.ai/mcp?elicitation_mode=native"
-      },
-      "cf-portal": {
-        "type": "remote",
-        "url": "https://portal.mcp.cfdata.org/mcp?codemode=search_and_execute",
-        "oauth": {}
-      },
-      "uidotsh": {
-        "type": "remote",
-        "url": "https://ui.sh/mcp?agent=pi",
-        "headers": {
-          "Authorization": "Bearer ${UIDOTSH_TOKEN}"
-        },
-        "oauth": false
-      },
-      "computer": {
-        "type": "local",
-        "command": [
-          "cua-driver",
-          "mcp"
-        ],
-        "enabled": true,
-        "timeout": 60000
+  "mcpServers": {
+    "cf-portal": {
+      "url": "https://portal.mcp.cfdata.org/mcp?codemode=search_and_execute"
+    },
+    "uidotsh": {
+      "url": "https://ui.sh/mcp?agent=pi",
+      "headers": {
+        "Authorization": "Bearer ${UIDOTSH_TOKEN}"
       }
+    },
+    "computer": {
+      "command": "cua-driver",
+      "args": ["mcp"],
+      "timeout": 60
     }
   }
 }
