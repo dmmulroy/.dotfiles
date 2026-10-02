@@ -1,59 +1,14 @@
 {
   "version": 3,
   "skills": {
-    "code-review": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/code-review/SKILL.md",
-      "skillFolderHash": "d8e341cee7980127dddda05159bedf25dc853615",
-      "installedAt": "2026-07-15T16:15:09.847Z",
-      "updatedAt": "2026-08-24T12:24:26.761Z"
-    },
     "diagnosing-bugs": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "sourceUrl": "https://github.com/mattpocock/skills.git",
       "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
-      "skillFolderHash": "99bd56983e42bc752c52da67f1112e4121781cd1",
+      "skillFolderHash": "de4236cf34757c4e9ea7afe78d46c023213ff254",
       "installedAt": "2026-07-15T16:15:09.850Z",
-      "updatedAt": "2026-08-24T12:24:27.844Z"
-    },
-    "domain-modeling": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
-      "skillFolderHash": "388c9822641805ca2dcd5038e68a1d5282437ee5",
-      "installedAt": "2026-07-15T16:15:09.851Z",
-      "updatedAt": "2026-09-02T13:21:44.380Z"
-    },
-    "grill-me": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/productivity/grill-me/SKILL.md",
-      "skillFolderHash": "3df14e2d3a89459bf300614be9247e3ce74798f8",
-      "installedAt": "2026-07-15T16:15:09.852Z",
-      "updatedAt": "2026-08-24T12:24:28.685Z"
-    },
-    "grill-with-docs": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
-      "skillFolderHash": "eedaf2562c83155115e9c649fa3ecaac2e10e81d",
-      "installedAt": "2026-07-15T16:15:09.853Z",
-      "updatedAt": "2026-08-24T12:24:29.923Z"
-    },
-    "grilling": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/productivity/grilling/SKILL.md",
-      "skillFolderHash": "f0732035b8b1b60ae39454e4191caef32fa91903",
-      "installedAt": "2026-07-15T16:15:09.854Z",
-      "updatedAt": "2026-08-24T12:24:30.837Z"
+      "updatedAt": "2026-09-30T16:30:29.174Z"
     },
     "handoff": {
       "source": "mattpocock/skills",
@@ -63,16 +18,6 @@
       "skillFolderHash": "2242e8f05424b8c2ae94194a90d97b88d16108ec",
       "installedAt": "2026-07-15T16:15:09.855Z",
       "updatedAt": "2026-08-24T12:24:32.632Z"
-    },
-    "implement": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/implement/SKILL.md",
-      "skillFolderHash": "f07d230f645fc9ac390cf13a450bbff12ad791a3",
-      "pluginName": "mattpocock-skills",
-      "installedAt": "2026-07-15T16:15:09.855Z",
-      "updatedAt": "2026-07-15T16:15:09.855Z"
     },
     "prototype": {
       "source": "mattpocock/skills",
@@ -91,15 +36,6 @@
       "skillFolderHash": "0a6796c5667e95ed2301ba7381c123b4acb2ae1a",
       "installedAt": "2026-07-15T16:15:09.858Z",
       "updatedAt": "2026-08-24T12:24:33.591Z"
-    },
-    "tdd": {
-      "source": "mattpocock/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/mattpocock/skills.git",
-      "skillPath": "skills/engineering/tdd/SKILL.md",
-      "skillFolderHash": "79288be15c67b849f22b6572056601090fd20913",
-      "installedAt": "2026-07-15T16:15:09.860Z",
-      "updatedAt": "2026-08-24T12:24:34.833Z"
     },
     "write-discoverable-code": {
       "source": "modem-dev/skills",
@@ -125,9 +61,9 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/humanlayer/skills.git",
       "skillPath": "plugins/show-me/skills/show-me/SKILL.md",
-      "skillFolderHash": "0bdb821a21e793a4f6f82a7078c052154447e5cc",
+      "skillFolderHash": "362200ac2fb3c17b765049444e88de73767e6d08",
       "installedAt": "2026-08-13T19:24:43.796Z",
-      "updatedAt": "2026-08-13T19:24:43.796Z"
+      "updatedAt": "2026-09-30T16:30:31.657Z"
     },
     "cua-driver": {
       "source": "trycua/cua",

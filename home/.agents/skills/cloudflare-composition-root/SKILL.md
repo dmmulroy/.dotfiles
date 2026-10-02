@@ -1,6 +1,7 @@
 ---
 name: cloudflare-composition-root
 description: Composition roots for Hono and Cloudflare. Use when adding a binding-backed service or refactoring raw runtime dependencies out of inner code.
+disable-model-invocation: true
 ---
 
 # Cloudflare Composition Root
