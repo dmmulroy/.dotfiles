@@ -11,6 +11,7 @@ const POLICY_FILE_PATH = fileURLToPath(new URL(`../${POLICY_FILE_NAME}`, import.
 const DEFAULT_ENVIRONMENT = "default";
 const SHELL_SEPARATORS = new Set(["&&", "||", ";", "|", "\n"]);
 const SHELL_META_TOKENS = new Set(["<", ">", ">>", "<<", "&"]);
+const SHELL_REDIRECTION_OPERATORS = new Set(["<", ">", ">>", "<<"]);
 const WRANGLER_DEPLOY_COMMANDS = new Set(["deploy", "publish"]);
 const WRANGLER_VALUE_FLAGS = new Set(["--cwd", "--config", "-c", "--env", "-e", "--name"]);
 const CF_VALUE_FLAGS = new Set([
@@ -332,6 +333,8 @@ function tokenizeShell(command: string): Result<readonly string[], CloudflareDep
 			continue;
 		}
 		if (/[;&|<>]/.test(character)) {
+			// A file-descriptor number written against a redirection (`2>`, `1>>`) is never an argument.
+			if ((character === "<" || character === ">") && /^\d+$/.test(token)) token = "";
 			pushToken();
 			const pair = character + (command[index + 1] ?? "");
 			if (["&&", "||", ">>", "<<"].includes(pair)) {
@@ -437,11 +440,31 @@ function isPackageTaskRunner(value: string): value is PackageTask["runner"] {
 	);
 }
 
+/**
+ * Removes redirection operators and their targets (`> log`, `2>&1`, `&> log`) so they are not read
+ * as task names. A background `&` is kept, leaving its segment to fail closed as before.
+ */
+function withoutShellRedirections(tokens: readonly string[]): readonly string[] {
+	const commandTokens: string[] = [];
+	for (let index = 0; index < tokens.length; index += 1) {
+		const token = tokens[index];
+		if (token === undefined) continue;
+		if (token === "&" && SHELL_REDIRECTION_OPERATORS.has(tokens[index + 1] ?? "")) continue;
+		if (SHELL_REDIRECTION_OPERATORS.has(token)) {
+			if (tokens[index + 1] === "&") index += 1;
+			index += 1;
+			continue;
+		}
+		commandTokens.push(token);
+	}
+	return commandTokens;
+}
+
 function parsePackageTask(
 	tokens: readonly string[],
 	cwd: string,
 ): Result<PackageTask | undefined, CloudflareDeploymentBlocked> {
-	const assignment = parseEnvironmentAssignments(tokens);
+	const assignment = parseEnvironmentAssignments(withoutShellRedirections(tokens));
 	const executable = executableName(assignment.rest[0] ?? "");
 	if (!isPackageTaskRunner(executable)) {
 		return { _tag: "ok", value: undefined };
@@ -591,11 +614,23 @@ function readPnpmWorkspacePatterns(
 		if (!inPackages || /^\s*(?:#|$)/.test(line)) continue;
 		const match = line.match(/^\s*-\s*(?:"([^"]+)"|'([^']+)'|([^#\s]+))\s*(?:#.*)?$/);
 		const pattern = match?.[1] ?? match?.[2] ?? match?.[3];
+		// Each `*` must be a whole path segment matching one directory level; `**`, partial
+		// wildcards, negations, and paths outside the workspace are not interpreted.
 		if (
 			pattern === undefined ||
 			pattern.startsWith("!") ||
+			isAbsolute(pattern) ||
 			/[$?!{}[\]]/.test(pattern) ||
-			(pattern.match(/\*/g)?.length ?? 0) > 1
+			pattern
+				.replace(/\/$/, "")
+				.split("/")
+				.some(
+					(segment) =>
+						segment === "" ||
+						segment === "." ||
+						segment === ".." ||
+						(segment.includes("*") && segment !== "*"),
+				)
 		) {
 			return blocked(
 				`script resolution cannot safely interpret workspace package pattern ${JSON.stringify(line.trim())}.`,
@@ -614,27 +649,39 @@ function workspacePackagePaths(
 ): Result<readonly string[], CloudflareDeploymentBlocked> {
 	const packagePaths: string[] = [];
 	for (const pattern of patterns) {
-		const star = pattern.indexOf("*");
-		if (star === -1) {
-			packagePaths.push(join(workspaceRoot, pattern, "package.json"));
-			continue;
+		// Expand one path segment at a time; each `*` matches exactly one directory level.
+		let directories = [workspaceRoot];
+		for (const segment of pattern.split("/")) {
+			if (segment !== "*") {
+				directories = directories.map((directory) => join(directory, segment));
+				continue;
+			}
+			const expanded: string[] = [];
+			for (const directory of directories) {
+				let entries;
+				try {
+					entries = readdirSync(directory, { withFileTypes: true });
+				} catch (cause) {
+					// A wildcard below a plain file or a missing directory matches nothing, as in pnpm.
+					const code = (cause as { readonly code?: unknown } | undefined)?.code;
+					if (code === "ENOENT" || code === "ENOTDIR") continue;
+					return blocked(
+						`script resolution cannot inspect workspace directory ${directory}: ${cause instanceof Error ? cause.message : String(cause)}.`,
+					);
+				}
+				for (const entry of entries) {
+					if (entry.isDirectory()) expanded.push(join(directory, entry.name));
+					if (expanded.length > MAX_WORKSPACE_PACKAGES)
+						return blocked(
+							`script resolution exceeded ${MAX_WORKSPACE_PACKAGES} workspace packages.`,
+						);
+				}
+			}
+			directories = expanded;
 		}
-		const prefix = pattern.slice(0, star).replace(/\/$/, "");
-		const suffix = pattern.slice(star + 1).replace(/^\//, "");
-		let entries;
-		try {
-			entries = readdirSync(join(workspaceRoot, prefix), { withFileTypes: true });
-		} catch (cause) {
-			return blocked(
-				`script resolution cannot inspect workspace directory ${join(workspaceRoot, prefix)}: ${cause instanceof Error ? cause.message : String(cause)}.`,
-			);
-		}
-		for (const entry of entries) {
-			if (entry.isDirectory())
-				packagePaths.push(join(workspaceRoot, prefix, entry.name, suffix, "package.json"));
-			if (packagePaths.length > MAX_WORKSPACE_PACKAGES)
-				return blocked(`script resolution exceeded ${MAX_WORKSPACE_PACKAGES} workspace packages.`);
-		}
+		for (const directory of directories) packagePaths.push(join(directory, "package.json"));
+		if (packagePaths.length > MAX_WORKSPACE_PACKAGES)
+			return blocked(`script resolution exceeded ${MAX_WORKSPACE_PACKAGES} workspace packages.`);
 	}
 	return { _tag: "ok", value: packagePaths };
 }

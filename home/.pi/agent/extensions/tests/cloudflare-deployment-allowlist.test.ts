@@ -538,6 +538,117 @@ test("resolves complete pnpm workspace deployment script chains", () => {
 	}
 });
 
+function makeNestedAlchemyWorkspace(): {
+	readonly root: string;
+	readonly siteApp: string;
+	readonly policy: CloudflareDeploymentPolicy;
+} {
+	const root = mkdtempSync(join(tmpdir(), "cloudflare-nested-workspace-"));
+	const siteApp = join(root, "apps", "online.example", "app");
+	const sharedInfrastructure = join(root, "packages", "shared-infrastructure");
+	mkdirSync(siteApp, { recursive: true });
+	mkdirSync(sharedInfrastructure, { recursive: true });
+	mkdirSync(join(root, "apps", "online.example", "notes"), { recursive: true });
+	writeFileSync(
+		join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - apps/*/*\n  - packages/*\n\ncatalog:\n  effect: 4.0.6\n",
+	);
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({
+			name: "nested-fixture",
+			scripts: { "deploy:site": "vp run @example/online.example-app#deploy:production" },
+		}),
+	);
+	writeFileSync(
+		join(siteApp, "package.json"),
+		JSON.stringify({ name: "@example/online.example-app" }),
+	);
+	writeFileSync(
+		join(sharedInfrastructure, "package.json"),
+		JSON.stringify({ name: "@example/shared-infrastructure" }),
+	);
+	writeFileSync(
+		join(siteApp, "vite.config.ts"),
+		`import { defineConfig } from "vite-plus";
+export default defineConfig({
+  run: {
+    tasks: {
+      "deploy:production": {
+        cache: false,
+        command: "alchemy deploy --stage production --yes",
+      },
+    },
+  },
+});
+`,
+	);
+	writeFileSync(
+		join(siteApp, "alchemy.run.ts"),
+		'export default Alchemy.Stack("ExampleSiteApp", {}, Effect.void);\n',
+	);
+	return {
+		root,
+		siteApp,
+		policy: makeAlchemyPolicy([
+			{
+				project: join(siteApp, "alchemy.run.ts"),
+				stages: ["production"],
+				stack: "ExampleSiteApp",
+			},
+		]),
+	};
+}
+
+test("resolves workspace patterns with one wildcard per path segment", () => {
+	const workspace = makeNestedAlchemyWorkspace();
+	for (const command of [
+		"vp run deploy:site",
+		"vp run @example/online.example-app#deploy:production",
+		"vp run --filter apps/online.example/app deploy:production",
+	])
+		assert.equal(decide(command, workspace.root, workspace.policy)._tag, "allow", command);
+
+	const wrongStage = makeAlchemyPolicy([
+		{
+			project: join(workspace.siteApp, "alchemy.run.ts"),
+			stages: ["staging"],
+			stack: "ExampleSiteApp",
+		},
+	]);
+	assert.equal(decide("vp run deploy:site", workspace.root, wrongStage)._tag, "block");
+
+	for (const pattern of ["apps/**", "apps/online.*/app", "../apps/*", "/apps/*"]) {
+		writeFileSync(join(workspace.root, "pnpm-workspace.yaml"), `packages:\n  - ${pattern}\n`);
+		const decision = decide("vp run deploy:site", workspace.root, workspace.policy);
+		assert.equal(decision._tag, "block", pattern);
+		if (decision._tag === "block")
+			assert.match(decision.reason, /workspace package pattern/, pattern);
+	}
+});
+
+test("ignores output redirection when resolving package tasks", () => {
+	const workspace = makeNestedAlchemyWorkspace();
+	for (const command of [
+		"vp run deploy:site > /tmp/deploy.log 2>&1",
+		"vp run deploy:site 2>&1 > /tmp/deploy.log",
+		"vp run deploy:site >> /tmp/deploy.log",
+		"vp run deploy:site 2>/dev/null",
+		"vp run > /tmp/deploy.log deploy:site",
+	])
+		assert.equal(decide(command, workspace.root, workspace.policy)._tag, "allow", command);
+
+	const denyAll = makeAlchemyPolicy([]);
+	for (const command of [
+		"vp run deploy:site > /tmp/deploy.log 2>&1",
+		"vp run > /tmp/deploy.log deploy:site",
+	]) {
+		const decision = decide(command, workspace.root, denyAll);
+		assert.equal(decision._tag, "block", command);
+		if (decision._tag === "block") assert.match(decision.reason, /unknown Alchemy project/, command);
+	}
+});
+
 test("exempts every canonical working directory in an allowlisted repository before script resolution", () => {
 	const workspace = makeRepositoryExemptionWorkspace();
 	const repositoryAlias = join(tmpdir(), `cloudflare-repository-alias-${Date.now()}`);
