@@ -835,6 +835,17 @@ cmd_update() {
     # Re-stow dotfiles before pi uses checked-out skills and configuration.
     __stow_dotfiles
 
+    # Preinstall the newest Node releases (security patches) so the Vite+ shim
+    # never has to download one the first time a project resolves to it.
+    if __command_exists vp; then
+        __print_info "Installing latest Node.js LTS and current releases..."
+        if vp env install lts && vp env install latest && vp env default lts >/dev/null; then
+            __print_success "Node.js runtimes up to date"
+        else
+            __print_warning "Failed to update Node.js runtimes"
+        fi
+    fi
+
     # Install missing Herdr plugins and refresh existing managed checkouts.
     __sync_herdr_plugins || return 1
 
