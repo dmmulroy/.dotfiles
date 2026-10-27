@@ -7,11 +7,12 @@
     "agent/extensions/*"
   ],
   "scripts": {
-    "check": "npm run check --workspace=pi-extension-private-gateway && npm run check --workspace=pi-cfpaste-extension && npm run check --workspace=pi-save-md-extension && npm run check --workspace=pi-worktrees-extension",
+    "check": "npm run check --workspace=pi-extension-private-gateway && npm run check --workspace=pi-cfpaste-extension && npm run check --workspace=pi-save-md-extension && npm run check --workspace=pi-worktrees-extension && npm run check --workspace=pi-herdr-codemode-extension",
     "test:cfpaste": "npm run test --workspace=pi-cfpaste-extension",
     "test:continue-after-compaction": "node --import tsx --test agent/extensions/tests/continue-after-compaction.test.ts",
     "test:save-md": "npm run test --workspace=pi-save-md-extension",
-    "test:worker-configuration-guard": "node --import tsx --test agent/extensions/tests/worker-configuration-guard.test.ts"
+    "test:worker-configuration-guard": "node --import tsx --test agent/extensions/tests/worker-configuration-guard.test.ts",
+    "test:herdr-codemode": "npm run test --workspace=pi-herdr-codemode-extension"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^1.3.0",

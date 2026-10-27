@@ -28,6 +28,7 @@ Current workspace-managed extensions live under:
 - `agent/extensions/private-gateway`
 - `agent/extensions/pi-skill-toggle`
 - `agent/extensions/save-md`
+- `agent/extensions/herdr-codemode` (vendors `@herdr/sdk`; see its README)
 
 Pi Web Tools is maintained at [dmmulroy/pi-web-tools](https://github.com/dmmulroy/pi-web-tools) and installed through `agent/settings.json` as a Git package.
 
