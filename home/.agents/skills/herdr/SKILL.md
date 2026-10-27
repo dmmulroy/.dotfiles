@@ -1,6 +1,7 @@
 ---
 name: herdr
 description: "Control Herdr panes, tabs, workspaces, commands, dev servers, other background processes, and agents. Use for subagents when the user or another skill explicitly asks for or requires them. Requires HERDR_ENV=1."
+disable-model-invocation: true
 ---
 
 # Herdr
