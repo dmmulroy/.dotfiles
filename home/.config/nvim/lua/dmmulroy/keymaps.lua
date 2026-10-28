@@ -10,7 +10,7 @@ vim.keymap.set("n", "<space>", "<nop>", { desc = "Disable space (leader) in norm
 
 vim.keymap.set("n", "<C-/>", "<nop>")
 
--- Window navigation is provided by after/plugin/herdr-navigation.lua.
+-- Window navigation is provided by lua/plugins/smart-splits.lua (Herdr + Rex).
 
 -- Swap between last two buffers
 vim.keymap.set("n", "<leader>'", "<C-^>", { desc = "Switch to last buffer" })
