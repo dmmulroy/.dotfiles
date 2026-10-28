@@ -399,7 +399,7 @@ __install_pi() {
     fi
 
     __print_info "Installing pi..."
-    if vp install -g @mariozechner/pi-coding-agent; then
+    if vp install -g @earendil-works/pi-coding-agent; then
         __print_success "pi installed successfully"
     else
         __print_error "Failed to install pi"
