@@ -57,5 +57,3 @@
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
-[http]
-	sslCAInfo = /opt/homebrew/etc/ca-certificates/cert.pem
