@@ -26,6 +26,11 @@ readonly REX_APP_PATH="/Applications/Rex Beta.app"
 readonly REX_APPCAST_URL="https://blob.superlogical.com/public/rex-app/preview/appcast.xml"
 readonly REX_TEAM_ID="AG92C3PT77"
 readonly REX_BUNDLED_CLI="${HOME}/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS/rex"
+# Rex app settings (fonts, keyboard, tabs) live in macOS defaults, not init.lua.
+readonly REX_DEFAULTS_DOMAIN="com.superlogical.rex"
+readonly REX_APP_SETTINGS_FILE="${HOME_DIR}/.config/rex/macos-defaults.conf"
+readonly REX_THEME_NAME="catppuccin-macchiato"
+readonly REX_THEME_IMPORT_ACTION="import_catppuccin_macchiato"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key.pub"
@@ -523,9 +528,73 @@ __reload_rex_config() {
     fi
 }
 
+# Write the Rex app settings tracked in macos-defaults.conf. Rex reads most of
+# them only at launch, so a running app needs a relaunch to show changes.
+__apply_rex_app_settings() {
+    if [[ ! -f "$REX_APP_SETTINGS_FILE" ]]; then
+        __print_warning "Rex app settings file not found: ${REX_APP_SETTINGS_FILE}"
+        return 0
+    fi
+
+    local key type value current expected changed=0
+    while read -r key type value; do
+        [[ -z "$key" || "$key" == \#* ]] && continue
+        current="$(defaults read "$REX_DEFAULTS_DOMAIN" "$key" 2>/dev/null || true)"
+        expected="$value"
+        if [[ "$type" == "bool" ]]; then
+            [[ "$value" == "true" ]] && expected="1" || expected="0"
+        fi
+        [[ "$current" == "$expected" ]] && continue
+        if defaults write "$REX_DEFAULTS_DOMAIN" "$key" "-${type}" "$value"; then
+            changed=$((changed + 1))
+        else
+            __print_error "Failed to write Rex setting ${key}"
+            return 1
+        fi
+    done < "$REX_APP_SETTINGS_FILE"
+
+    if (( changed == 0 )); then
+        __print_success "Rex app settings are up to date"
+    elif pgrep -qf "${REX_APP_PATH}/Contents/MacOS/"; then
+        __print_success "Wrote ${changed} Rex app setting(s); relaunch Rex to apply them"
+    else
+        __print_success "Wrote ${changed} Rex app setting(s)"
+    fi
+}
+
+# True when the tracked theme is among the app's imported custom themes.
+__rex_theme_imported() {
+    defaults export "$REX_DEFAULTS_DOMAIN" - 2>/dev/null \
+        | plutil -convert xml1 -o - - 2>/dev/null \
+        | awk '/<key>Workspace.customThemes<\/key>/{f=1; next} f&&/<\/data>/{exit} f&&!/<data>/{print}' \
+        | base64 -D 2>/dev/null \
+        | grep -q "\"name\":\"${REX_THEME_NAME}\""
+}
+
+# Import the tracked theme through the init.lua action when the app lacks it.
+# Needs a running app with Remote Control on (set by macos-defaults.conf).
+__import_rex_theme() {
+    if __rex_theme_imported; then
+        __print_success "Rex theme ${REX_THEME_NAME} is imported"
+        return 0
+    fi
+    local rex_bin
+    if ! pgrep -qf "${REX_APP_PATH}/Contents/MacOS/" || ! rex_bin="$(__rex_cli)"; then
+        __print_warning "Rex is not running; launch it and rerun '${SCRIPT_NAME} update' to import the ${REX_THEME_NAME} theme"
+        return 0
+    fi
+    if "$rex_bin" do "$REX_THEME_IMPORT_ACTION" >/dev/null 2>&1; then
+        __print_success "Imported Rex theme ${REX_THEME_NAME}"
+    else
+        __print_warning "Could not import the Rex theme; run 'Import Catppuccin Macchiato Theme' from the Rex palette"
+    fi
+}
+
 __setup_rex() {
     __update_rex_app || return 1
+    __apply_rex_app_settings
     __reload_rex_config
+    __import_rex_theme
 }
 
 __install_pi() {
@@ -988,6 +1057,8 @@ cmd_update() {
     # Update Rex (not in Homebrew) and reload its re-stowed config.
     __update_rex_app || __print_warning "Rex update failed; continuing"
     __reload_rex_config || __print_warning "Rex config reload failed; continuing"
+    __apply_rex_app_settings || __print_warning "Rex app settings failed; continuing"
+    __import_rex_theme
 
     # Update pi and its configured packages.
     if __command_exists pi; then

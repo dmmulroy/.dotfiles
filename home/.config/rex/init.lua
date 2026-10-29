@@ -440,21 +440,11 @@ rex.action({
 -- App-only settings (Rex Settings window, not configurable here)
 -- -----------------------------------------------------------------------------
 
--- Stored in the com.superlogical.rex macOS defaults. Current values:
---   Workspace.darkThemeID = custom Catppuccin Macchiato
---   Workspace.lightThemeID = merino-light
---   Workspace.interfaceStyle = useTheme
---   Workspace.terminalFontName = MonoLisa
---   Workspace.terminalFontPointSize = 18
---   Workspace.tabStyle = vertical
---   Workspace.sidebarPosition = left
---   Workspace.sidebarWidth = 227
---   Workspace.sidebarShowsActivity = false
---   Workspace.inactivePaneFadeMode = both
---   Workspace.usesPaneGlass = false
---   Workspace.tabIconTintMode = off
---   rex.client.remoteControl = true   -- needed for `rex -C` client actions
---   rex.server.automatic-restart-enabled = true
+-- Stored in the com.superlogical.rex macOS defaults. Tracked in
+-- ~/.config/rex/macos-defaults.conf (fonts, Option key, padding, tabs,
+-- sidebar, Remote Control); `dot update` writes them with `defaults write`
+-- and imports the theme via import_catppuccin_macchiato when missing.
+-- Rex reads them at launch, so relaunch the app after changing that file.
 --
 -- Fixed by Rex, no setting: ~64 MiB scrollback per terminal; new terminals use
 -- the login shell (fish).
