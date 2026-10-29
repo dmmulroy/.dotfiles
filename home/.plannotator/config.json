@@ -6,7 +6,9 @@
     "diffIndicators": "bars",
     "overflow": "wrap",
     "lineBgIntensity": "subtle",
-    "lineDiffType": "word-alt"
+    "lineDiffType": "word-alt",
+    "fontFamily": "monolisa",
+    "fontSize": "16px"
   },
   "displayName": "dillon",
   "prompts": {
@@ -16,6 +18,6 @@
   },
   "reviewAnalysis": {
     "semanticDiff": true,
-    "callFlow": false
+    "callFlow": true
   }
 }

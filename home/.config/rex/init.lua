@@ -336,6 +336,10 @@ rex.action({
 	end,
 })
 
+-- Twitch chat: palette action "Twitch Chat: Toggle" (no keybinding).
+-- twt pane that follows the active tab; see twitch_chat.lua.
+require("twitch_chat")
+
 -- -----------------------------------------------------------------------------
 -- Custom actions reference
 -- -----------------------------------------------------------------------------

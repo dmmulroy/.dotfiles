@@ -590,11 +590,45 @@ __import_rex_theme() {
     fi
 }
 
+# Install Rex's xterm-rex terminfo entry (~/.terminfo) and its ssh guard
+# (~/.config/rex/ssh_config + an Include in ~/.ssh/config, so remote hosts get
+# xterm-256color). Both hold machine paths, so Rex writes them, not stow.
+__setup_rex_terminfo() {
+    local rex_cli
+    rex_cli="$(__rex_cli)" || {
+        __print_warning "rex CLI not found; skipping Rex terminfo setup"
+        return 0
+    }
+    if "$rex_cli" terminfo status 2>/dev/null | grep -q '^Ready:'; then
+        __print_success "Rex terminfo is set up"
+    elif "$rex_cli" terminfo setup >/dev/null; then
+        __print_success "Installed Rex terminfo (xterm-rex) and ssh guard"
+    else
+        __print_error "rex terminfo setup failed"
+        return 1
+    fi
+}
+
+# Rex agent skill + hooks. The shared skill (~/.agents/skills/rex) is tracked
+# in home/.agents/skills/rex; setup refreshes it through the stow symlink and
+# adds hooks to Claude Code / Codex settings.
+__setup_rex_agents() {
+    local rex_cli
+    rex_cli="$(__rex_cli)" || return 0
+    if "$rex_cli" skill setup >/dev/null; then
+        __print_success "Rex agent skill and hooks are set up"
+    else
+        __print_warning "rex skill setup failed; run it by hand to see why"
+    fi
+}
+
 __setup_rex() {
     __update_rex_app || return 1
     __apply_rex_app_settings
     __reload_rex_config
     __import_rex_theme
+    __setup_rex_terminfo
+    __setup_rex_agents
 }
 
 __install_pi() {
