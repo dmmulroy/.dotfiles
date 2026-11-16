@@ -7,7 +7,7 @@ macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 
 ## PRIORITY CHECK — REX CONFIG API AUDIT (WEEKLY)
 
-**Last audit: 2026-10-28**
+**Last audit: 2026-11-16**
 
 At the start of every session, compare this date with today. If it is **7 or
 more days old**, do this audit **before** the user's task (tell the user you
