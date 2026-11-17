@@ -7,6 +7,12 @@ local function run_follow_script(mode)
 	if mode then
 		table.insert(argv, "mode=" .. mode)
 	end
+	-- [DEBUG-tw01] keep the follower's output instead of discarding it
+	local quoted = {}
+	for _, a in ipairs(argv) do
+		table.insert(quoted, "'" .. a:gsub("'", "'\\''") .. "'")
+	end
+	argv = { "/bin/sh", "-c", "exec " .. table.concat(quoted, " ") .. " >>/tmp/rex-twitch-chat-debug.log 2>&1" }
 	local handle, err = rex.exec.start(argv, { detach = true, stdout = false, stderr = false })
 	if not handle then
 		error("twitch chat: can't run " .. shared.FOLLOW_SCRIPT .. ": " .. tostring(err), 0)

@@ -6,8 +6,9 @@
 -- Prefix (herdr: [keys] prefix = "ctrl+semicolon")
 -- -----------------------------------------------------------------------------
 
--- Rex has no prefix *mode*; a prefix is the first key of a sequence. There is
--- no on-screen indicator while it is pending. Escape cancels.
+-- Rex has no prefix *mode*; a prefix is the first key of a sequence. While it
+-- is pending the app shows a "⌃; Show Keys" pill (Workspace.showsKeySequenceHints
+-- in ../macos-defaults.conf); clicking it lists the keys. Escape cancels.
 local P = "ctrl+;>"
 
 -- Press the prefix twice to send a literal ctrl+; to the terminal.

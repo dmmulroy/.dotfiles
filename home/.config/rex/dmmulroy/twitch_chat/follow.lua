@@ -5,6 +5,23 @@
 -- `rex do` scripts resolve require() beside the script, so this is the sibling shared.lua.
 local shared = require("shared")
 
+-- [DEBUG-tw01]
+local function dbg(msg)
+	io.stderr:write(os.date("%Y-%m-%d %H:%M:%S") .. " [DEBUG-tw01] " .. msg .. "\n")
+	io.stderr:flush()
+end
+local function dump(v)
+	if type(v) ~= "table" then
+		return tostring(v)
+	end
+	local parts = {}
+	for k, x in pairs(v) do
+		table.insert(parts, tostring(k) .. "=" .. dump(x))
+	end
+	return "{" .. table.concat(parts, ", ") .. "}"
+end
+dbg("start mode=" .. tostring(rex.args.mode))
+
 local DEFAULT_TWITCH_CHAT_WIDTH = 0.2
 local LOCK_FILE = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat-follow.lock"
 local WIDTH_TOLERANCE = 0.005
@@ -41,6 +58,7 @@ local function list_session_ids()
 end
 
 if rex.args.mode == "off" then
+	dbg("mode=off requested") -- [DEBUG-tw01]
 	for _, session_id in ipairs(list_session_ids()) do
 		attach(session_id)
 		for _, chat in ipairs(shared.find_twitch_chat_blocks(session_id)) do
@@ -271,7 +289,8 @@ local function sync_session(session_id)
 	end
 end
 
-local function close_all_and_stop()
+local function close_all_and_stop(reason)
+	dbg("close_all_and_stop: " .. tostring(reason)) -- [DEBUG-tw01]
 	if stopping then
 		return
 	end
@@ -323,13 +342,15 @@ rex.on("terminal.size_changed", function(ctx, ev)
 end)
 
 rex.on("terminal.child_exited", function(ctx, ev)
+	dbg("child_exited ctx=" .. dump(ctx) .. " ev=" .. dump(ev)) -- [DEBUG-tw01]
 	if chat_window[ev.block_id or ctx.block_id] then
-		close_all_and_stop()
+		close_all_and_stop("child_exited " .. tostring(ev.block_id or ctx.block_id))
 	end
 end)
 
 -- Rex reports window_closed before the blocks in it close.
 rex.on("window_closed", function(_, ev)
+	dbg("window_closed " .. dump(ev)) -- [DEBUG-tw01]
 	closed_windows[ev.window_id] = true
 end)
 
@@ -338,6 +359,7 @@ end)
 rex.on("block_closed", function(_, ev)
 	local window_id = chat_window[ev.block_id]
 	local session_id = chat_session[ev.block_id]
+	dbg("block_closed " .. dump(ev) .. " chat_window=" .. tostring(window_id) .. " closed_windows=" .. tostring(window_id and closed_windows[window_id])) -- [DEBUG-tw01]
 	if stopping or not window_id then
 		return
 	end
@@ -346,6 +368,6 @@ rex.on("block_closed", function(_, ev)
 	if closed_windows[window_id] then
 		closed_windows[window_id] = nil
 	elseif session_exists(session_id) then
-		close_all_and_stop()
+		close_all_and_stop("block_closed " .. tostring(ev.block_id))
 	end
 end)
