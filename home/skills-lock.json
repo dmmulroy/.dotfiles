@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "grilling": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grilling/SKILL.md",
+      "computedHash": "e40cc1d348f6d935e28f1e24474302d7368f0a400429271a43b35fe154891dc5",
+      "installMode": "copy"
+    }
+  }
+}
