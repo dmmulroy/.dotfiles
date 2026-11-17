@@ -1,6 +1,6 @@
 -- Twitch chat (twt) column in every tab of every session.
 
-local shared = require("twitch_chat_shared")
+local shared = require("dmmulroy.twitch_chat.shared")
 
 local function run_follow_script(mode)
 	local argv = { shared.rex_cli_path(), "do", "--all", shared.FOLLOW_SCRIPT }

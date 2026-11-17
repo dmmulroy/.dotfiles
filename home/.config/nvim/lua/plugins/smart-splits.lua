@@ -4,7 +4,7 @@
 -- moves focus into the neighbouring multiplexer pane. The multiplexer side
 -- forwards <C-h/j/k/l> to Neovim when it is the foreground process:
 --   Herdr: vim-herdr-navigation plugin (home/.config/herdr/config.toml)
---   Rex:   ctrl+h/j/k/l function bindings (home/.config/rex/init.lua)
+--   Rex:   ctrl+h/j/k/l function bindings (home/.config/rex/dmmulroy/smart_splits.lua)
 -- Herdr is listed first because it is the inner multiplexer when nested.
 -- Outside both, it falls back to plain Neovim window navigation.
 return {

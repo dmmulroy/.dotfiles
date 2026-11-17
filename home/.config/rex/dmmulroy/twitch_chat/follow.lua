@@ -1,8 +1,9 @@
--- Run by twitch_chat.lua with `rex do --all`.
+-- Run by twitch_chat/init.lua with `rex do --all`.
 --   (no args)  keep a twt column in every tab of every session
 --   mode=off   quit every twt; a running follower then closes the rest and exits
 
-local shared = require("twitch_chat_shared")
+-- `rex do` scripts resolve require() beside the script, so this is the sibling shared.lua.
+local shared = require("shared")
 
 local DEFAULT_TWITCH_CHAT_WIDTH = 0.2
 local LOCK_FILE = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat-follow.lock"

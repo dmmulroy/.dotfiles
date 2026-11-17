@@ -1,11 +1,12 @@
--- Shared by twitch_chat.lua (config action) and twitch_chat_follow.lua (script).
+-- Shared by init.lua (config action, required as "dmmulroy.twitch_chat.shared")
+-- and follow.lua (`rex do` script, required as "shared").
 
 local M = {}
 
 local home = os.getenv("HOME")
 
 M.TWITCH_CHAT_LABEL = "twitch-chat"
-M.FOLLOW_SCRIPT = home .. "/.config/rex/twitch_chat_follow.lua"
+M.FOLLOW_SCRIPT = home .. "/.config/rex/dmmulroy/twitch_chat/follow.lua"
 
 local TERMINAL = "com.superlogical.terminal"
 

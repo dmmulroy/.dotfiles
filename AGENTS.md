@@ -37,7 +37,7 @@ are doing it, keep it short):
 │   ├── fish/           # Shell (AGENTS.md)
 │   ├── nvim/           # Editor (AGENTS.md)
 │   ├── herdr/          # Terminal-native workspace/tab/pane manager
-│   ├── rex/            # Rex multiplexer (init.lua, ported from herdr)
+│   ├── rex/            # Rex multiplexer (init.lua -> dmmulroy/, ported from herdr)
 │   ├── git/            # Conditional work config
 │   ├── ghostty/        # Terminal
 │   ├── starship.toml   # Prompt (custom.scm, 2s timeout for Vite+)
@@ -63,7 +63,7 @@ are doing it, keep it short):
 | Neovim plugin | `home/.config/nvim/lua/plugins/<name>.lua` |
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
 | Herdr config | `home/.config/herdr/config.toml` |
-| Rex config | `home/.config/rex/init.lua` (then `rex config check && rex config reload`) |
+| Rex config | `home/.config/rex/dmmulroy/` (`init.lua` bootstraps; keys in `keymaps.lua`; then `rex config check && rex config reload`) |
 | Rex app settings (font, Option key, tabs) | `home/.config/rex/macos-defaults.conf` (`dot update` writes defaults; relaunch Rex) |
 | Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Herdr + Rex backends) |
 | Starship prompt | `home/.config/starship.toml` |
@@ -120,7 +120,7 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 | Fish | `config.fish` | Sources `conf.d/`, sets EDITOR/MANPAGER |
 | Neovim | `init.lua` | 1 line: `require("dmmulroy")` |
 | Herdr | `config.toml` | Prefix `C-;`, workspaces/tabs/panes |
-| Rex | `init.lua` | Same `C-;` prefix as `ctrl+;>` sequences; app updated by `dot` from Sparkle appcast (not Homebrew) |
+| Rex | `init.lua` -> `dmmulroy/` | Same `C-;` prefix as `ctrl+;>` sequences; app updated by `dot` from Sparkle appcast (not Homebrew) |
 | Git | `config` | SSH signing, `pull.rebase`, conditional include |
 | Starship | `starship.toml` | 2s timeout (Vite+ shims), custom.scm after dir |
 | Pi | `settings.json` | Private gateway provider, Catppuccin theme |
