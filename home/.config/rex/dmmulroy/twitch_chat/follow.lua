@@ -5,23 +5,6 @@
 -- `rex do` scripts resolve require() beside the script, so this is the sibling shared.lua.
 local shared = require("shared")
 
--- [DEBUG-tw01]
-local function dbg(msg)
-	io.stderr:write(os.date("%Y-%m-%d %H:%M:%S") .. " [DEBUG-tw01] " .. msg .. "\n")
-	io.stderr:flush()
-end
-local function dump(v)
-	if type(v) ~= "table" then
-		return tostring(v)
-	end
-	local parts = {}
-	for k, x in pairs(v) do
-		table.insert(parts, tostring(k) .. "=" .. dump(x))
-	end
-	return "{" .. table.concat(parts, ", ") .. "}"
-end
-dbg("start mode=" .. tostring(rex.args.mode))
-
 local DEFAULT_TWITCH_CHAT_WIDTH = 0.2
 local LOCK_FILE = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat-follow.lock"
 local WIDTH_TOLERANCE = 0.005
@@ -58,7 +41,6 @@ local function list_session_ids()
 end
 
 if rex.args.mode == "off" then
-	dbg("mode=off requested") -- [DEBUG-tw01]
 	for _, session_id in ipairs(list_session_ids()) do
 		attach(session_id)
 		for _, chat in ipairs(shared.find_twitch_chat_blocks(session_id)) do
@@ -98,6 +80,12 @@ local TERMINAL = "com.superlogical.terminal"
 local known_chat_size -- { columns, rows } from the app
 local own_client_id -- this script's client, the owner of chats it created
 local stopping = false
+-- A twt that crashes is restarted in its own tab. More than MAX_TWT_CRASHES
+-- in one tab within TWT_CRASH_WINDOW_SECONDS (e.g. a bad token) turns chat off.
+local MAX_TWT_CRASHES = 3
+local TWT_CRASH_WINDOW_SECONDS = 60
+local twt_crash_times = {} -- window_id -> os.time() of recent crashes
+local crashed_chats = {} -- chat block_id -> true while its replacement starts
 
 local function session_exists(session_id)
 	for _, id in ipairs(list_session_ids()) do
@@ -142,7 +130,9 @@ local function window_contents(window)
 	local chat_block_id, other_count = nil, 0
 	for _, layer in ipairs(window.layers or {}) do
 		for _, block in ipairs(layer.blocks or {}) do
-			if block.label == shared.TWITCH_CHAT_LABEL then
+			if crashed_chats[block.block_id] then
+				-- Closing; not chat and not yours.
+			elseif block.label == shared.TWITCH_CHAT_LABEL then
 				chat_block_id = block.block_id
 			else
 				other_count = other_count + 1
@@ -290,7 +280,6 @@ local function sync_session(session_id)
 end
 
 local function close_all_and_stop(reason)
-	dbg("close_all_and_stop: " .. tostring(reason)) -- [DEBUG-tw01]
 	if stopping then
 		return
 	end
@@ -316,6 +305,47 @@ rex.on("session_created", function(_, ev)
 	end
 end)
 
+-- q exits 0; toggling off (shared.quit_twt) sends SIGTERM. Anything else,
+-- like a panic (exit 101) or abort, is a crash.
+local function is_twt_quit(payload)
+	if payload.exit_code == 0 then
+		return true
+	end
+	local err = tostring(payload.error or "")
+	return err == "signal: terminated" or err == "signal: interrupt" or err == "signal: hangup"
+end
+
+local function too_many_twt_crashes(window_id)
+	local now = os.time()
+	local recent = {}
+	for _, t in ipairs(twt_crash_times[window_id] or {}) do
+		if now - t < TWT_CRASH_WINDOW_SECONDS then
+			table.insert(recent, t)
+		end
+	end
+	table.insert(recent, now)
+	twt_crash_times[window_id] = recent
+	return #recent > MAX_TWT_CRASHES
+end
+
+-- Replace a crashed twt in its own tab instead of closing chat everywhere.
+local function restart_crashed_twt(chat_block_id, payload)
+	local window_id = chat_window[chat_block_id]
+	local session_id = chat_session[chat_block_id]
+	local how = tostring(payload.error or ("exit code " .. tostring(payload.exit_code)))
+	if too_many_twt_crashes(window_id) then
+		rex.log("warn", "twitch chat: twt keeps crashing (" .. how .. "); turning chat off")
+		close_all_and_stop("twt crash loop " .. chat_block_id)
+		return
+	end
+	rex.log("warn", "twitch chat: twt crashed (" .. how .. "); restarting it in that tab")
+	chat_window[chat_block_id] = nil
+	chat_session[chat_block_id] = nil
+	crashed_chats[chat_block_id] = true
+	rex.call("block.close", { session_id = session_id, block_id = chat_block_id })
+	sync_session(session_id)
+end
+
 rex.on("session_destroyed", function(_, ev)
 	for chat_block_id, session_id in pairs(chat_session) do
 		if session_id == ev.session_id then
@@ -326,7 +356,6 @@ rex.on("session_destroyed", function(_, ev)
 	attached[ev.session_id] = nil
 end)
 
--- twt quit (q, or toggle off): chat is off everywhere.
 rex.on("terminal.size_changed", function(ctx, ev)
 	local block_id = ev.block_id or ctx.block_id
 	local payload = ev.payload or ev
@@ -342,24 +371,33 @@ rex.on("terminal.size_changed", function(ctx, ev)
 end)
 
 rex.on("terminal.child_exited", function(ctx, ev)
-	dbg("child_exited ctx=" .. dump(ctx) .. " ev=" .. dump(ev)) -- [DEBUG-tw01]
-	if chat_window[ev.block_id or ctx.block_id] then
-		close_all_and_stop("child_exited " .. tostring(ev.block_id or ctx.block_id))
+	local chat_block_id = ev.block_id or ctx.block_id
+	if stopping or not chat_window[chat_block_id] then
+		return
+	end
+	local payload = ev.payload or ev
+	if is_twt_quit(payload) then
+		-- twt quit (q, or toggle off): chat is off everywhere.
+		close_all_and_stop("child_exited " .. tostring(chat_block_id))
+	else
+		restart_crashed_twt(chat_block_id, payload)
 	end
 end)
 
 -- Rex reports window_closed before the blocks in it close.
 rex.on("window_closed", function(_, ev)
-	dbg("window_closed " .. dump(ev)) -- [DEBUG-tw01]
 	closed_windows[ev.window_id] = true
 end)
 
 -- Closed with its tab: nothing to do. Closed on its own (e.g. closing the
 -- pane): chat is off everywhere.
 rex.on("block_closed", function(_, ev)
+	if crashed_chats[ev.block_id] then
+		crashed_chats[ev.block_id] = nil
+		return
+	end
 	local window_id = chat_window[ev.block_id]
 	local session_id = chat_session[ev.block_id]
-	dbg("block_closed " .. dump(ev) .. " chat_window=" .. tostring(window_id) .. " closed_windows=" .. tostring(window_id and closed_windows[window_id])) -- [DEBUG-tw01]
 	if stopping or not window_id then
 		return
 	end
