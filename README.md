@@ -1,6 +1,6 @@
 # Dotfiles
 
-A comprehensive, automated dotfiles management system for macOS development environments. Features a powerful CLI tool for setup, maintenance, and AI-powered development insights.
+A comprehensive, automated dotfiles management system for macOS and Linux (Debian/Ubuntu via apt, Arch via pacman) development environments. Features a powerful CLI tool for setup, maintenance, and AI-powered development insights.
 
 ## Overview
 
@@ -44,8 +44,10 @@ After installation, the `dot` command will be available globally for ongoing man
 │   │   └── ...
 │   └── .ideavimrc     # IntelliJ IDEA Vim config
 ├── packages/
-│   ├── bundle         # Base Brewfile
-│   └── bundle.work    # Work-specific packages
+│   ├── bundle         # Base Brewfile (macOS)
+│   ├── bundle.work    # Work-specific packages (macOS)
+│   ├── apt            # Debian/Ubuntu packages
+│   └── pacman         # Arch packages
 ├── CLAUDE.md          # Instructions for AI assistants
 └── README.md          # This file
 ```

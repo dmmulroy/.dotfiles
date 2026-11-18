@@ -1,4 +1,5 @@
-# Brew
+# Brew (macOS only; Linux uses apt or pacman)
+test -x /opt/homebrew/bin/brew; or return
 set --global --export HOMEBREW_PREFIX "/opt/homebrew";
 set --global --export HOMEBREW_CELLAR "/opt/homebrew/Cellar";
 set --global --export HOMEBREW_REPOSITORY "/opt/homebrew";

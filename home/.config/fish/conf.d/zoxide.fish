@@ -1,1 +1,1 @@
-zoxide init fish | source
+command -q zoxide; and zoxide init fish | source

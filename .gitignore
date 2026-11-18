@@ -3,6 +3,32 @@ lazy-lock.json
 home/.config/fish/fish_variables
 home/.config/fish/conf.d/secrets.fish
 home/.config/fish/conf.d/vault-funcs.fish
+# Machine-installed, not portable: OrbStack's absolute symlinks, Fisher bootstrapped on apt
+home/.config/fish/completions/docker.fish
+home/.config/fish/completions/kubectl.fish
+home/.config/fish/completions/orbctl.fish
+home/.config/fish/functions/fisher.fish
+# jhillyerd/plugin-git: installed by Fisher from fish_plugins (`fisher update`), not committed.
+home/.config/fish/conf.d/git.fish
+home/.config/fish/functions/__git.branch_has_wip.fish
+home/.config/fish/functions/__git.current_branch.fish
+home/.config/fish/functions/__git.default_branch.fish
+home/.config/fish/functions/__git.delete_branches.fish
+home/.config/fish/functions/__git.destroy.fish
+home/.config/fish/functions/__git.develop_branch.fish
+home/.config/fish/functions/__git.init.fish
+home/.config/fish/functions/gbage.fish
+home/.config/fish/functions/gbda.fish
+home/.config/fish/functions/gdv.fish
+home/.config/fish/functions/gignored.fish
+home/.config/fish/functions/glp.fish
+home/.config/fish/functions/grel.fish
+home/.config/fish/functions/grename.fish
+home/.config/fish/functions/grt.fish
+home/.config/fish/functions/gtest.fish
+home/.config/fish/functions/gtl.fish
+home/.config/fish/functions/gunwip.fish
+home/.config/fish/functions/gwip.fish
 home/.config/opencode/amp_stuff/
 .envrc
 backups/

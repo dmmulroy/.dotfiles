@@ -1,0 +1,36 @@
+# Arch packages installed by `dot init` (one per line).
+# Not packaged here; `dot` installs them upstream instead: herdr.
+ast-grep
+base-devel
+btop
+cloc
+cmake
+curl
+direnv
+fd
+ffmpeg
+fish
+fisher
+fontconfig
+fzf
+git
+github-cli
+gnupg
+jq
+just
+lua-language-server
+luacheck
+neovim
+python
+ripgrep
+shellcheck
+starship
+stow
+stylua
+tree
+tree-sitter-cli
+unzip
+wget
+wl-clipboard
+xclip
+zoxide

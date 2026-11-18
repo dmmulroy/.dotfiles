@@ -3,7 +3,7 @@
 **Generated:** 2026-05-09T00:00:00Z
 **Commit:** 871ce6f
 
-macOS dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
+macOS + Linux (Debian/Ubuntu, Arch) dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
 
 ## PRIORITY CHECK — REX CONFIG API AUDIT (WEEKLY)
 
@@ -47,8 +47,10 @@ are doing it, keep it short):
 ├── home/.pi/           # Pi agent workspace (AGENTS.md)
 │   └── agent/extensions/ # TypeScript extensions
 ├── packages/
-│   ├── bundle          # Base Brewfile (32 formulas, 13 casks)
-│   └── bundle.work     # Work additions (formulas only)
+│   ├── bundle          # Base Brewfile, macOS (32 formulas, 13 casks)
+│   ├── bundle.work     # Work additions (formulas only)
+│   ├── apt             # Debian/Ubuntu package names, one per line
+│   └── pacman          # Arch package names, one per line
 └── docs/
 ```
 
@@ -56,7 +58,7 @@ are doing it, keep it short):
 
 | Task | Location |
 |------|----------|
-| Add package | `dot package add <name>` or edit `packages/bundle` |
+| Add package | `dot package add <name>` (edits `packages/bundle` on macOS, `packages/apt`/`pacman` on Linux) |
 | Shell alias/abbr | `home/.config/fish/conf.d/aliases.fish` |
 | Shell function | `home/.config/fish/functions/` |
 | Git alias | `home/.config/git/config` [alias] section |
@@ -81,6 +83,45 @@ are doing it, keep it short):
 - Private helpers: prefix `__` (e.g., `__git.default_branch`)
 - Pi extensions: TypeScript, npm workspaces under `home/.pi/`
 - Agent skills: Markdown-first (`SKILL.md`) under `home/.agents/skills/`, stowed to `~/.agents/skills/`
+
+## CROSS-PLATFORM (macOS + Linux)
+
+One stow tree for every OS; differences are runtime checks only (Dax Raad's
+`thdxr/environment` model). No per-OS stow packages.
+
+- `dot` sets `DOT_OS` (`darwin`|`linux`) and `DOT_PACKAGE_MANAGER`
+  (`brew`|`apt`|`pacman`, from `/etc/os-release` `ID`/`ID_LIKE`).
+- `TOOL_REGISTRY` 7th field is the OS (`all`|`darwin`|`linux`); init and doctor skip others.
+- Linux extras (`__install_linux_extras`): Neovim release (apt's is too old),
+  starship, herdr into `~/.local/bin` when the distro lacks them; Fisher is
+  fetched after stow in `__setup_fish_shell`.
+- Fish: guard macOS-only config with `test (uname) = Darwin` or `command -q`.
+  Vite+ lives in `~/.vite-plus` on macOS, `~/.local/share/vite-plus` on Linux.
+- Rex, `macos-defaults.conf`, casks, WARP/Homebrew fixes: macOS only.
+- Never commit absolute symlinks into stowed dirs (stow aborts on them).
+- Fish must work on 3.7 (Ubuntu 24.04 / exe.dev): no fish-4-only variables
+  such as `$__fish_cache_dir` without a fallback.
+
+## EXE.DEV VMS
+
+Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
+
+- `exe/first-boot.sh` clones this repo and runs `dot init --headless`; log in
+  `~/dot-init.log`, state in `~/dot-init.status` (running/done/failed).
+- Default for new VMs: `ssh exe.dev defaults write dev.exe new.setup-script < exe/first-boot.sh`
+- `--headless`: skips SSH key + font, every `__confirm` takes its default,
+  `sudo chsh` instead of `chsh`.
+- Test without a VM: Ubuntu 24.04 container, `exedev` user with NOPASSWD sudo.
+- Model logins are manual and stay on the VM's disk (no proxy/gateway):
+  `claude auth login` (Claude subscription via pi-claude-cli, which `dot init`
+  installs with Claude Code), then `/login` in pi for ChatGPT/Codex.
+
+## FISH PLUGINS
+
+Fisher owns plugins on every machine: `fish_plugins` is committed, the plugin
+files (jhillyerd/plugin-git: `conf.d/git.fish`, `functions/__git.*`, `g*.fish`)
+are gitignored, and `dot init` runs `fisher update`. Personal git abbrs go in
+`conf.d/git_abbreviations.fish`, never in the plugin's files.
 
 ## ANTI-PATTERNS
 

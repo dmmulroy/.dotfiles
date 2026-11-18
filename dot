@@ -36,6 +36,31 @@ readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key.pub"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
 
+# Platform detection. Runtime checks only: one stow tree for every OS, and each
+# step or command branches on these values (darwin+brew, linux+apt|pacman).
+__detect_os() {
+    case "$(uname -s)" in
+        Darwin) DOT_OS="darwin" ;;
+        Linux) DOT_OS="linux" ;;
+        *) DOT_OS="unknown" ;;
+    esac
+
+    DOT_PACKAGE_MANAGER="none"
+    if [[ "$DOT_OS" == "darwin" ]]; then
+        DOT_PACKAGE_MANAGER="brew"
+    elif [[ "$DOT_OS" == "linux" && -r /etc/os-release ]]; then
+        # Parse instead of sourcing: os-release sets VERSION, which dot marks readonly.
+        local os_release_ids
+        os_release_ids="$(awk -F= '$1 == "ID" || $1 == "ID_LIKE" { gsub(/"/, "", $2); printf "%s ", $2 }' /etc/os-release)"
+        case " $os_release_ids " in
+            *" debian "*|*" ubuntu "*) DOT_PACKAGE_MANAGER="apt" ;;
+            *" arch "*|*" archlinux "*) DOT_PACKAGE_MANAGER="pacman" ;;
+        esac
+    fi
+}
+__detect_os
+readonly DOT_OS DOT_PACKAGE_MANAGER
+
 # Progress indicators
 CURRENT_STEP=0
 TOTAL_STEPS=0
@@ -81,6 +106,13 @@ __confirm() {
         prompt="$prompt [y/N]: "
     fi
     
+    # Headless runs (exe.dev first boot) and non-tty stdin take the default.
+    if [[ "${DOT_HEADLESS:-false}" == "true" || ! -t 0 ]]; then
+        __print_info "${prompt}${default} (non-interactive)"
+        [[ "$default" == "y" ]]
+        return
+    fi
+
     read -r -p "$prompt" response
     
     case "$response" in
@@ -206,21 +238,26 @@ __require_no_args() {
 #   required    – "true" = fatal on failure, "false" = warn and continue
 #   skip_var    – variable that skips this step when "true" ("-" = never skip)
 #   doctor      – "true" = include in doctor dev-tools check, "false" = skip
+#   os          – "all", "darwin", or "linux"; other platforms skip the step
 #
 # Order matters: steps run top-to-bottom in cmd_init.
 TOOL_REGISTRY=(
-    "Homebrew          ;; brew ;; fn:__install_homebrew     ;; true  ;; -         ;; true"
-    "Brewfile packages ;; -    ;; fn:__install_packages     ;; true  ;; -         ;; false"
-    "Stow dotfiles     ;; -    ;; fn:__stow_dotfiles        ;; true  ;; -         ;; false"
-    "Bun               ;; bun  ;; fn:__install_bun          ;; true  ;; -         ;; true"
-    "Herdr plugins     ;; -    ;; fn:__sync_herdr_plugins   ;; true  ;; -         ;; false"
-    "Rex               ;; -    ;; fn:__setup_rex            ;; false ;; -         ;; false"
-    "Scroll Reverser   ;; -    ;; fn:__setup_scroll_reverser ;; false ;; -        ;; false"
-    "Vite+             ;; vp   ;; fn:__install_vite_plus    ;; true  ;; -         ;; true"
-    "pi                ;; pi   ;; fn:__install_pi           ;; true  ;; -         ;; true"
-    "SSH key           ;; -    ;; fn:__generate_ssh_key     ;; false ;; SKIP_SSH  ;; false"
-    "MonoLisa font     ;; -    ;; fn:__install_font         ;; false ;; SKIP_FONT ;; false"
-    "Fish shell        ;; -    ;; fn:__setup_fish_shell     ;; false ;; -         ;; false"
+    "Homebrew          ;; brew ;; fn:__install_homebrew       ;; true  ;; -         ;; true  ;; darwin"
+    "Brewfile packages ;; -    ;; fn:__install_packages       ;; true  ;; -         ;; false ;; darwin"
+    "Linux packages    ;; -    ;; fn:__install_linux_packages ;; true  ;; -         ;; false ;; linux"
+    "Linux extras      ;; -    ;; fn:__install_linux_extras   ;; false ;; -         ;; false ;; linux"
+    "Stow dotfiles     ;; -    ;; fn:__stow_dotfiles          ;; true  ;; -         ;; false ;; all"
+    "Bun               ;; bun  ;; fn:__install_bun            ;; true  ;; -         ;; true  ;; all"
+    "Herdr plugins     ;; -    ;; fn:__sync_herdr_plugins     ;; true  ;; -         ;; false ;; all"
+    "Rex               ;; -    ;; fn:__setup_rex              ;; false ;; -         ;; false ;; darwin"
+    "Scroll Reverser   ;; -    ;; fn:__setup_scroll_reverser  ;; false ;; -         ;; false ;; darwin"
+    "Vite+             ;; vp   ;; fn:__install_vite_plus      ;; true  ;; -         ;; true  ;; all"
+    "pi                ;; pi   ;; fn:__install_pi             ;; true  ;; -         ;; true  ;; all"
+    "Claude Code       ;; claude ;; fn:__install_claude_code  ;; false ;; -         ;; true  ;; all"
+    "pi-claude-cli     ;; -    ;; fn:__install_pi_claude_cli  ;; false ;; -         ;; false ;; all"
+    "SSH key           ;; -    ;; fn:__generate_ssh_key       ;; false ;; SKIP_SSH  ;; false ;; all"
+    "MonoLisa font     ;; -    ;; fn:__install_font           ;; false ;; SKIP_FONT ;; false ;; all"
+    "Fish shell        ;; -    ;; fn:__setup_fish_shell       ;; false ;; -         ;; false ;; all"
 )
 
 # Parse a registry entry into variables: r_name, r_check, r_install, r_required, r_skip, r_doctor
@@ -232,6 +269,15 @@ __parse_tool_entry() {
     r_required="$(echo "$entry" | awk -F';;' '{print $4}' | xargs)"
     r_skip="$(    echo "$entry" | awk -F';;' '{print $5}' | xargs)"
     r_doctor="$(  echo "$entry" | awk -F';;' '{print $6}' | xargs)"
+    r_os="$(      echo "$entry" | awk -F';;' '{print $7}' | xargs)"
+}
+
+# True when the parsed registry entry (r_os, r_skip) should run on this machine.
+__registry_entry_applies() {
+    [[ "$r_os" == "all" || "$r_os" == "$DOT_OS" ]] || return 1
+    if [[ "$r_skip" != "-" ]] && [[ "${!r_skip:-}" == "true" ]]; then
+        return 1
+    fi
 }
 
 # Run all registered init steps
@@ -240,20 +286,14 @@ __run_init_steps() {
     TOTAL_STEPS=0
     for entry in "${TOOL_REGISTRY[@]}"; do
         __parse_tool_entry "$entry"
-        if [[ "$r_skip" != "-" ]] && [[ "${!r_skip:-}" == "true" ]]; then
-            continue
-        fi
+        __registry_entry_applies || continue
         ((++TOTAL_STEPS))
     done
     CURRENT_STEP=0
 
     for entry in "${TOOL_REGISTRY[@]}"; do
         __parse_tool_entry "$entry"
-
-        # Check skip variable
-        if [[ "$r_skip" != "-" ]] && [[ "${!r_skip:-}" == "true" ]]; then
-            continue
-        fi
+        __registry_entry_applies || continue
 
         __print_step "$r_name"
 
@@ -342,6 +382,8 @@ __install_bun() {
 
     __print_info "Installing Bun..."
     if curl -fsSL https://bun.sh/install | bash; then
+        # Later steps in this run need it before a new shell picks up PATH.
+        export PATH="${HOME}/.bun/bin:${PATH}"
         __print_success "Bun installed successfully"
     else
         __print_error "Failed to install Bun"
@@ -357,6 +399,9 @@ __install_vite_plus() {
 
     __print_info "Installing Vite+..."
     if curl -fsSL https://vite.plus | bash; then
+        # __install_pi runs `vp` in this same process. macOS installs to
+        # ~/.vite-plus, Linux to the XDG data dir.
+        export PATH="${HOME}/.vite-plus/bin:${XDG_DATA_HOME:-${HOME}/.local/share}/vite-plus/bin:${PATH}"
         __print_success "Vite+ installed successfully"
     else
         __print_error "Failed to install Vite+"
@@ -685,6 +730,46 @@ __install_pi() {
     fi
 }
 
+# Claude Code's native installer (~/.local/bin/claude). pi-claude-cli runs it
+# for the Claude subscription; log in yourself afterwards: `claude auth login`.
+__install_claude_code() {
+    if __command_exists claude; then
+        __print_success "Claude Code is already installed"
+        return 0
+    fi
+
+    __print_info "Installing Claude Code..."
+    if curl -fsSL https://claude.ai/install.sh | bash; then
+        export PATH="${HOME}/.local/bin:${PATH}"
+        __print_success "Claude Code installed (log in with: claude auth login)"
+    else
+        __print_error "Failed to install Claude Code"
+        return 1
+    fi
+}
+
+# pi's settings.json is gitignored (private gateway), so fresh machines need
+# the subscription provider package added explicitly.
+__install_pi_claude_cli() {
+    local package_source="git:github.com/dmmulroy/pi-claude-cli"
+    if ! __command_exists pi; then
+        __print_error "pi is not installed"
+        return 1
+    fi
+    if pi list 2>/dev/null | grep -Fqx "  ${package_source}"; then
+        __print_success "pi-claude-cli is already installed"
+        return 0
+    fi
+
+    __print_info "Installing pi-claude-cli..."
+    if pi install "$package_source" </dev/null; then
+        __print_success "pi-claude-cli installed (pick a model with /model after claude auth login)"
+    else
+        __print_error "Failed to install pi-claude-cli"
+        return 1
+    fi
+}
+
 __install_packages() {
     if [[ ! -f "${PACKAGES_DIR}/bundle" ]]; then
         __print_error "Base Brewfile not found at ${PACKAGES_DIR}/bundle"
@@ -757,11 +842,176 @@ __install_packages() {
     fi
 }
 
+# Print the Linux package list for this distro: packages/apt or packages/pacman.
+__linux_package_list_file() {
+    case "$DOT_PACKAGE_MANAGER" in
+        apt|pacman) printf '%s\n' "${PACKAGES_DIR}/${DOT_PACKAGE_MANAGER}" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Print package names from a Linux package list (one per line, # comments).
+__read_linux_package_list() {
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="${line//[[:space:]]/}"
+        [[ -n "$line" ]] && printf '%s\n' "$line"
+    done < "$1"
+}
+
+__linux_package_install() {
+    case "$DOT_PACKAGE_MANAGER" in
+        apt) sudo apt-get install -y "$@" ;;
+        pacman) sudo pacman -S --needed --noconfirm "$@" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Print installed Linux package names, one per line.
+__linux_installed_packages() {
+    case "$DOT_PACKAGE_MANAGER" in
+        apt) dpkg-query -W -f='${db:Status-Status} ${Package}\n' | awk '$1 == "installed" {print $2}' ;;
+        pacman) pacman -Qq ;;
+        *) return 1 ;;
+    esac
+}
+
+__require_linux_package_manager() {
+    if [[ "$DOT_PACKAGE_MANAGER" == "apt" || "$DOT_PACKAGE_MANAGER" == "pacman" ]]; then
+        return 0
+    fi
+    __print_error "Unsupported Linux distro: expected Debian/Ubuntu (apt) or Arch (pacman) in /etc/os-release"
+    return 1
+}
+
+__install_linux_packages() {
+    __require_linux_package_manager || return 1
+
+    local package_list_file
+    package_list_file="$(__linux_package_list_file)"
+    if [[ ! -f "$package_list_file" ]]; then
+        __print_error "Package list not found at $package_list_file"
+        return 1
+    fi
+
+    local packages=()
+    local package_name
+    while IFS= read -r package_name; do
+        packages+=("$package_name")
+    done < <(__read_linux_package_list "$package_list_file")
+
+    __print_info "Installing ${#packages[@]} packages with $DOT_PACKAGE_MANAGER..."
+    if [[ "$DOT_PACKAGE_MANAGER" == "apt" ]]; then
+        sudo apt-get update || return 1
+    else
+        sudo pacman -Sy || return 1
+    fi
+
+    if __linux_package_install "${packages[@]}"; then
+        __print_success "All $DOT_PACKAGE_MANAGER packages installed successfully"
+        return 0
+    fi
+
+    # One missing name fails the whole batch, so retry one at a time.
+    __print_warning "Some packages failed to install, trying individually..."
+    local failed_packages=()
+    for package_name in "${packages[@]}"; do
+        if ! __linux_package_install "$package_name" >/dev/null 2>&1; then
+            __print_warning "Failed to install: $package_name"
+            failed_packages+=("${DOT_PACKAGE_MANAGER}:${package_name}")
+        fi
+    done
+
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        __print_warning "Failed to install ${#failed_packages[@]} packages:"
+        printf "  - %s\n" "${failed_packages[@]}"
+        __save_failed_packages "${failed_packages[@]}"
+    fi
+}
+
+# Print the major.minor version of the nvim on PATH (e.g. 0.11), or fail.
+__nvim_minor_version() {
+    __command_exists nvim || return 1
+    nvim --version | head -1 | sed -E 's/^NVIM v([0-9]+\.[0-9]+).*/\1/'
+}
+
+# Neovim from the GitHub release: Debian/Ubuntu ship versions too old for this config.
+__install_neovim_release() {
+    local minimum_minor=11
+    local current_version
+    if current_version="$(__nvim_minor_version)" && [[ "${current_version%%.*}" -gt 0 || "${current_version#*.}" -ge $minimum_minor ]]; then
+        __print_success "Neovim $current_version is already installed"
+        return 0
+    fi
+
+    local arch
+    case "$(uname -m)" in
+        x86_64|amd64) arch="x86_64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) __print_error "No Neovim release for $(uname -m)"; return 1 ;;
+    esac
+
+    local install_root="${HOME}/.local/opt"
+    __print_info "Installing Neovim release (linux-${arch}) to ${install_root}/nvim..."
+    mkdir -p "$install_root" "${HOME}/.local/bin"
+    rm -rf "${install_root}/nvim-linux-${arch}"
+    if curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${arch}.tar.gz" | tar -xz -C "$install_root"; then
+        ln -sfn "${install_root}/nvim-linux-${arch}" "${install_root}/nvim"
+        ln -sfn "${install_root}/nvim/bin/nvim" "${HOME}/.local/bin/nvim"
+        __print_success "Neovim installed"
+    else
+        __print_error "Failed to install Neovim"
+        return 1
+    fi
+}
+
+# Install a tool from its upstream script when the distro package is missing.
+__install_linux_tool_from_script() {
+    local tool_name="$1"
+    local install_command="$2"
+    if __command_exists "$tool_name"; then
+        __print_success "$tool_name is already installed"
+        return 0
+    fi
+    __print_info "Installing $tool_name..."
+    if bash -c "$install_command"; then
+        __print_success "$tool_name installed"
+    else
+        __print_error "Failed to install $tool_name"
+        return 1
+    fi
+}
+
+# Tools not in (or too old in) the distro repos; installed into ~/.local/bin.
+__install_linux_extras() {
+    mkdir -p "${HOME}/.local/bin"
+    export PATH="${HOME}/.local/bin:${PATH}"
+    local failed=0
+
+    __install_neovim_release || failed=1
+    __install_linux_tool_from_script starship \
+        'curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"' || failed=1
+    __install_linux_tool_from_script herdr \
+        'curl -fsSL https://herdr.dev/install.sh | sh' || failed=1
+
+    return $failed
+}
+
+__update_linux_packages() {
+    __require_linux_package_manager || return 1
+    __print_info "Updating $DOT_PACKAGE_MANAGER packages..."
+    case "$DOT_PACKAGE_MANAGER" in
+        apt) sudo apt-get update && sudo apt-get upgrade -y ;;
+        pacman) sudo pacman -Syu --noconfirm ;;
+    esac
+}
+
 __stow_dotfiles() {
     
     if ! __command_exists stow; then
         __print_error "GNU Stow is not installed"
-        __print_info "Please install stow via Homebrew: brew install stow"
+        __print_info "Install it with your package manager (brew, apt, or pacman): stow"
         return 1
     fi
     
@@ -792,7 +1042,7 @@ __generate_ssh_key() {
     if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_PRIVATE_KEY_PATH" -N ""; then
         __print_success "SSH key generated successfully"
         __print_info "Add the public key to GitHub:"
-        echo "  pbcopy < ${GITHUB_PRIVATE_KEY_PATH}.pub"
+        echo "  cat ${GITHUB_PRIVATE_KEY_PATH}.pub"
         echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
     else
         __print_error "Failed to generate SSH key"
@@ -819,6 +1069,9 @@ __install_font() {
     local font_temp_dir
     font_temp_dir=$(mktemp -d)
     local font_install_dir="${HOME}/Library/Fonts"
+    if [[ "$DOT_OS" == "linux" ]]; then
+        font_install_dir="${HOME}/.local/share/fonts"
+    fi
 
     __print_info "Cloning font repository..."
     if GIT_SSH_COMMAND="ssh -i '$github_private_key' -o IdentitiesOnly=yes" git clone "$FONT_REPO_URL" "$font_temp_dir"; then
@@ -834,6 +1087,9 @@ __install_font() {
         done < <(find "$font_temp_dir" -type f \( -name '*.otf' -o -name '*.ttf' \) -print0)
 
         if [[ $font_count -gt 0 ]]; then
+            if [[ "$DOT_OS" == "linux" ]] && __command_exists fc-cache; then
+                fc-cache -f "$font_install_dir" >/dev/null
+            fi
             __print_success "Installed $font_count font files"
         else
             __print_warning "No font files found in repository"
@@ -968,8 +1224,14 @@ EOF
     if __command_exists pbcopy; then
         pbcopy < "${key_path}.pub"
         __print_success "Public key copied to clipboard!"
+    elif [[ -n "${WAYLAND_DISPLAY:-}" ]] && __command_exists wl-copy; then
+        wl-copy < "${key_path}.pub"
+        __print_success "Public key copied to clipboard!"
+    elif [[ -n "${DISPLAY:-}" ]] && __command_exists xclip; then
+        xclip -selection clipboard < "${key_path}.pub"
+        __print_success "Public key copied to clipboard!"
     else
-        __print_warning "pbcopy not available, skipping clipboard copy"
+        __print_warning "No clipboard tool available, skipping clipboard copy"
     fi
 
     # Display instructions
@@ -1012,27 +1274,49 @@ __setup_fish_shell() {
         __print_success "Fish added to /etc/shells"
     fi
     
-    # Set fish as default shell
+    # Set fish as default shell; a failure here still installs plugins below.
+    local default_shell_failed=false
     if [[ "$SHELL" != "$fish_path" ]]; then
         __print_info "Setting Fish as default shell..."
-        if chsh -s "$fish_path"; then
+        # Linux: sudo chsh avoids chsh's own password prompt (passwordless sudo on VMs).
+        local chsh_command=(chsh -s "$fish_path")
+        if [[ "$DOT_OS" == "linux" ]]; then
+            chsh_command=(sudo chsh -s "$fish_path" "$(id -un)")
+        fi
+        if "${chsh_command[@]}"; then
             __print_success "Default shell changed to Fish"
             __print_info "Please log out and back in for changes to take effect"
         else
             __print_error "Failed to change default shell"
-            return 1
+            default_shell_failed=true
         fi
     else
         __print_success "Fish is already the default shell"
     fi
     
-    # Install Fisher plugins
-    __print_info "Installing Fish plugins..."
-    if fish -c "fisher install jhillyerd/plugin-git" 2>/dev/null; then
+    # Fisher comes from Homebrew/pacman. Elsewhere (apt) fetch its function file;
+    # this runs after stow so it cannot block stowing ~/.config/fish.
+    if ! fish -c "type -q fisher" 2>/dev/null; then
+        __print_info "Installing Fisher..."
+        mkdir -p "${HOME}/.config/fish/functions"
+        if curl -fsSL -o "${HOME}/.config/fish/functions/fisher.fish" \
+            https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish; then
+            __print_success "Fisher installed"
+        else
+            __print_warning "Failed to install Fisher"
+        fi
+    fi
+
+    # Install the plugins listed in fish_plugins. Their files are gitignored, so
+    # Fisher owns them on every machine (including updates).
+    __print_info "Installing Fish plugins from fish_plugins..."
+    if fish -c "fisher update"; then
         __print_success "Fish plugins installed"
     else
         __print_warning "Failed to install some Fish plugins"
     fi
+
+    [[ "$default_shell_failed" == false ]]
 }
 
 # Command functions
@@ -1049,6 +1333,13 @@ cmd_init() {
                 ;;
             --skip-font)
                 SKIP_FONT=true
+                ;;
+            --headless)
+                # No prompts, no SSH key, no font: for exe.dev and other remote VMs.
+                SKIP_SSH=true
+                SKIP_FONT=true
+                export DOT_HEADLESS=true
+                export DEBIAN_FRONTEND=noninteractive
                 ;;
             *)
                 __print_error "Unknown init option: $1"
@@ -1075,7 +1366,55 @@ cmd_update() {
         __print_error "Failed to update repository"
         return 1
     fi
-    
+
+    if [[ "$DOT_OS" == "darwin" ]]; then
+        __update_homebrew_packages || return 1
+    else
+        __update_linux_packages || return 1
+        __install_linux_extras || __print_warning "Some Linux extras failed; continuing"
+    fi
+
+    # Re-stow dotfiles before pi uses checked-out skills and configuration.
+    __stow_dotfiles
+
+    # Preinstall the newest Node releases (security patches) so the Vite+ shim
+    # never has to download one the first time a project resolves to it.
+    if __command_exists vp; then
+        __print_info "Installing latest Node.js LTS and current releases..."
+        if vp env install lts && vp env install latest && vp env default lts >/dev/null; then
+            __print_success "Node.js runtimes up to date"
+        else
+            __print_warning "Failed to update Node.js runtimes"
+        fi
+    fi
+
+    # Install missing Herdr plugins and refresh existing managed checkouts.
+    __sync_herdr_plugins || return 1
+
+    # Update Rex (macOS app, not in Homebrew) and reload its re-stowed config.
+    if [[ "$DOT_OS" == "darwin" ]]; then
+        __update_rex_app || __print_warning "Rex update failed; continuing"
+        __reload_rex_config || __print_warning "Rex config reload failed; continuing"
+        __apply_rex_app_settings || __print_warning "Rex app settings failed; continuing"
+        __import_rex_theme
+        __setup_scroll_reverser || __print_warning "Scroll Reverser setup failed; continuing"
+    fi
+
+    # Update pi and its configured packages.
+    if __command_exists pi; then
+        __print_info "Updating pi and configured packages..."
+        if (cd "$DOTFILES_DIR" && pi update --all); then
+            __print_success "pi and configured packages updated"
+        else
+            __print_error "Failed to update pi and configured packages"
+            return 1
+        fi
+    else
+        __print_warning "pi is not installed; skipping pi update"
+    fi
+}
+
+__update_homebrew_packages() {
     __print_info "Updating Homebrew..."
     # WARP adds latency that triggers brew's curl speed-limit abort
     # Pre-download API files to work around this
@@ -1109,44 +1448,6 @@ cmd_update() {
             return 1
         fi
     fi
-
-    # Re-stow dotfiles before pi uses checked-out skills and configuration.
-    __stow_dotfiles
-
-    # Preinstall the newest Node releases (security patches) so the Vite+ shim
-    # never has to download one the first time a project resolves to it.
-    if __command_exists vp; then
-        __print_info "Installing latest Node.js LTS and current releases..."
-        if vp env install lts && vp env install latest && vp env default lts >/dev/null; then
-            __print_success "Node.js runtimes up to date"
-        else
-            __print_warning "Failed to update Node.js runtimes"
-        fi
-    fi
-
-    # Install missing Herdr plugins and refresh existing managed checkouts.
-    __sync_herdr_plugins || return 1
-
-    # Update Rex (not in Homebrew) and reload its re-stowed config.
-    __update_rex_app || __print_warning "Rex update failed; continuing"
-    __reload_rex_config || __print_warning "Rex config reload failed; continuing"
-    __apply_rex_app_settings || __print_warning "Rex app settings failed; continuing"
-    __import_rex_theme
-
-    __setup_scroll_reverser || __print_warning "Scroll Reverser setup failed; continuing"
-
-    # Update pi and its configured packages.
-    if __command_exists pi; then
-        __print_info "Updating pi and configured packages..."
-        if (cd "$DOTFILES_DIR" && pi update --all); then
-            __print_success "pi and configured packages updated"
-        else
-            __print_error "Failed to update pi and configured packages"
-            return 1
-        fi
-    else
-        __print_warning "pi is not installed; skipping pi update"
-    fi
 }
 
 cmd_doctor() {
@@ -1155,11 +1456,15 @@ cmd_doctor() {
     
     local issues=0
     
-    # Check Homebrew
-    if __command_exists brew; then
-        __print_success "Homebrew installed"
-    else
-        __print_error "Homebrew not installed"
+    __print_info "Platform: $DOT_OS (package manager: $DOT_PACKAGE_MANAGER)"
+    if [[ "$DOT_OS" == "darwin" ]]; then
+        if __command_exists brew; then
+            __print_success "Homebrew installed"
+        else
+            __print_error "Homebrew not installed"
+            ((++issues))
+        fi
+    elif ! __require_linux_package_manager; then
         ((++issues))
     fi
     
@@ -1219,6 +1524,7 @@ cmd_doctor() {
     for entry in "${TOOL_REGISTRY[@]}"; do
         __parse_tool_entry "$entry"
         [[ "$r_doctor" != "true" ]] && continue
+        [[ "$r_os" == "all" || "$r_os" == "$DOT_OS" ]] || continue
         if __command_exists "$r_check"; then
             __print_success "$r_check is available"
         else
@@ -1240,26 +1546,9 @@ cmd_doctor() {
         __print_warning "Missing development tools: ${missing_tools[*]}"
     fi
 
-    # Rex: app, CLI, stowed config
-    local rex_bin
-    if [[ -d "$REX_APP_PATH" ]]; then
-        __print_success "Rex is installed (build $(__rex_installed_build))"
-    else
-        __print_warning "Rex is not installed - run '${SCRIPT_NAME} init' or '${SCRIPT_NAME} update'"
-    fi
-    if [[ -L "${HOME}/.config/rex" ]]; then
-        __print_success "Rex config is stowed"
-    else
-        __print_warning "~/.config/rex is not a stow symlink - run '${SCRIPT_NAME} stow'"
-    fi
-    if rex_bin="$(__rex_cli)"; then
-        if "$rex_bin" config check >/dev/null 2>&1; then
-            __print_success "Rex config loads without errors"
-        else
-            __print_warning "Rex config has errors - run 'rex config check'"
-        fi
-    else
-        __print_warning "rex CLI not found - launch Rex once to install its server"
+    # Rex: app, CLI, stowed config (macOS only)
+    if [[ "$DOT_OS" == "darwin" ]]; then
+        __doctor_check_rex
     fi
     
     # Check if Fish plugins are installed (Fisher)
@@ -1288,6 +1577,29 @@ cmd_doctor() {
         fi
     else
         __print_header "Found $issues critical issues"
+    fi
+}
+
+__doctor_check_rex() {
+    local rex_bin
+    if [[ -d "$REX_APP_PATH" ]]; then
+        __print_success "Rex is installed (build $(__rex_installed_build))"
+    else
+        __print_warning "Rex is not installed - run '${SCRIPT_NAME} init' or '${SCRIPT_NAME} update'"
+    fi
+    if [[ -L "${HOME}/.config/rex" ]]; then
+        __print_success "Rex config is stowed"
+    else
+        __print_warning "~/.config/rex is not a stow symlink - run '${SCRIPT_NAME} stow'"
+    fi
+    if rex_bin="$(__rex_cli)"; then
+        if "$rex_bin" config check >/dev/null 2>&1; then
+            __print_success "Rex config loads without errors"
+        else
+            __print_warning "Rex config has errors - run 'rex config check'"
+        fi
+    else
+        __print_warning "rex CLI not found - launch Rex once to install its server"
     fi
 }
 
@@ -1420,6 +1732,7 @@ complete -c dot -n "__fish_use_subcommand" -a "help" -d "Show help message"
 # Global and init options
 complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-ssh" -d "Skip SSH key generation"
 complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-font" -d "Skip font installation"
+complete -c dot -n "__fish_seen_subcommand_from init" -l "headless" -d "No prompts, SSH key, or font (remote VMs)"
 complete -c dot -n "__fish_use_subcommand" -l "version" -d "Show version information"
 complete -c dot -n "__fish_use_subcommand" -s "h" -l "help" -d "Show help message"
 
@@ -1749,7 +2062,7 @@ cmd_retry_failed() {
         [[ -z "$package_info" ]] && continue
         ((++retry_count))
 
-        if [[ ! "$package_info" =~ ^(brew|cask):(.+)$ ]]; then
+        if [[ ! "$package_info" =~ ^(brew|cask|apt|pacman):(.+)$ ]]; then
             __print_warning "Unrecognized failed package entry: $package_info"
             remaining_packages+=("$package_info")
             continue
@@ -1759,7 +2072,15 @@ cmd_retry_failed() {
         package_name="${BASH_REMATCH[2]}"
         __print_info "Retrying $package_type package: $package_name"
 
-        if __brew_install "$package_type" "$package_name" 2>/dev/null; then
+        if [[ "$package_type" == "apt" || "$package_type" == "pacman" ]]; then
+            if [[ "$package_type" == "$DOT_PACKAGE_MANAGER" ]] && __linux_package_install "$package_name" >/dev/null 2>&1; then
+                __print_success "Successfully installed: $package_name"
+                ((++success_count))
+            else
+                __print_warning "Still failing: $package_name"
+                remaining_packages+=("$package_info")
+            fi
+        elif __brew_install "$package_type" "$package_name" 2>/dev/null; then
             __print_success "Successfully installed: $package_name"
             ((++success_count))
         else
@@ -1786,6 +2107,11 @@ cmd_retry_failed() {
 cmd_check_packages() {
     __require_no_args check-packages "$@" || return 1
     __print_header "Checking installed packages"
+
+    if [[ "$DOT_OS" == "linux" ]]; then
+        __check_linux_packages
+        return
+    fi
     
     local missing_brew=()
     local missing_cask=()
@@ -1872,6 +2198,98 @@ cmd_check_packages() {
     fi
 }
 
+__check_linux_packages() {
+    __require_linux_package_manager || return 1
+
+    local package_list_file installed_packages
+    package_list_file="$(__linux_package_list_file)"
+    if ! installed_packages="$(__linux_installed_packages)"; then
+        __print_error "Failed to list installed $DOT_PACKAGE_MANAGER packages"
+        return 1
+    fi
+
+    local installed_count=0
+    local missing_packages=()
+    local package_name
+    while IFS= read -r package_name; do
+        if __list_contains "$package_name" "$installed_packages"; then
+            ((++installed_count))
+        else
+            missing_packages+=("$package_name")
+        fi
+    done < <(__read_linux_package_list "$package_list_file")
+
+    __print_header "Package Status Report"
+    __print_success "$DOT_PACKAGE_MANAGER packages installed: $installed_count"
+    if [[ ${#missing_packages[@]} -gt 0 ]]; then
+        __print_warning "Missing $DOT_PACKAGE_MANAGER packages (${#missing_packages[@]}):"
+        printf "  - %s\n" "${missing_packages[@]}"
+        __print_info "Run '${SCRIPT_NAME} init' to install missing packages"
+    else
+        __print_success "All packages are installed!"
+    fi
+}
+
+# Linux `dot package` subcommands edit packages/apt or packages/pacman.
+__linux_package_command() {
+    local subcommand="$1"
+    shift
+    __require_linux_package_manager || return 1
+
+    local package_list_file
+    package_list_file="$(__linux_package_list_file)"
+    local package_name="${1:-}"
+
+    case "$subcommand" in
+        list)
+            __print_header "$DOT_PACKAGE_MANAGER packages ($(basename "$package_list_file"))"
+            __read_linux_package_list "$package_list_file" | sed 's/^/  /'
+            ;;
+        add)
+            if [[ -z "$package_name" || $# -gt 1 ]]; then
+                __print_error "Usage: ${SCRIPT_NAME} package add <package-name>"
+                return 1
+            fi
+            if __read_linux_package_list "$package_list_file" | grep -Fqx -- "$package_name"; then
+                __print_warning "Package '$package_name' already exists in $(basename "$package_list_file")"
+                return 0
+            fi
+            __linux_package_install "$package_name" || return 1
+            # Keep the leading comment block, then the sorted names.
+            local temp_file
+            temp_file=$(mktemp)
+            {
+                grep '^#' "$package_list_file" || true
+                { __read_linux_package_list "$package_list_file"; echo "$package_name"; } | sort -u
+            } > "$temp_file"
+            mv "$temp_file" "$package_list_file"
+            __print_success "Added '$package_name' to $(basename "$package_list_file")"
+            ;;
+        remove)
+            if [[ -z "$package_name" || $# -gt 1 ]]; then
+                __print_error "Usage: ${SCRIPT_NAME} package remove <package-name>"
+                return 1
+            fi
+            if ! grep -Fqx -- "$package_name" "$package_list_file"; then
+                __print_warning "Package '$package_name' is not in $(basename "$package_list_file")"
+                return 0
+            fi
+            local temp_file
+            temp_file=$(mktemp)
+            grep -Fvx -- "$package_name" "$package_list_file" > "$temp_file" || true
+            mv "$temp_file" "$package_list_file"
+            __print_success "Removed '$package_name' from $(basename "$package_list_file") (still installed)"
+            ;;
+        update)
+            __update_linux_packages
+            ;;
+        *)
+            __print_error "Unknown package subcommand: $subcommand"
+            return 1
+            ;;
+    esac
+}
+
 cmd_package() {
     local subcommand="${1:-list}"
     shift || true
@@ -1883,6 +2301,11 @@ cmd_package() {
             return
         fi
     done
+
+    if [[ "$DOT_OS" == "linux" && "$subcommand" =~ ^(add|remove|update|list)$ ]]; then
+        __linux_package_command "$subcommand" "$@"
+        return
+    fi
 
     case "$subcommand" in
         add)
@@ -2511,10 +2934,11 @@ __print_command_help() {
         init)
             cat << EOF
 USAGE:
-    ${SCRIPT_NAME} init [--skip-ssh] [--skip-font]
+    ${SCRIPT_NAME} init [--skip-ssh] [--skip-font] [--headless]
 
 Initialize the complete environment. Skip SSH key or font setup with the
-corresponding option.
+corresponding option. --headless skips both and answers every prompt with
+its default (exe.dev first boot: exe/first-boot.sh).
 EOF
             ;;
         update)
