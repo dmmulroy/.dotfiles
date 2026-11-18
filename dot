@@ -215,6 +215,7 @@ TOOL_REGISTRY=(
     "Bun               ;; bun  ;; fn:__install_bun          ;; true  ;; -         ;; true"
     "Herdr plugins     ;; -    ;; fn:__sync_herdr_plugins   ;; true  ;; -         ;; false"
     "Rex               ;; -    ;; fn:__setup_rex            ;; false ;; -         ;; false"
+    "Scroll Reverser   ;; -    ;; fn:__setup_scroll_reverser ;; false ;; -        ;; false"
     "Vite+             ;; vp   ;; fn:__install_vite_plus    ;; true  ;; -         ;; true"
     "pi                ;; pi   ;; fn:__install_pi           ;; true  ;; -         ;; true"
     "SSH key           ;; -    ;; fn:__generate_ssh_key     ;; false ;; SKIP_SSH  ;; false"
@@ -629,6 +630,44 @@ __setup_rex() {
     __import_rex_theme
     __setup_rex_terminfo
     __setup_rex_agents
+}
+
+# Scroll direction: natural on the trackpad, traditional on the mouse.
+# macOS has one global "natural scrolling" switch, so keep it on and let
+# Scroll Reverser (cask in packages/bundle) flip only mouse wheel events.
+readonly SCROLL_REVERSER_DOMAIN="com.pilotmoon.scroll-reverser"
+readonly SCROLL_REVERSER_APP="/Applications/Scroll Reverser.app"
+
+__setup_scroll_reverser() {
+    if [[ ! -d "$SCROLL_REVERSER_APP" ]]; then
+        __print_warning "Scroll Reverser not installed; skipping (brew install --cask scroll-reverser)"
+        return 0
+    fi
+
+    # Global natural scrolling on (trackpad stays natural).
+    defaults write -g com.apple.swipescrolldirection -bool true
+
+    local key value
+    while read -r key value; do
+        defaults write "$SCROLL_REVERSER_DOMAIN" "$key" -bool "$value"
+    done <<'SETTINGS'
+InvertScrollingOn true
+ReverseMouse true
+ReverseTrackpad false
+ReverseTablet false
+ReverseY true
+ReverseX false
+StartAtLogin true
+SETTINGS
+
+    # Scroll Reverser reads prefs at launch; restart it to apply.
+    if pgrep -xq "Scroll Reverser"; then
+        osascript -e 'quit app "Scroll Reverser"' >/dev/null 2>&1 || true
+        sleep 1
+    fi
+    open -g "$SCROLL_REVERSER_APP" || true
+    __print_success "Scroll Reverser configured (trackpad natural, mouse traditional)"
+    __print_info "Grant Scroll Reverser Accessibility access in System Settings > Privacy & Security if prompted"
 }
 
 __install_pi() {
@@ -1093,6 +1132,8 @@ cmd_update() {
     __reload_rex_config || __print_warning "Rex config reload failed; continuing"
     __apply_rex_app_settings || __print_warning "Rex app settings failed; continuing"
     __import_rex_theme
+
+    __setup_scroll_reverser || __print_warning "Scroll Reverser setup failed; continuing"
 
     # Update pi and its configured packages.
     if __command_exists pi; then
