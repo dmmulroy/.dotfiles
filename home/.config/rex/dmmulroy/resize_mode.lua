@@ -1,4 +1,4 @@
--- Resize mode (herdr: resize_mode = "prefix+shift+r"). Entered with C-; R,
+-- Resize mode. Entered with C-; R,
 -- bound in dmmulroy/keymaps.lua.
 
 -- rex.mode(name, { exclusive = bool }) declares options; a mode also exists as
@@ -23,5 +23,5 @@ end
 rex.bind("resize/=", "pane.balance")
 rex.bind("resize/enter", "client.mode.exit")
 
--- herdr resize_pane_* without a mode were unset; direct equivalents:
+-- Direct resize binds without the mode:
 -- rex.bind("ctrl+alt+left", "pane.resize", { direction = "left" })

@@ -66,6 +66,7 @@ are doing it, keep it short):
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
 | Herdr config | `home/.config/herdr/config.toml` |
 | Rex config | `home/.config/rex/dmmulroy/` (`init.lua` bootstraps; keys in `keymaps.lua`; then `rex config check && rex config reload`) |
+| Rex config Lua rocks (twitch-lua) | `REX_LUA_ROCKS` in `dot` (`__install_rex_lua_rocks`, run by init/update): `luarocks --lua-version 5.1 --tree ~/.local/share/rex/rocks`; the config reads that tree (`twitch_chat/shared.lua`) |
 | Rex app settings (font, Option key, tabs) | `home/.config/rex/macos-defaults.conf` (`dot update` writes defaults; relaunch Rex) |
 | Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Herdr + Rex backends) |
 | Starship prompt | `home/.config/starship.toml` |

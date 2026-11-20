@@ -1,4 +1,4 @@
--- Theme (herdr: [theme] catppuccin + custom tokens)
+-- Theme
 
 -- Themes, fonts, tab style, and sidebar are app settings, not config options.
 -- This action imports the tracked Catppuccin Macchiato theme into the app.

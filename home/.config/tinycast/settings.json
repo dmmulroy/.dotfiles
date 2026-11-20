@@ -1,7 +1,7 @@
 {
   "general": {
     "launcherShortcut": "cmd+space",
-    "showInMenuBar": true,
+    "showInMenuBar": false,
     "automaticallyCheckForUpdates": true,
     "popToRootSeconds": 0,
     "escapeKeyBehavior": "navigateBackOrClose",
@@ -125,6 +125,7 @@
   "snippets": {
     "showInLauncher": true,
     "folder": null,
+    "defaultAction": "paste",
     "commands": {}
   },
   "navigation": {

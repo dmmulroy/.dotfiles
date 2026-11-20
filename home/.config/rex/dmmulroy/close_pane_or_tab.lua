@@ -1,4 +1,4 @@
--- herdr semantics for close pane: close the tab along with its last pane.
+-- Close pane: close the tab along with its last pane.
 -- Rex's pane.close doesn't, so count the tab's panes first.
 -- Bound to C-; x in dmmulroy/keymaps.lua.
 
@@ -14,7 +14,7 @@ rex.action({
 	name = "close_pane_or_tab",
 	title = "Close Pane (or Tab if Last Pane)",
 	category = "Panes",
-	keywords = "close pane tab last herdr",
+	keywords = "close pane tab last",
 	run = function(ctx)
 		local view = rex.session.view({})
 		local window

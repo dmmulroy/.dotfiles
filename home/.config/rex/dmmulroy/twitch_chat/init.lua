@@ -31,15 +31,9 @@ rex.action({
 	run = toggle_twitch_chat,
 })
 
--- twitch-lua's own palette actions ("Twitch: Set Stream Title…"), loaded from its
--- checkout (the same TWITCH_LUA_DIR as shared.lua). Skipped when there is no checkout.
-local twitch_lua_dir = os.getenv("TWITCH_LUA_DIR") or (os.getenv("HOME") .. "/Code/personal/twitch-lua")
-local twitch_lua_actions = io.open(twitch_lua_dir .. "/lua/twitch/rex/palette_actions.lua", "r")
-if twitch_lua_actions then
-	twitch_lua_actions:close()
-	package.path = package.path
-		.. ";" .. twitch_lua_dir .. "/lua/?.lua"
-		.. ";" .. twitch_lua_dir .. "/vendor/?.lua"
-		.. ";" .. twitch_lua_dir .. "/vendor/?/init.lua"
+-- twitch-lua's own palette actions ("Twitch: Set Stream Title…"), from its rock (or the
+-- TWITCH_LUA_DIR checkout; see shared.lua). Skipped when twitch-lua is not installed.
+if shared.twitch_lua_installed() then
+	shared.add_twitch_lua_to_package_path()
 	require("twitch.rex.palette_actions").register_twitch_palette_actions()
 end

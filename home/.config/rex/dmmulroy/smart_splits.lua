@@ -1,4 +1,4 @@
--- Vim-aware navigation (herdr: vim-herdr-navigation plugin on ctrl+h/j/k/l)
+-- Vim-aware navigation on ctrl+h/j/k/l
 
 -- Neovim side: smart-splits.nvim with smart-splits-backend-rex
 -- (home/.config/nvim/lua/plugins/smart-splits.lua). When Neovim is in the

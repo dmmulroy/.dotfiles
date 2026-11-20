@@ -1,6 +1,9 @@
 -- Run by twitch_chat/init.lua with `rex do --all`.
---   (no args)  keep a twt column in every tab of every session
---   mode=off   quit every twt; a running follower then closes the rest and exits
+--   (no args)  keep a chat column in every tab of every session
+--   mode=off   quit every chat pane; a running follower then closes the rest and exits
+-- The chat program is shared.twitch_chat_backend(): the Lua client or twt. Either way one
+-- process holds the only Twitch connection and the panes share it. "twt" in the names
+-- below means the chat program of a pane, whichever it is.
 
 -- `rex do` scripts resolve require() beside the script, so this is the sibling shared.lua.
 local shared = require("shared")
@@ -8,6 +11,16 @@ local shared = require("shared")
 local DEFAULT_TWITCH_CHAT_WIDTH = 0.2
 local LOCK_FILE = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat-follow.lock"
 local WIDTH_TOLERANCE = 0.005
+-- twt's panic report (stderr) and our crash notes. A crashed pane closes
+-- itself, so without this the reason is lost. `rex.log` goes nowhere here:
+-- init.lua starts this script with stdout/stderr off.
+local TWT_CRASH_LOG = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat-twt.log"
+-- Twitch allows 3 chat (EventSub) connections per account, so panes don't each
+-- connect. Every pane runs `twt --attach` on this socket; the first one starts
+-- a `twt --serve` that holds the one connection and exits ~10s after the last
+-- pane closes. Its stderr goes to TWITCH_CHAT_SOCKET .. ".log".
+-- Needs twt from github.com/dmmulroy/twitch-tui-fork (main), installed to ~/.cargo/bin/twt.
+local TWITCH_CHAT_SOCKET = (os.getenv("TMPDIR") or "/tmp/") .. "rex-twitch-chat.sock"
 
 local twt = os.getenv("HOME") .. "/.cargo/bin/twt"
 do
@@ -17,6 +30,32 @@ do
 	else
 		twt = "twt"
 	end
+end
+
+-- The command of a chat pane. exec keeps the chat program as the pane's child, so
+-- quit_twt's kill and the exit code in child_exited still see the program itself. Both
+-- draw on stdout; only panics and errors go to stderr.
+local function twitch_chat_pane_command()
+	if shared.twitch_chat_backend() == "lua" then
+		-- The Lua client: Ctrl-C quits (exit 0), which turns chat off everywhere like twt's q.
+		-- It starts the one connection process itself, which exits after the last pane closes.
+		return {
+			"/bin/sh",
+			"-c",
+			'exec "$0" do "$1" tty="$(tty)" rex="$0" 2>>"$2"',
+			shared.rex_cli_path(),
+			shared.TWITCH_LUA_PANE_SCRIPT,
+			TWT_CRASH_LOG,
+		}
+	end
+	return {
+		"/bin/sh",
+		"-c",
+		'RUST_BACKTRACE=1 exec "$0" --attach "$1" --first-state normal 2>>"$2"',
+		twt,
+		TWITCH_CHAT_SOCKET,
+		TWT_CRASH_LOG,
+	}
 end
 
 -- With --all the script hears every session, but calls into one need an attach.
@@ -216,7 +255,7 @@ local function add_twitch_chat(session_id, window)
 			block = {
 				flavor = "com.superlogical.terminal.shell",
 				label = shared.TWITCH_CHAT_LABEL,
-				options = { command = { twt, "--first-state", "normal" } },
+				options = { command = twitch_chat_pane_command() },
 			},
 		},
 	})
@@ -311,6 +350,11 @@ local function is_twt_quit(payload)
 	if payload.exit_code == 0 then
 		return true
 	end
+	-- The Lua client is a `rex do` script, and rex exits with status 130 when it is sent
+	-- SIGTERM or SIGINT (measured), where twt dies by the signal.
+	if payload.exit_code == 130 and shared.twitch_chat_backend() == "lua" then
+		return true
+	end
 	local err = tostring(payload.error or "")
 	return err == "signal: terminated" or err == "signal: interrupt" or err == "signal: hangup"
 end
@@ -333,6 +377,11 @@ local function restart_crashed_twt(chat_block_id, payload)
 	local window_id = chat_window[chat_block_id]
 	local session_id = chat_session[chat_block_id]
 	local how = tostring(payload.error or ("exit code " .. tostring(payload.exit_code)))
+	local log = io.open(TWT_CRASH_LOG, "a")
+	if log then
+		log:write(os.date("%Y-%m-%d %H:%M:%S"), " twt crashed in ", tostring(chat_block_id), ": ", how, "\n")
+		log:close()
+	end
 	if too_many_twt_crashes(window_id) then
 		rex.log("warn", "twitch chat: twt keeps crashing (" .. how .. "); turning chat off")
 		close_all_and_stop("twt crash loop " .. chat_block_id)

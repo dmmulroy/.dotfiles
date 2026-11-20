@@ -29,7 +29,6 @@ home/.config/fish/functions/gtest.fish
 home/.config/fish/functions/gtl.fish
 home/.config/fish/functions/gunwip.fish
 home/.config/fish/functions/gwip.fish
-home/.config/opencode/amp_stuff/
 .envrc
 backups/
 packages/failed_packages_*.txt
@@ -45,11 +44,6 @@ __pycache__/
 
 # jj
 .jj
-
-# opencode
-home/.config/opencode/node_modules/
-home/.config/opencode/plugins/git-ai.ts
-.opencode/plans/
 
 # Plannotator runtime/state (keep config tracked)
 home/.plannotator/*
