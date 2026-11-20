@@ -19,6 +19,7 @@ npm workspace for pi agent extensions. TypeScript, ESM-only.
 │       ├── pi-skill-toggle/      # Skill discovery, toggle UI, frontmatter patching
 │       ├── save-md/              # Save assistant responses as Markdown
 │       ├── pi-cloak/             # Secret cloaking extension
+│       ├── mpl/                  # Codemode tool mpl_render: matplotlib-style charts (github:ivarvong/mpl), Catppuccin Macchiato default
 │       ├── git-interceptor.ts    # Standalone: git command interception
 │       ├── whimsical.ts          # Standalone: whimsical diagram integration
 │       └── web-tools.json        # Helium browser profile config
@@ -36,6 +37,7 @@ Skills live in `home/.agents/skills/` and stow to `~/.agents/skills/`. Do not co
 | Create standalone extension | `agent/extensions/<name>.ts` |
 | Create skill | `home/.agents/skills/<name>/SKILL.md` |
 | Secret masking | `agent/cloak.json` |
+| Chart tool / chart themes | `agent/extensions/mpl/` (`styles/*.mplstyle`, spec docs in `index.ts` `mplInstructions`) |
 | Pi Web Tools source | `~/Code/personal/pi-web-tools` |
 | Type-check and test local packages | `npm run check` (from .pi root) |
 

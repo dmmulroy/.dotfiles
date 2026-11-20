@@ -1,0 +1,55 @@
+# catppuccin-macchiato: Catppuccin Macchiato palette (https://catppuccin.com/palette) on the pro-* layout
+# Plain matplotlib rc keys: plt.style.use("path/to/catppuccin-macchiato.mplstyle") works in matplotlib too.
+# Colours: base 24273a, surface0 363a4f, surface1 494d64, surface2 5b6078, subtext0 a5adcb, subtext1 b8c0e0, text cad3f5
+
+figure.facecolor: 24273a
+axes.facecolor: 24273a
+savefig.facecolor: 24273a
+axes.edgecolor: 494d64
+grid.color: 363a4f
+text.color: cad3f5
+axes.titlecolor: cad3f5
+axes.labelcolor: a5adcb
+xtick.color: 5b6078
+ytick.color: 5b6078
+xtick.labelcolor: a5adcb
+ytick.labelcolor: a5adcb
+patch.edgecolor: 24273a
+legend.labelcolor: b8c0e0
+# blue, mauve, green, peach, red, teal, yellow, pink
+axes.prop_cycle: cycler('color', ['8aadf4', 'c6a0f6', 'a6da95', 'f5a97f', 'ed8796', '8bd5ca', 'eed49f', 'f5bde6'])
+font.family: Inter
+font.size: 9
+figure.figsize: 7.2, 4.2
+axes.spines.top: False
+axes.spines.right: False
+axes.spines.left: False
+axes.grid: True
+axes.grid.axis: y
+axes.axisbelow: True
+axes.linewidth: 0.8
+axes.titlesize: 12
+axes.titleweight: semibold
+axes.titlelocation: left
+axes.titlepad: 10
+axes.labelsize: 9
+axes.labelpad: 6
+grid.linestyle: -
+grid.linewidth: 0.6
+lines.linewidth: 1.6
+lines.solid_capstyle: round
+lines.markersize: 5
+patch.linewidth: 0
+xtick.major.size: 3
+xtick.major.width: 0.8
+xtick.major.pad: 5
+xtick.labelsize: 8.5
+xtick.direction: out
+ytick.major.size: 0
+ytick.major.pad: 6
+ytick.labelsize: 8.5
+legend.frameon: False
+legend.fontsize: 8.5
+legend.handlelength: 1.4
+legend.handletextpad: 0.6
+legend.columnspacing: 1.4
