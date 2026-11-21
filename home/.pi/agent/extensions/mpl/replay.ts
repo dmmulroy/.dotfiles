@@ -1,8 +1,8 @@
 /**
  * Replays an mpl chart spec (a JSON list of [method, args, kwargs] calls) onto a Figure.
  * Adapted from mpl's tools/replay-core.ts (buildWith), which mpl does not export. The spec is data:
- * every method name is checked against an allow-list, so a codemode script cannot reach anything
- * but Axes and Figure drawing methods.
+ * every method name is checked against an allow-list of public Axes and Figure methods, type-checked
+ * against mpl's API, so a codemode script cannot reach private helpers, construction or output.
  */
 import {
 	AutoDateLocator,
@@ -37,7 +37,12 @@ export interface MplFigureSpec {
 	readonly rc?: Readonly<Record<string, unknown>>;
 	readonly grid?: MplGrid;
 	readonly calls: readonly MplCall[];
+	/** Looks up an rc value of the active theme plus `rc` for {"$rc": key}; undefined for an unknown key. */
+	readonly rcParam?: MplRcLookup;
 }
+
+/** The rc value a {"$rc": key} spec value resolves to, as matplotlib's rcParams[key]. */
+export type MplRcLookup = (key: string) => unknown;
 
 /** Thrown for a spec mistake (unknown method, bad index); the message is meant for the model. */
 export class MplSpecError extends Error {
@@ -46,30 +51,60 @@ export class MplSpecError extends Error {
 
 type Dyn = Record<string, (...args: unknown[]) => unknown>;
 
-const NOT_DRAWING = new Set(["constructor", "spec", "addAxesAt", "addAxesFromSpec", "add_subplot", "subplots", "toScene"]);
+/** The public method names of a class instance type. TypeScript `private` members are not in `keyof`, so they never appear. */
+type MethodName<T> = { [K in keyof T]-?: T[K] extends (...args: never[]) => unknown ? K : never }[keyof T] & string;
+type AxesMethod = MethodName<Axes>;
+type FigureMethod = MethodName<Figure>;
 
-function drawingMethods(proto: object): ReadonlySet<string> {
-	const names = new Set<string>();
-	for (let p: object | null = proto; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) {
-		for (const name of Object.getOwnPropertyNames(p)) {
-			if (name.startsWith("_") || NOT_DRAWING.has(name) || /^to[A-Z]|^svg|^png/.test(name)) continue;
-			const d = Object.getOwnPropertyDescriptor(p, name);
-			if (d && typeof d.value === "function") names.add(name);
-		}
-	}
-	return names;
-}
+/** Public Axes methods a spec may call: matplotlib's drawing, labelling and axis API. */
+const AXES_ALLOWED = [
+	"annotate", "axhline", "axhspan", "axline", "axvline", "axvspan", "bar", "barh", "boxplot", "errorbar", "fill_between",
+	"get_title", "get_xinverted", "get_xticklabels", "get_yinverted", "get_yticklabels", "grid", "hist", "hlines", "imshow",
+	"invert_xaxis", "invert_yaxis", "labelOuter", "legend", "pie", "plot", "scatter", "set_anchor", "set_aspect",
+	"set_box_aspect", "set_title", "set_xinverted", "set_xlabel", "set_xlim", "set_xscale", "set_xticklabels", "set_xticks",
+	"set_yinverted", "set_ylabel", "set_ylim", "set_yscale", "set_yticklabels", "set_yticks", "step", "text", "tick_params",
+	"vlines", "xaxis_inverted", "yaxis_inverted",
+] as const satisfies readonly AxesMethod[];
+/** Public Axes methods a spec may not call: internal state (spec), internal objects (set_subplotspec), special calls (twinx). */
+const AXES_DENIED = ["spec", "set_subplotspec", "twinx"] as const satisfies readonly AxesMethod[];
+
+/** Public Figure methods a spec may call as "fig.<name>". */
+const FIGURE_ALLOWED = [
+	"text", "suptitle", "supxlabel", "supylabel", "subplots_adjust", "autofmt_xdate", "tight_layout", "colorbar",
+] as const satisfies readonly FigureMethod[];
+/** Public Figure methods a spec may not call: Axes construction and output, which render.ts owns. */
+const FIGURE_DENIED = [
+	"add_subplot", "addAxesAt", "addAxesFromSpec", "subplots", "pngStream", "svgChunks", "svgStream", "toPNG", "toPNGSync",
+	"toRGBA", "toScene", "toSVG",
+] as const satisfies readonly FigureMethod[];
+
+// Every public method is classified. When an mpl bump adds one, typecheck fails on the line below naming it:
+// add it to *_ALLOWED (and to mplInstructions in index.ts if the model should know it) or to *_DENIED.
+type Unclassified<M, Listed> = Exclude<M, Listed>;
+const everyAxesMethodClassified: [Unclassified<AxesMethod, (typeof AXES_ALLOWED)[number] | (typeof AXES_DENIED)[number]>] extends [never]
+	? true
+	: Unclassified<AxesMethod, (typeof AXES_ALLOWED)[number] | (typeof AXES_DENIED)[number]> = true;
+const everyFigureMethodClassified: [Unclassified<FigureMethod, (typeof FIGURE_ALLOWED)[number] | (typeof FIGURE_DENIED)[number]>] extends [never]
+	? true
+	: Unclassified<FigureMethod, (typeof FIGURE_ALLOWED)[number] | (typeof FIGURE_DENIED)[number]> = true;
+void everyAxesMethodClassified;
+void everyFigureMethodClassified;
+
+/**
+ * Whether this mpl build has Axes.pie_label. It ships with ivarvong/mpl#87 (open as of 2026-11-21); until our pin
+ * includes it, pie charts fall back to pie's single textprops. UPSTREAM(ivarvong/mpl#87): once the pin includes it,
+ * typecheck flags "pie_label" as unclassified: add it to AXES_ALLOWED, then delete this constant, its use below and
+ * the fallback guidance in index.ts. See AGENTS.md.
+ */
+export const MPL_HAS_PIE_LABEL: boolean = typeof (Axes.prototype as unknown as Dyn)["pie_label"] === "function";
 
 /** Axes methods a spec may call, such as plot, bar, set_title. */
-export const MPL_AXES_METHODS: ReadonlySet<string> = drawingMethods(Axes.prototype);
+export const MPL_AXES_METHODS: ReadonlySet<string> = new Set<string>([...AXES_ALLOWED, ...(MPL_HAS_PIE_LABEL ? ["pie_label"] : [])]);
 /** Figure methods a spec may call as "fig.<name>", such as fig.suptitle. */
-export const MPL_FIGURE_METHODS: ReadonlySet<string> = new Set(
-	["text", "suptitle", "supxlabel", "supylabel", "subplots_adjust", "autofmt_xdate", "tight_layout", "colorbar"].filter(
-		(name) => typeof (Figure.prototype as unknown as Dyn)[name] === "function",
-	),
-);
+export const MPL_FIGURE_METHODS: ReadonlySet<string> = new Set<string>(FIGURE_ALLOWED);
 /** Pseudo-calls the replayer handles itself. */
 export const MPL_SPECIAL_CALLS = ["sca", "twinx", "$concise_x", "$date_x"] as const;
+
 
 const DATE_LOCATORS: Readonly<Record<string, new (kw?: unknown) => unknown>> = {
 	AutoDateLocator: AutoDateLocator as never,
@@ -92,11 +127,25 @@ function toDate(s: unknown): Date {
 	return d;
 }
 
-/** JSON values to mpl values at any depth: {$date}, {$dates}, {$float: "nan"|"inf"|"-inf"}. */
-export function decodeValue(a: unknown): unknown {
-	if (Array.isArray(a)) return a.map(decodeValue);
+/** rc colours are stored as bare hex ("24273a"); kwargs need the "#" matplotlib colour form. */
+function rcColour(v: unknown): unknown {
+	return typeof v === "string" && /^(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? `#${v}` : v;
+}
+
+/**
+ * JSON values to mpl values at any depth, including inside kwarg objects such as wedgeprops:
+ * {$date}, {$dates}, {$float: "nan"|"inf"|"-inf"}, and {$rc: key} (the theme's rc value, e.g. "figure.facecolor").
+ */
+export function decodeValue(a: unknown, rcParam?: MplRcLookup): unknown {
+	if (Array.isArray(a)) return a.map((v) => decodeValue(v, rcParam));
 	if (a === null || typeof a !== "object") return a;
 	const o = a as Record<string, unknown>;
+	if ("$rc" in o) {
+		const key = o.$rc;
+		const value = typeof key === "string" && rcParam ? rcParam(key) : undefined;
+		if (value === undefined) throw new MplSpecError(`$rc: unknown rc key ${JSON.stringify(key)}; use a matplotlib rcParams key such as "figure.facecolor" or "text.color"`);
+		return rcColour(value);
+	}
 	if ("$dates" in o) {
 		if (!Array.isArray(o.$dates)) throw new MplSpecError("$dates expects an array");
 		return o.$dates.map(toDate);
@@ -106,17 +155,18 @@ export function decodeValue(a: unknown): unknown {
 		const s = String(o.$float);
 		return s === "nan" ? NaN : s === "inf" ? Infinity : s === "-inf" ? -Infinity : Number(s);
 	}
-	return a;
+	if ("$transform" in o || "$ret" in o) return a;
+	return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, decodeValue(v, rcParam)]));
 }
 
-function decodeKwargs(kwargs: Readonly<Record<string, unknown>> | undefined, ax: Axes): Record<string, unknown> {
+function decodeKwargs(kwargs: Readonly<Record<string, unknown>> | undefined, ax: Axes, rcParam?: MplRcLookup): Record<string, unknown> {
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(kwargs ?? {})) {
 		if (v && typeof v === "object" && "$transform" in v) {
 			const t = (v as { $transform: unknown }).$transform;
 			if (t !== "axes" && t !== "data") throw new MplSpecError(`$transform must be "axes" or "data"`);
 			out[k] = t === "axes" ? ax.transAxes : ax.transData;
-		} else out[k] = decodeValue(v);
+		} else out[k] = decodeValue(v, rcParam);
 	}
 	return out;
 }
@@ -130,6 +180,20 @@ function unknownMethod(fn: string): MplSpecError {
 		`unknown call "${fn}". Axes methods: ${[...MPL_AXES_METHODS].sort().join(", ")}. ` +
 			`Figure methods (prefix "fig."): ${[...MPL_FIGURE_METHODS].join(", ")}. Special: ${MPL_SPECIAL_CALLS.join(", ")}.`,
 	);
+}
+
+/**
+ * A positional arg {"$ret": i} is the value calls[i] returned, such as the PieContainer pie() returns for pie_label.
+ * Same convention as mpl's fixture specs (ivarvong/mpl#87). Only earlier calls that returned something can be named.
+ */
+function resolveRet(a: unknown, index: number, rets: ReadonlyMap<number, unknown>, rcParam?: MplRcLookup): unknown {
+	if (a === null || typeof a !== "object" || Array.isArray(a) || !("$ret" in a)) return decodeValue(a, rcParam);
+	const i = (a as { $ret: unknown }).$ret;
+	if (typeof i !== "number" || !Number.isInteger(i) || i < 0 || i >= index) {
+		throw new MplSpecError(`$ret must name an earlier call index (0..${index - 1}), got ${JSON.stringify(i)}`);
+	}
+	if (!rets.has(i)) throw new MplSpecError(`$ret: calls[${i}] returned nothing to pass on`);
+	return rets.get(i);
 }
 
 /** Builds the Figure for a spec. Throws MplSpecError for spec mistakes and mpl's own errors for bad kwargs. */
@@ -150,6 +214,7 @@ export function buildFigure(spec: MplFigureSpec): Figure {
 		axes = [ax];
 	}
 	let ax = axes[0] as Axes;
+	const rets = new Map<number, unknown>();
 
 	spec.calls.forEach((call, index) => {
 		if (!Array.isArray(call) || typeof call[0] !== "string") {
@@ -162,8 +227,8 @@ export function buildFigure(spec: MplFigureSpec): Figure {
 					`e.g. ["bar", [["a", "b"], [3, 7]], { color: "C1" }]`,
 			);
 		}
-		const args = args0.map(decodeValue);
 		try {
+			const args = args0.map((a) => resolveRet(a, index, rets, spec.rcParam));
 			if (fn === "sca") {
 				const i = args[0];
 				if (typeof i !== "number" || !axes[i]) throw new MplSpecError(`sca: no Axes ${String(i)} (have ${axes.length})`);
@@ -195,7 +260,7 @@ export function buildFigure(spec: MplFigureSpec): Figure {
 			if (fn.startsWith("fig.")) {
 				const name = fn.slice(4);
 				if (!MPL_FIGURE_METHODS.has(name)) throw unknownMethod(fn);
-				const kw = decodeKwargs(kwargs, ax);
+				const kw = decodeKwargs(kwargs, ax, spec.rcParam);
 				if (name === "colorbar") {
 					const mappable = [...ax.artists]
 						.reverse()
@@ -208,7 +273,8 @@ export function buildFigure(spec: MplFigureSpec): Figure {
 				return;
 			}
 			if (!MPL_AXES_METHODS.has(fn)) throw unknownMethod(fn);
-			(ax as unknown as Dyn)[fn]?.(...withKwargs(args, decodeKwargs(kwargs, ax)));
+			const ret = (ax as unknown as Dyn)[fn]?.(...withKwargs(args, decodeKwargs(kwargs, ax, spec.rcParam)));
+			if (ret !== undefined) rets.set(index, ret);
 		} catch (error) {
 			if (error instanceof MplSpecError && error.message.startsWith(`calls[`)) throw error;
 			const message = error instanceof Error ? error.message : String(error);

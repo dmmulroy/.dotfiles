@@ -3,22 +3,32 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { toMplRenderToolDefinition } from "../index.ts";
-import { MPL_THEMES, renderChart } from "../render.ts";
-import { decodeValue, MPL_AXES_METHODS } from "../replay.ts";
+import { resolveMplTheme, toMplRenderToolDefinition } from "../index.ts";
+import { MPL_DEFAULT_THEME, MPL_LIGHT_THEME, MPL_THEMES, renderChart } from "../render.ts";
+import { decodeValue, MPL_AXES_METHODS, MPL_HAS_PIE_LABEL } from "../replay.ts";
 
 const outDir = mkdtempSync(join(tmpdir(), "pi-mpl-test-"));
 after(() => rmSync(outDir, { recursive: true, force: true }));
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
 
-test("the themes include macchiato, pro-slate and pro-dark", () => {
-	for (const t of ["catppuccin-macchiato", "pro-slate", "pro-dark"]) assert.ok(MPL_THEMES.includes(t), t);
+test("the themes include macchiato, latte, pro-slate and pro-dark", () => {
+	for (const t of ["catppuccin-macchiato", "catppuccin-latte", "pro-slate", "pro-dark"]) assert.ok(MPL_THEMES.includes(t), t);
 });
 
 test("Axes allow-list has drawing methods and no private names", () => {
-	for (const m of ["plot", "bar", "scatter", "hist", "set_title", "legend", "imshow"]) assert.ok(MPL_AXES_METHODS.has(m), m);
+	for (const m of ["plot", "bar", "scatter", "hist", "set_title", "legend", "imshow", "pie"]) assert.ok(MPL_AXES_METHODS.has(m), m);
 	assert.ok(![...MPL_AXES_METHODS].some((m) => m.startsWith("_") || m === "constructor"));
+});
+
+test("specs cannot reach TypeScript-private helpers, internal state or output methods", () => {
+	// private in mpl's .d.ts but real functions on Axes.prototype at runtime
+	for (const m of ["next", "bars", "parseBins", "lineProps", "settle", "arrowOf"]) {
+		assert.ok(!MPL_AXES_METHODS.has(m), m);
+		assert.throws(() => renderChart({ calls: [[m, []]] }, outDir), new RegExp(`calls\\[0\\] ${m}: unknown call`), m);
+	}
+	for (const m of ["spec", "set_subplotspec"]) assert.throws(() => renderChart({ calls: [[m, []]] }, outDir), /unknown call/, m);
+	for (const m of ["fig.toSVG", "fig.add_subplot", "fig.subplots"]) assert.throws(() => renderChart({ calls: [[m, []]] }, outDir), /unknown call/, m);
 });
 
 test("decodeValue turns $dates, $date and $float into values", () => {
@@ -28,7 +38,7 @@ test("decodeValue turns $dates, $date and $float into values", () => {
 	assert.ok(Number.isNaN(decodeValue({ $float: "nan" })));
 });
 
-for (const theme of ["catppuccin-macchiato", "pro-slate", "pro-dark"]) {
+for (const theme of ["catppuccin-macchiato", "catppuccin-latte", "pro-slate", "pro-dark"]) {
 	test(`renders a grid with dates in ${theme}`, () => {
 		const days = ["2026-10-01", "2026-10-02", "2026-10-03"];
 		const out = renderChart(
@@ -56,8 +66,88 @@ for (const theme of ["catppuccin-macchiato", "pro-slate", "pro-dark"]) {
 	});
 }
 
+test("pie and donut render in a grid with a legend", () => {
+	assert.ok(MPL_AXES_METHODS.has("pie"));
+	const out = renderChart(
+		{
+			grid: { rows: 1, cols: 2 },
+			calls: [
+				["pie", [[35, 25, 40]], { labels: ["a", "b", "c"], autopct: "%1.0f%%", startangle: 90, explode: [0.05, 0, 0] }],
+				["sca", [1]],
+				["pie", [[3, 2, 1]], { labels: ["x", "y", "z"], labeldistance: null, wedgeprops: { width: 0.4, edgecolor: { $rc: "figure.facecolor" }, linewidth: 1.5 } }],
+				["legend", [], { loc: "center" }],
+			],
+		},
+		outDir,
+	);
+	assert.deepEqual([...(out.png ?? []).slice(0, 4)], PNG_MAGIC);
+	assert.throws(() => renderChart({ calls: [["pie", [[1, 2]], { frame: true }]] }, outDir), /calls\[0\] pie:/);
+});
+
+// The success path is the pie_label test below: no other mpl call takes another call's return value yet.
+test("$ret rejects references to later, missing or empty calls", () => {
+	assert.throws(() => renderChart({ calls: [["plot", [{ $ret: 0 }, [1]]]] }, outDir), /calls\[0\] plot: \$ret must name an earlier call/);
+	assert.throws(() => renderChart({ calls: [["set_title", ["t"]], ["sca", [{ $ret: 5 }]]] }, outDir), /calls\[1\] sca: \$ret must name/);
+	assert.throws(() => renderChart({ calls: [["sca", [0]], ["plot", [{ $ret: 0 }, [1]]]] }, outDir), /calls\[0\] returned nothing/);
+});
+
+// UPSTREAM(ivarvong/mpl#87): todo until the mpl pin has Axes.pie_label; then this runs and must pass (see AGENTS.md).
+test("pie_label styles inside percentages apart from outside names", { todo: MPL_HAS_PIE_LABEL ? false : "waiting on ivarvong/mpl#87 (Axes.pie_label)" }, () => {
+	const out = renderChart(
+		{
+			calls: [
+				["pie", [[35, 25, 40]], { labels: ["a", "b", "c"], startangle: 90 }],
+				["pie_label", [{ $ret: 0 }, "{absval:d} ({frac:.0%})"], { textprops: { color: { $rc: "figure.facecolor" }, fontweight: "bold" } }],
+			],
+		},
+		outDir,
+	);
+	assert.deepEqual([...(out.png ?? []).slice(0, 4)], PNG_MAGIC);
+});
+
+test("$rc resolves the active theme's rc values, inside nested kwargs too", () => {
+	const rc = (key: string) => ({ "figure.facecolor": "24273a", "lines.linewidth": 1.6 })[key];
+	assert.deepEqual(decodeValue({ wedgeprops: { edgecolor: { $rc: "figure.facecolor" } } }, rc), { wedgeprops: { edgecolor: "#24273a" } });
+	assert.equal(decodeValue({ $rc: "lines.linewidth" }, rc), 1.6);
+	assert.throws(() => decodeValue({ $rc: "nope" }, rc), /\$rc: unknown rc key "nope"/);
+	assert.throws(() => renderChart({ calls: [["plot", [[1], [1]], { color: { $rc: "no.such.key" } }]] }, outDir), /calls\[0\] plot: \$rc: unknown rc key/);
+	for (const theme of ["catppuccin-macchiato", "catppuccin-latte", "pro-slate", "default"]) {
+		const out = renderChart({ theme, calls: [["plot", [[1, 2], [2, 1]], { color: { $rc: "text.color" } }]] }, outDir);
+		assert.deepEqual([...(out.png ?? []).slice(0, 4)], PNG_MAGIC, theme);
+	}
+	// spec rc overrides win, as rcParams.update after style.use
+	const a = renderChart({ rc: { "text.color": "#ff0000" }, calls: [["plot", [[1, 2], [2, 1]], { color: { $rc: "text.color" } }]] }, outDir);
+	const b = renderChart({ rc: { "text.color": "#ff0000" }, calls: [["plot", [[1, 2], [2, 1]], { color: "#ff0000" }]] }, outDir);
+	assert.deepEqual(a.png, b.png);
+});
+
+test("an omitted theme follows the UI appearance; an explicit one is used as given", () => {
+	const ui = (appearance: "dark" | "light", hasUI = true) => ({ hasUI, ui: { theme: { appearance } } });
+	assert.equal(resolveMplTheme(undefined, ui("light")), MPL_LIGHT_THEME);
+	assert.equal(resolveMplTheme(undefined, ui("dark")), MPL_DEFAULT_THEME);
+	assert.equal(resolveMplTheme(undefined, ui("light", false)), MPL_DEFAULT_THEME, "print/json mode has no UI");
+	assert.equal(resolveMplTheme(undefined, undefined), MPL_DEFAULT_THEME);
+	for (const theme of ["pro-slate", "pro-dark", MPL_DEFAULT_THEME]) assert.equal(resolveMplTheme(theme, ui("light")), theme);
+});
+
+test("the tool re-reads the appearance on every call", async () => {
+	const tool = toMplRenderToolDefinition(() => outDir);
+	const ctx = { hasUI: true, ui: { theme: { appearance: "dark" as "dark" | "light" } } };
+	const render = async (theme?: string) => {
+		const result = await tool.execute("id", { theme, calls: [["plot", [[1, 2], [2, 1]]]] } as never, undefined, undefined, ctx as never);
+		assert.notEqual(result.isError, true);
+		return result.structuredContent as { theme: string; pngPath: string };
+	};
+	assert.equal((await render()).theme, MPL_DEFAULT_THEME);
+	ctx.ui.theme.appearance = "light";
+	const light = await render();
+	assert.equal(light.theme, MPL_LIGHT_THEME);
+	assert.deepEqual(readFileSync(light.pngPath), readFileSync((await render(MPL_LIGHT_THEME)).pngPath));
+	assert.equal((await render("pro-dark")).theme, "pro-dark");
+});
+
 test("unknown methods and kwargs are reported with the call index", () => {
-	assert.throws(() => renderChart({ calls: [["plot", [[1], [1]]], ["pie", [[1]]]] }, outDir), /calls\[1\] pie: unknown call/);
+	assert.throws(() => renderChart({ calls: [["plot", [[1], [1]]], ["violinplot", [[1]]]] }, outDir), /calls\[1\] violinplot: unknown call/);
 	assert.throws(() => renderChart({ calls: [["plot", [[1], [1]], { colour: "red" }]] }, outDir), /calls\[0\] plot: .*colour/);
 	assert.throws(() => renderChart({ theme: "nope", calls: [] }, outDir), /unknown theme/);
 	assert.throws(() => renderChart({ scale: 10, calls: [] }, outDir), /scale must be between/);
