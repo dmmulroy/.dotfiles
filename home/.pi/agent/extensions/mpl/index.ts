@@ -2,12 +2,44 @@
  * mpl_render: a codemode tool that draws matplotlib-style charts with mpl (github.com/ivarvong/mpl)
  * from a JSON call list, writes PNG/SVG files, and returns the PNG so a script can show it with image().
  */
-import type { ExtensionAPI, ToolDefinition, ToolNamespace } from "@earendil-works/pi-coding-agent";
+import type {
+	ExtensionAPI,
+	ExtensionToolContext,
+	ThemeAppearance,
+	ToolDefinition,
+	ToolNamespace,
+} from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 import { MPL_DEFAULT_THEME, renderChart, type MplRenderInput } from "./render.ts";
 import { MPL_FIGURE_METHODS } from "./replay.ts";
 
 const MPL_RENDER_TOOL_NAME = "mpl_render";
+
+/** Opt-in theme name that follows the session's UI appearance. Never reaches render.ts, which stays pi-independent. */
+export const MPL_AUTO_THEME = "auto";
+/** The theme `"auto"` picks for a light UI. A dark UI or no UI keeps {@link MPL_DEFAULT_THEME}. */
+export const MPL_AUTO_LIGHT_THEME = "pro-slate";
+
+/** The slice of the tool execution context that {@link resolveMplTheme} reads; a real `ExtensionToolContext` satisfies it. */
+export interface MplThemeContext {
+	readonly hasUI: boolean;
+	readonly ui: { readonly theme: { readonly appearance: ThemeAppearance } };
+}
+
+/**
+ * Resolves `theme: "auto"` to a concrete theme name at the tool execution boundary, on every call, so
+ * a mid-session appearance change lands on the next chart: a light interactive UI gets
+ * {@link MPL_AUTO_LIGHT_THEME}, a dark UI or a headless run (no `hasUI`, e.g. print/json mode or a
+ * direct call without context) gets {@link MPL_DEFAULT_THEME}.
+ *
+ * Every other value passes through untouched, `undefined` included, so an omitted theme keeps
+ * renderChart()'s own default and an explicit style is always used as given.
+ */
+export function resolveMplTheme(theme: string | undefined, ctx: MplThemeContext | undefined): string | undefined {
+	if (theme !== MPL_AUTO_THEME) return theme;
+	const appearance = ctx?.hasUI ? ctx.ui?.theme?.appearance : undefined;
+	return appearance === "light" ? MPL_AUTO_LIGHT_THEME : MPL_DEFAULT_THEME;
+}
 
 export const mplInstructions = `Reference for mpl_render. mpl is a pixel-exact TypeScript port of matplotlib 3.11: calls follow matplotlib's object API (ax.<method>(*args, **kwargs)), kwargs and rc keys included.
 
@@ -16,7 +48,7 @@ Spec: { calls, theme?, rc?, grid?, format?, scale?, name?, tight_layout? }
 - grid: { rows, cols, sharex?, sharey?, width_ratios?, height_ratios? }. Axes are numbered row-major from 0; ["sca", [i]] makes Axes i current; ["twinx", []] adds a twin and makes it current.
 - Figure calls take a "fig." prefix: ${[...MPL_FIGURE_METHODS].map((m) => `fig.${m}`).join(", ")}. fig.colorbar maps the last imshow or colour-mapped scatter on the current Axes.
 - Values: {"$float": "nan"} is NaN. Kwarg {"$transform": "axes"} is ax.transAxes.
-- theme: "${MPL_DEFAULT_THEME}" (default, dark), "pro-slate" (light), "pro-dark", or any matplotlib style name. rc overrides keys, e.g. { "figure.figsize": [9, 4] }.
+- theme: "${MPL_DEFAULT_THEME}" (default, dark), "pro-slate" (light), "pro-dark", or any matplotlib style name. Omitting theme keeps the "${MPL_DEFAULT_THEME}" default, and an explicit style name is always used as given. "${MPL_AUTO_THEME}" is opt-in and follows this session's UI appearance, resolved again on every call: a light UI renders "${MPL_AUTO_LIGHT_THEME}", a dark UI or a headless run (print/json mode, no UI) renders "${MPL_DEFAULT_THEME}". rc overrides keys, e.g. { "figure.figsize": [9, 4] }.
 - scale: PNG pixel multiplier from 0.25 to 4, default 2 (1440x840 at the default size); 3 for print.
 - format: "png" (default), "svg", or "both". Files land in ~/.pi/agent/work/charts/<date>/; tight_layout runs unless the calls lay out the figure.
 
@@ -25,7 +57,7 @@ Dates:
 - Ticks: ["$concise_x", []] for ConciseDateFormatter, or ["$date_x", ["MonthLocator", { interval: 1 }, "%b %d" | "concise"]].
 - annotate takes epoch days (ms / 86400000) as coordinates.
 
-Colours (Macchiato): red #ed8796, peach #f5a97f, yellow #eed49f, green #a6da95, teal #8bd5ca, blue #8aadf4, mauve #c6a0f6, pink #f5bde6, muted text #a5adcb. Cycle C0..C7 = blue, mauve, green, peach, red, teal, yellow, pink.
+Colours ("${MPL_DEFAULT_THEME}" only; under "${MPL_AUTO_LIGHT_THEME}", "${MPL_AUTO_THEME}" or any other style let the theme choose, or name cycle slots C0..C7 instead of hex): red #ed8796, peach #f5a97f, yellow #eed49f, green #a6da95, teal #8bd5ca, blue #8aadf4, mauve #c6a0f6, pink #f5bde6, muted text #a5adcb. Cycle C0..C7 = blue, mauve, green, peach, red, teal, yellow, pink.
 
 Chart types: line, step, scatter, bar/barh (bottom/left for stacks), hist, boxplot, errorbar, fill_between, imshow + fig.colorbar, axhline/axvline/axhspan/axvspan, text, annotate. For shares use barh; for distributions use hist or boxplot; for legend placement use loc and ncols.
 
@@ -43,7 +75,11 @@ export const mplRenderParameters = Type.Object({
 	calls: Type.Array(Type.Array(Type.Unknown(), { minItems: 1, maxItems: 3 }), {
 		description: '[method, [positional args], {kwargs}], e.g. ["bar", [names, values], { color: "C1" }]',
 	}),
-	theme: Type.Optional(Type.String({ description: `default ${MPL_DEFAULT_THEME}` })),
+	theme: Type.Optional(
+		Type.String({
+			description: `default ${MPL_DEFAULT_THEME}; "${MPL_AUTO_THEME}" follows the UI appearance per call (light -> ${MPL_AUTO_LIGHT_THEME}, dark or headless -> ${MPL_DEFAULT_THEME})`,
+		}),
+	),
 	rc: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 	grid: Type.Optional(
 		Type.Object({
@@ -79,10 +115,11 @@ export function toMplRenderToolDefinition(outDir?: () => string): ToolDefinition
 		exposure: "codemode",
 		namespace: mplToolNamespace,
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-		async execute(_toolCallId, params) {
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionToolContext | undefined) {
 			const input = params as MplRenderInput;
+			const theme = resolveMplTheme(input.theme, ctx);
 			try {
-				const out = renderChart(input, outDir?.());
+				const out = renderChart(theme === input.theme ? input : { ...input, theme }, outDir?.());
 				const image = out.png
 					? { type: "image" as const, data: Buffer.from(out.png).toString("base64"), mimeType: "image/png" as const }
 					: undefined;
