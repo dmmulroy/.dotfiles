@@ -16,18 +16,11 @@ Whenever you touch this extension or bump mpl, check each open item. Every one h
 in the code (`rg "UPSTREAM\("`) and shows up as a `todo` test in `npm run check`.
 
 | Ref | What | Status (as of) |
-|-----|------|----------------|
-| ivarvong/mpl#87 | `Axes.pie_label`, so pie percentages and names get separate `textprops` | open (2026-11-21) |
+|-----|------|----------|
+| none | | |
 
-Check: `gh pr view 87 -R ivarvong/mpl --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "")'`
-
-When #87 is `MERGED`:
-1. Bump the pin (see "Updating mpl" below) to a commit that includes the merge.
-2. Typecheck now fails naming `"pie_label"`: add it to `AXES_ALLOWED` in `replay.ts`.
-3. Remove the fallback: `MPL_HAS_PIE_LABEL` and its use in `MPL_AXES_METHODS` (`replay.ts`), `PIE_WITHOUT_LABEL`
-   and the conditional in `index.ts`, and the `todo` option on the pie_label test. Keep `PIE_WITH_LABEL`.
-4. `npm run check -w pi-mpl-extension`: the pie_label test must run and pass (no `todo`).
-5. Delete the row above. While it is still open, update its status date when you check.
+To add one: open the upstream PR, mark every workaround `UPSTREAM(<ref>)`, make the test that needs it a `todo`, and
+add a row with the merge check and the cleanup steps for when it lands.
 
 ## Updating mpl
 

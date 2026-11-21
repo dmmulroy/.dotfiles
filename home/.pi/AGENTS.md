@@ -79,11 +79,6 @@ Most of `agent/` is gitignored by default. Tracked files are explicitly un-ignor
 - `agent/extensions/**` (but `node_modules/` within are re-ignored)
 - `agent/themes/*.json`
 
-## PENDING UPSTREAM
-
-- mpl extension waits on ivarvong/mpl#87 (`Axes.pie_label`). When touching mpl or running `npm run check`, check its
-  status and follow `agent/extensions/mpl/AGENTS.md` once it merges.
-
 ## NOTES
 
 - Pi Web Tools is installed from `git:github.com/dmmulroy/pi-web-tools`; `web-tools.json` is only Helium browser profile config

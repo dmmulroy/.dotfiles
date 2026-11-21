@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 import { resolveMplTheme, toMplRenderToolDefinition } from "../index.ts";
 import { MPL_DEFAULT_THEME, MPL_LIGHT_THEME, MPL_THEMES, renderChart } from "../render.ts";
-import { decodeValue, MPL_AXES_METHODS, MPL_HAS_PIE_LABEL } from "../replay.ts";
+import { decodeValue, MPL_AXES_METHODS } from "../replay.ts";
 
 const outDir = mkdtempSync(join(tmpdir(), "pi-mpl-test-"));
 after(() => rmSync(outDir, { recursive: true, force: true }));
@@ -91,8 +91,8 @@ test("$ret rejects references to later, missing or empty calls", () => {
 	assert.throws(() => renderChart({ calls: [["sca", [0]], ["plot", [{ $ret: 0 }, [1]]]] }, outDir), /calls\[0\] returned nothing/);
 });
 
-// UPSTREAM(ivarvong/mpl#87): todo until the mpl pin has Axes.pie_label; then this runs and must pass (see AGENTS.md).
-test("pie_label styles inside percentages apart from outside names", { todo: MPL_HAS_PIE_LABEL ? false : "waiting on ivarvong/mpl#87 (Axes.pie_label)" }, () => {
+test("pie_label styles inside percentages apart from outside names", () => {
+	assert.ok(MPL_AXES_METHODS.has("pie_label"));
 	const out = renderChart(
 		{
 			calls: [
@@ -103,6 +103,10 @@ test("pie_label styles inside percentages apart from outside names", { todo: MPL
 		outDir,
 	);
 	assert.deepEqual([...(out.png ?? []).slice(0, 4)], PNG_MAGIC);
+	// numpy semantics, as documented in mplInstructions: one fractional value makes x float64, and {absval:d} throws
+	const pie = ["pie", [[35.5, 25, 40]]] as const;
+	assert.throws(() => renderChart({ calls: [pie, ["pie_label", [{ $ret: 0 }, "{absval:d}"]]] }, outDir), /calls\[1\] pie_label:/);
+	assert.ok(renderChart({ calls: [pie, ["pie_label", [{ $ret: 0 }, "{absval:.1f}"]]] }, outDir).png);
 });
 
 test("$rc resolves the active theme's rc values, inside nested kwargs too", () => {

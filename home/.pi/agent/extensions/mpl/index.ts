@@ -5,7 +5,7 @@
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition, ToolNamespace } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 import { MPL_DEFAULT_THEME, MPL_LIGHT_THEME, mplThemeForAppearance, renderChart, type MplRenderInput } from "./render.ts";
-import { MPL_FIGURE_METHODS, MPL_HAS_PIE_LABEL } from "./replay.ts";
+import { MPL_FIGURE_METHODS } from "./replay.ts";
 
 const MPL_RENDER_TOOL_NAME = "mpl_render";
 
@@ -24,15 +24,8 @@ export function resolveMplTheme(theme: string | undefined, ctx: MplThemeContext 
 	return theme ?? mplThemeForAppearance(ctx?.hasUI ? ctx.ui?.theme?.appearance : undefined);
 }
 
-const PIE_BASICS = `Pie: ["pie", [values], { labels, colors, autopct: "%1.0f%%", explode, startangle: 90, counterclock, shadow, radius, labeldistance, pctdistance, wedgeprops: { width: 0.4, edgecolor: {"$rc": "figure.facecolor"}, linewidth: 1.5 }, textprops: { fontsize, color, fontweight }, rotatelabels, normalize }]. wedgeprops.width makes a donut; an edgecolor matching the background separates wedges. autopct is a printf string only (no callables). normalize: false with sum <= 1 draws a partial pie. frame: true and hatch throw. pie sets equal aspect and hides the axes.`;
-
-/** With pie_label: names outside in the theme colour, values inside in a dark colour, as matplotlib 3.11 does it. */
-const PIE_WITH_LABEL = `${PIE_BASICS}
-Pie text colours: pie's textprops styles names and percentages alike, and the theme's text colour is hard to read on filled wedges. Draw the pie (call i), then label it with ["pie_label", [{"$ret": i}, "{frac:.0%}"], { distance: 0.6, textprops: { color: {"$rc": "figure.facecolor"}, fontweight: "bold" } }]. labels is a str.format template with {absval} and {frac} fields (e.g. "{absval:,d} ({frac:.0%})") or a list of strings; alignment "auto" | "outer" | "center", rotate. Each pie_label call has its own textprops.`;
-
-// UPSTREAM(ivarvong/mpl#87): the fallback until our mpl pin has Axes.pie_label. Delete it once merged (see AGENTS.md).
-const PIE_WITHOUT_LABEL = `${PIE_BASICS}
-Pie text colours: textprops styles names and percentages alike, and the theme's text colour is hard to read on filled wedges. Keep the names as labels, use pctdistance: 0.75 with wedgeprops { edgecolor: {"$rc": "figure.facecolor"}, linewidth: 1.5 } so the percentages sit inside clear wedges, and keep autopct short ("%1.0f%%"). Use labeldistance: null plus a legend only when names do not fit around the pie.`;
+const PIE_GUIDE = `Pie: ["pie", [values], { labels, colors, autopct: "%1.0f%%", explode, startangle: 90, counterclock, shadow, radius, labeldistance, pctdistance, wedgeprops: { width: 0.4, edgecolor: {"$rc": "figure.facecolor"}, linewidth: 1.5 }, textprops: { fontsize, color, fontweight }, rotatelabels, normalize }]. wedgeprops.width makes a donut; an edgecolor matching the background separates wedges. autopct is a printf string only (no callables). normalize: false with sum <= 1 draws a partial pie. frame: true and hatch throw. pie sets equal aspect and hides the axes.
+Pie text colours: pie's textprops styles names and autopct percentages alike, and the theme's text colour is hard to read on filled wedges. So draw the pie (call i) with labels and no autopct, then add the values with ["pie_label", [{"$ret": i}, "{frac:.0%}"], { distance: 0.6, textprops: { color: {"$rc": "figure.facecolor"}, fontweight: "bold" } }] (use distance: 0.8 for a 0.4-wide donut). pie_label's labels is a str.format template with {absval} and {frac} fields (e.g. "{absval:,d} ({frac:.0%})") or a list of strings, one per wedge; alignment "auto" | "outer" | "center", rotate. {absval:d} needs whole-number values; if any value has a fraction use {absval} or {absval:.1f}. Each pie_label call has its own textprops.`;
 
 export const mplInstructions = `Reference for mpl_render. mpl is a pixel-exact TypeScript port of matplotlib 3.11: calls follow matplotlib's object API (ax.<method>(*args, **kwargs)), kwargs and rc keys included.
 
@@ -54,7 +47,7 @@ Colours: the theme can be dark or light, so never hardcode hex. Both Catppuccin 
 
 Chart types: line, step, scatter, bar/barh (bottom/left for stacks), hist, boxplot, errorbar, fill_between, imshow + fig.colorbar, pie, axhline/axvline/axhspan/axvspan, text, annotate. For shares of a whole with up to ~6 parts use pie (or a donut); with more parts, or to compare shares, use barh. For distributions use hist or boxplot; for legend placement use loc and ncols.
 
-${MPL_HAS_PIE_LABEL ? PIE_WITH_LABEL : PIE_WITHOUT_LABEL}
+${PIE_GUIDE}
 
 Gotchas:
 - Unknown kwargs and rc keys throw, as in matplotlib; the error names the call index and the offending key.

@@ -14,7 +14,7 @@
     ]
   },
   "dependencies": {
-    "mpl": "github:ivarvong/mpl#689ebd4"
+    "mpl": "github:ivarvong/mpl#9d6e19e"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

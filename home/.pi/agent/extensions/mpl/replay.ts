@@ -60,7 +60,7 @@ type FigureMethod = MethodName<Figure>;
 const AXES_ALLOWED = [
 	"annotate", "axhline", "axhspan", "axline", "axvline", "axvspan", "bar", "barh", "boxplot", "errorbar", "fill_between",
 	"get_title", "get_xinverted", "get_xticklabels", "get_yinverted", "get_yticklabels", "grid", "hist", "hlines", "imshow",
-	"invert_xaxis", "invert_yaxis", "labelOuter", "legend", "pie", "plot", "scatter", "set_anchor", "set_aspect",
+	"invert_xaxis", "invert_yaxis", "labelOuter", "legend", "pie", "pie_label", "plot", "scatter", "set_anchor", "set_aspect",
 	"set_box_aspect", "set_title", "set_xinverted", "set_xlabel", "set_xlim", "set_xscale", "set_xticklabels", "set_xticks",
 	"set_yinverted", "set_ylabel", "set_ylim", "set_yscale", "set_yticklabels", "set_yticks", "step", "text", "tick_params",
 	"vlines", "xaxis_inverted", "yaxis_inverted",
@@ -90,16 +90,8 @@ const everyFigureMethodClassified: [Unclassified<FigureMethod, (typeof FIGURE_AL
 void everyAxesMethodClassified;
 void everyFigureMethodClassified;
 
-/**
- * Whether this mpl build has Axes.pie_label. It ships with ivarvong/mpl#87 (open as of 2026-11-21); until our pin
- * includes it, pie charts fall back to pie's single textprops. UPSTREAM(ivarvong/mpl#87): once the pin includes it,
- * typecheck flags "pie_label" as unclassified: add it to AXES_ALLOWED, then delete this constant, its use below and
- * the fallback guidance in index.ts. See AGENTS.md.
- */
-export const MPL_HAS_PIE_LABEL: boolean = typeof (Axes.prototype as unknown as Dyn)["pie_label"] === "function";
-
 /** Axes methods a spec may call, such as plot, bar, set_title. */
-export const MPL_AXES_METHODS: ReadonlySet<string> = new Set<string>([...AXES_ALLOWED, ...(MPL_HAS_PIE_LABEL ? ["pie_label"] : [])]);
+export const MPL_AXES_METHODS: ReadonlySet<string> = new Set<string>(AXES_ALLOWED);
 /** Figure methods a spec may call as "fig.<name>", such as fig.suptitle. */
 export const MPL_FIGURE_METHODS: ReadonlySet<string> = new Set<string>(FIGURE_ALLOWED);
 /** Pseudo-calls the replayer handles itself. */
@@ -184,7 +176,7 @@ function unknownMethod(fn: string): MplSpecError {
 
 /**
  * A positional arg {"$ret": i} is the value calls[i] returned, such as the PieContainer pie() returns for pie_label.
- * Same convention as mpl's fixture specs (ivarvong/mpl#87). Only earlier calls that returned something can be named.
+ * Same convention as mpl's fixture specs. Only earlier calls that returned something can be named.
  */
 function resolveRet(a: unknown, index: number, rets: ReadonlyMap<number, unknown>, rcParam?: MplRcLookup): unknown {
 	if (a === null || typeof a !== "object" || Array.isArray(a) || !("$ret" in a)) return decodeValue(a, rcParam);
