@@ -538,6 +538,78 @@ test("resolves complete pnpm workspace deployment script chains", () => {
 	}
 });
 
+/** An npm workspace shaped like home/.pi: root package.json `workspaces`, no pnpm-workspace.yaml. */
+function makeNpmWorkspace(workspaces: unknown = ["agent/extensions/*"]): {
+	readonly root: string;
+	readonly app: string;
+} {
+	const root = mkdtempSync(join(tmpdir(), "cloudflare-npm-workspace-"));
+	const app = join(root, "agent", "extensions", "app");
+	const lib = join(root, "agent", "extensions", "lib");
+	mkdirSync(app, { recursive: true });
+	mkdirSync(lib, { recursive: true });
+	writeFileSync(
+		join(root, "package.json"),
+		JSON.stringify({
+			name: "npm-workspace-root",
+			workspaces,
+			scripts: {
+				check: "npm run check --workspace=pi-lib && npm run check --workspace=@example/app",
+				"deploy:app": "npm run deploy -w @example/app",
+			},
+		}),
+	);
+	writeFileSync(
+		join(app, "package.json"),
+		JSON.stringify({
+			name: "@example/app",
+			scripts: { check: "npm run typecheck && npm run test", typecheck: "tsc --noEmit", test: "node --test", deploy: "alchemy deploy --stage prod" },
+		}),
+	);
+	writeFileSync(
+		join(lib, "package.json"),
+		JSON.stringify({ name: "pi-lib", scripts: { check: "tsc --noEmit" } }),
+	);
+	writeFileSync(join(app, "alchemy.run.ts"), 'export default Alchemy.Stack("App", {}, Effect.void);\n');
+	return { root, app };
+}
+
+test("resolves npm workspace filters from package.json workspaces", () => {
+	const workspace = makeNpmWorkspace();
+	const policy = makeAlchemyPolicy([{ project: join(workspace.app, "alchemy.run.ts"), stages: ["prod"], stack: "App" }]);
+	for (const command of [
+		"npm run check",
+		"npm run check --workspace=pi-lib",
+		"npm run check --workspace pi-lib",
+		"npm run check -w pi-lib",
+		"npm run check -w agent/extensions/app",
+	]) {
+		const decision = decide(command, workspace.root, policy);
+		assert.notEqual(decision._tag, "block", `${command}: ${"reason" in decision ? decision.reason : ""}`);
+	}
+	// deployment scripts behind an npm workspace filter are still traced and checked
+	assert.equal(decide("npm run deploy:app", workspace.root, policy)._tag, "allow");
+	assert.equal(decide("npm run deploy -w @example/app", workspace.root, policy)._tag, "allow");
+	const wrongStage = makeAlchemyPolicy([{ project: join(workspace.app, "alchemy.run.ts"), stages: ["staging"], stack: "App" }]);
+	assert.equal(decide("npm run deploy:app", workspace.root, wrongStage)._tag, "block");
+	const missing = decide("npm run deploy -w @example/missing", workspace.root, policy);
+	assert.equal(missing._tag, "block");
+	if (missing._tag === "block") assert.match(missing.reason, /no workspace package for exact filter/);
+});
+
+test("reads package.json workspaces in object form and fails closed on dynamic patterns", () => {
+	const objectForm = makeNpmWorkspace({ packages: ["./agent/extensions/*"] });
+	const policy = makeAlchemyPolicy([{ project: join(objectForm.app, "alchemy.run.ts"), stages: ["prod"], stack: "App" }]);
+	assert.equal(decide("npm run deploy:app", objectForm.root, policy)._tag, "allow");
+
+	for (const workspaces of [["agent/**"], ["!agent/extensions/app"], ["../outside/*"], "agent/*", [42]]) {
+		const workspace = makeNpmWorkspace(workspaces);
+		const decision = decide("npm run deploy:app", workspace.root, policy);
+		assert.equal(decision._tag, "block", JSON.stringify(workspaces));
+		if (decision._tag === "block") assert.match(decision.reason, /workspace/, JSON.stringify(workspaces));
+	}
+});
+
 function makeNestedAlchemyWorkspace(): {
 	readonly root: string;
 	readonly siteApp: string;

@@ -493,7 +493,8 @@ function parsePackageTask(
 			else cwdValues.push(equalsOption[2]);
 			continue;
 		}
-		if (["--filter", "-F", "--workspace"].includes(argument)) {
+		// npm's -w is --workspace <name>; pnpm's -w (below) is --workspace-root and takes no value.
+		if (["--filter", "-F", "--workspace"].includes(argument) || (executable === "npm" && argument === "-w")) {
 			const value = args[index + 1];
 			if (value === undefined || value.startsWith("-"))
 				return blocked(`script resolution option ${argument} requires one exact workspace value.`);
@@ -592,6 +593,39 @@ function loadCachedPackageScripts(
 	return loaded;
 }
 
+/**
+ * Validates one workspace package pattern. Each `*` must be a whole path segment matching one directory level;
+ * `**`, partial wildcards, negations, and paths outside the workspace are not interpreted.
+ */
+function staticWorkspacePattern(
+	pattern: string | undefined,
+	source: string,
+	workspacePath: string,
+): Result<string, CloudflareDeploymentBlocked> {
+	if (
+		pattern === undefined ||
+		pattern.startsWith("!") ||
+		isAbsolute(pattern) ||
+		/[$?!{}[\]]/.test(pattern) ||
+		pattern
+			.replace(/\/$/, "")
+			.replace(/^\.\//, "")
+			.split("/")
+			.some(
+				(segment) =>
+					segment === "" ||
+					segment === "." ||
+					segment === ".." ||
+					(segment.includes("*") && segment !== "*"),
+			)
+	) {
+		return blocked(
+			`script resolution cannot safely interpret workspace package pattern ${JSON.stringify(source)} in ${workspacePath}.`,
+		);
+	}
+	return { _tag: "ok", value: pattern.replace(/\/$/, "").replace(/^\.\//, "") };
+}
+
 function readPnpmWorkspacePatterns(
 	workspacePath: string,
 ): Result<readonly string[], CloudflareDeploymentBlocked> {
@@ -613,34 +647,65 @@ function readPnpmWorkspacePatterns(
 		if (inPackages && /^\S/.test(line)) break;
 		if (!inPackages || /^\s*(?:#|$)/.test(line)) continue;
 		const match = line.match(/^\s*-\s*(?:"([^"]+)"|'([^']+)'|([^#\s]+))\s*(?:#.*)?$/);
-		const pattern = match?.[1] ?? match?.[2] ?? match?.[3];
-		// Each `*` must be a whole path segment matching one directory level; `**`, partial
-		// wildcards, negations, and paths outside the workspace are not interpreted.
-		if (
-			pattern === undefined ||
-			pattern.startsWith("!") ||
-			isAbsolute(pattern) ||
-			/[$?!{}[\]]/.test(pattern) ||
-			pattern
-				.replace(/\/$/, "")
-				.split("/")
-				.some(
-					(segment) =>
-						segment === "" ||
-						segment === "." ||
-						segment === ".." ||
-						(segment.includes("*") && segment !== "*"),
-				)
-		) {
-			return blocked(
-				`script resolution cannot safely interpret workspace package pattern ${JSON.stringify(line.trim())}.`,
-			);
-		}
-		patterns.push(pattern.replace(/\/$/, ""));
+		const pattern = staticWorkspacePattern(match?.[1] ?? match?.[2] ?? match?.[3], line.trim(), workspacePath);
+		if (pattern._tag === "err") return pattern;
+		patterns.push(pattern.value);
 	}
 	return patterns.length === 0
 		? blocked(`script resolution found no static package patterns in ${workspacePath}.`)
 		: { _tag: "ok", value: patterns };
+}
+
+/**
+ * The `workspaces` patterns of an npm/yarn/bun root package.json: an array of strings or `{ packages: [...] }`.
+ * undefined when the manifest declares no workspaces, so the upward search keeps looking.
+ */
+function readPackageJsonWorkspacePatterns(
+	packagePath: string,
+): Result<readonly string[], CloudflareDeploymentBlocked> | undefined {
+	let manifest: unknown;
+	try {
+		manifest = JSON.parse(readFileSync(packagePath, "utf8"));
+	} catch {
+		return undefined;
+	}
+	if (!isStringRecord(manifest) || manifest.workspaces === undefined) return undefined;
+	const declared = isStringRecord(manifest.workspaces) ? manifest.workspaces.packages : manifest.workspaces;
+	if (!Array.isArray(declared) || declared.some((pattern) => typeof pattern !== "string"))
+		return blocked(`script resolution cannot read the static workspaces list in ${packagePath}.`);
+	const patterns: string[] = [];
+	for (const raw of declared as readonly string[]) {
+		const pattern = staticWorkspacePattern(raw, raw, packagePath);
+		if (pattern._tag === "err") return pattern;
+		patterns.push(pattern.value);
+	}
+	return patterns.length === 0
+		? blocked(`script resolution found no static package patterns in ${packagePath}.`)
+		: { _tag: "ok", value: patterns };
+}
+
+/**
+ * The nearest workspace root above `cwd`: a pnpm-workspace.yaml, or a package.json with `workspaces`
+ * (npm, yarn, bun). At one directory pnpm-workspace.yaml wins, as pnpm ignores package.json workspaces.
+ */
+function findWorkspaceRoot(
+	cwd: string,
+): Result<{ readonly root: string; readonly patterns: readonly string[] }, CloudflareDeploymentBlocked> | undefined {
+	let current = resolve(cwd);
+	while (true) {
+		const pnpmPath = join(current, "pnpm-workspace.yaml");
+		if (existsSync(pnpmPath)) {
+			const patterns = readPnpmWorkspacePatterns(pnpmPath);
+			return patterns._tag === "err" ? patterns : { _tag: "ok", value: { root: current, patterns: patterns.value } };
+		}
+		const packagePath = join(current, "package.json");
+		const patterns = existsSync(packagePath) ? readPackageJsonWorkspacePatterns(packagePath) : undefined;
+		if (patterns !== undefined)
+			return patterns._tag === "err" ? patterns : { _tag: "ok", value: { root: current, patterns: patterns.value } };
+		const parent = dirname(current);
+		if (parent === current) return undefined;
+		current = parent;
+	}
 }
 
 function workspacePackagePaths(
@@ -691,15 +756,14 @@ function resolveWorkspacePackagePath(
 	filter: string,
 	cache: DeploymentEvaluationCache | undefined,
 ): Result<string, CloudflareDeploymentBlocked> {
-	const workspacePath = findFileUpward(cwd, ["pnpm-workspace.yaml"]);
-	if (workspacePath === undefined)
+	const workspace = findWorkspaceRoot(cwd);
+	if (workspace === undefined)
 		return blocked(
-			`script resolution cannot apply workspace filter ${JSON.stringify(filter)} without pnpm-workspace.yaml.`,
+			`script resolution cannot apply workspace filter ${JSON.stringify(filter)} without pnpm-workspace.yaml or package.json workspaces.`,
 		);
-	const patterns = readPnpmWorkspacePatterns(workspacePath);
-	if (patterns._tag === "err") return patterns;
-	const workspaceRoot = dirname(workspacePath);
-	const candidates = workspacePackagePaths(workspaceRoot, patterns.value);
+	if (workspace._tag === "err") return workspace;
+	const { root: workspaceRoot, patterns } = workspace.value;
+	const candidates = workspacePackagePaths(workspaceRoot, patterns);
 	if (candidates._tag === "err") return candidates;
 	const matches: string[] = [];
 	for (const candidate of candidates.value) {
