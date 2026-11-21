@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { toMplRenderToolDefinition } from "../index.ts";
-import { MPL_THEMES, renderChart } from "../render.ts";
+import { MPL_AUTO_LIGHT_THEME, MPL_AUTO_THEME, resolveMplTheme, toMplRenderToolDefinition, type MplThemeContext } from "../index.ts";
+import { MPL_DEFAULT_THEME, MPL_THEMES, renderChart } from "../render.ts";
 import { decodeValue, MPL_AXES_METHODS } from "../replay.ts";
 
 const outDir = mkdtempSync(join(tmpdir(), "pi-mpl-test-"));
@@ -76,4 +76,65 @@ test("the tool returns the PNG as an image block in structuredContent", async ()
 	const failed = await tool.execute("id", { calls: [["nope", []]] } as never, undefined, undefined, undefined as never);
 	assert.equal(failed.isError, true);
 	assert.match((failed.structuredContent as { error: string }).error, /unknown call/);
+});
+
+/** A tool context with just the fields resolveMplTheme() reads; `appearance` is mutable so a test can flip it between calls. */
+function themeContext(appearance: "dark" | "light", hasUI = true): MplThemeContext & { ui: { theme: { appearance: "dark" | "light" } } } {
+	return { hasUI, ui: { theme: { appearance } } };
+}
+
+test("an omitted theme stays undefined, so renderChart keeps its own default", () => {
+	assert.equal(resolveMplTheme(undefined, themeContext("light")), undefined);
+	assert.equal(resolveMplTheme(undefined, undefined), undefined);
+});
+
+test(`"${MPL_AUTO_THEME}" resolves to ${MPL_AUTO_LIGHT_THEME} in a light UI and ${MPL_DEFAULT_THEME} in a dark UI`, () => {
+	assert.equal(resolveMplTheme(MPL_AUTO_THEME, themeContext("light")), MPL_AUTO_LIGHT_THEME);
+	assert.equal(resolveMplTheme(MPL_AUTO_THEME, themeContext("dark")), MPL_DEFAULT_THEME);
+	assert.ok(MPL_THEMES.includes(MPL_AUTO_LIGHT_THEME));
+});
+
+test(`"${MPL_AUTO_THEME}" falls back to ${MPL_DEFAULT_THEME} without a UI`, () => {
+	assert.equal(resolveMplTheme(MPL_AUTO_THEME, undefined), MPL_DEFAULT_THEME);
+	assert.equal(resolveMplTheme(MPL_AUTO_THEME, themeContext("light", false)), MPL_DEFAULT_THEME);
+	assert.equal(resolveMplTheme(MPL_AUTO_THEME, { hasUI: true } as MplThemeContext), MPL_DEFAULT_THEME);
+});
+
+test(`"${MPL_AUTO_THEME}" is resolved at the tool boundary, so renderChart never sees it`, () => {
+	assert.ok(!MPL_THEMES.includes(MPL_AUTO_THEME));
+	assert.throws(() => renderChart({ theme: MPL_AUTO_THEME, calls: [] }, outDir), /unknown theme/);
+});
+
+test("an explicit theme is never overridden by the UI appearance", () => {
+	for (const theme of ["pro-dark", MPL_DEFAULT_THEME, "ggplot"]) {
+		assert.equal(resolveMplTheme(theme, themeContext("light")), theme);
+		assert.equal(resolveMplTheme(theme, themeContext("dark")), theme);
+	}
+});
+
+test(`the tool renders "${MPL_AUTO_THEME}" per call and follows an appearance change`, async () => {
+	const tool = toMplRenderToolDefinition(() => outDir);
+	const ctx = themeContext("dark");
+	const render = async (theme?: string) => {
+		const result = await tool.execute("id", { theme, calls: [["plot", [[1, 2], [2, 1]]]] } as never, undefined, undefined, ctx as never);
+		assert.notEqual(result.isError, true);
+		const { pngPath } = result.structuredContent as { pngPath?: string };
+		assert.ok(pngPath && existsSync(pngPath));
+		return readFileSync(pngPath);
+	};
+
+	const autoDark = await render(MPL_AUTO_THEME);
+	assert.deepEqual([...autoDark.subarray(0, 4)], PNG_MAGIC);
+	assert.deepEqual(autoDark, await render(MPL_DEFAULT_THEME), `${MPL_AUTO_THEME} in a dark UI should render ${MPL_DEFAULT_THEME}`);
+
+	ctx.ui.theme.appearance = "light";
+	const autoLight = await render(MPL_AUTO_THEME);
+	assert.deepEqual(autoLight, await render(MPL_AUTO_LIGHT_THEME), `${MPL_AUTO_THEME} in a light UI should render ${MPL_AUTO_LIGHT_THEME}`);
+	assert.notDeepEqual(autoLight, autoDark);
+
+	assert.deepEqual(
+		await render(),
+		await render(MPL_DEFAULT_THEME),
+		`an omitted theme should stay ${MPL_DEFAULT_THEME} even while the UI is light`,
+	);
 });
