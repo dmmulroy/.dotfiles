@@ -1343,16 +1343,24 @@ __setup_fish_shell() {
         fi
     fi
 
-    # Install the plugins listed in fish_plugins. Their files are gitignored, so
-    # Fisher owns them on every machine (including updates).
-    __print_info "Installing Fish plugins from fish_plugins..."
-    if fish -c "fisher update"; then
-        __print_success "Fish plugins installed"
+    __sync_fish_plugins
+
+    [[ "$default_shell_failed" == false ]]
+}
+
+# Install/update the plugins listed in fish_plugins. Their files are gitignored,
+# so Fisher owns them on every machine; init and update both run this.
+__sync_fish_plugins() {
+    if ! __command_exists fish || ! fish -c "type -q fisher" 2>/dev/null; then
+        __print_warning "Fisher not installed; skipping Fish plugins"
+        return 0
+    fi
+    __print_info "Syncing Fish plugins from fish_plugins..."
+    if fish -c "fisher update" >/dev/null; then
+        __print_success "Fish plugins up to date"
     else
         __print_warning "Failed to install some Fish plugins"
     fi
-
-    [[ "$default_shell_failed" == false ]]
 }
 
 # Command functions
@@ -1412,6 +1420,9 @@ cmd_update() {
 
     # Re-stow dotfiles before pi uses checked-out skills and configuration.
     __stow_dotfiles
+
+    # Fisher-managed plugin files are gitignored; pulls can't restore them.
+    __sync_fish_plugins
 
     # Preinstall the newest Node releases (security patches) so the Vite+ shim
     # never has to download one the first time a project resolves to it.
