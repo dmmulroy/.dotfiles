@@ -1043,6 +1043,31 @@ __update_linux_packages() {
     esac
 }
 
+# Move files that block stow (targets stow does not own, e.g. ~/.pi/AGENTS.md
+# shipped by the exe.dev exeuntu image) to ~/.dot-backup/<timestamp>/.
+__backup_stow_conflicts() {
+    local conflicts
+    conflicts=$(stow -n -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home 2>&1 \
+        | sed -n -e 's/.*existing target is not owned by stow: //p' \
+                 -e 's/.*existing target is neither a link nor a directory: //p' \
+        | sort -u)
+    [[ -z "$conflicts" ]] && return 0
+
+    __print_warning "These files block stow:"
+    sed 's|^|    ~/|' <<< "$conflicts"
+    if ! __confirm "Move them to ~/.dot-backup/ and continue?" "y"; then
+        return 1
+    fi
+
+    local backup_dir="${HOME}/.dot-backup/$(date +%Y%m%d-%H%M%S)"
+    local target
+    while IFS= read -r target; do
+        mkdir -p "${backup_dir}/$(dirname "$target")"
+        mv "${HOME}/${target}" "${backup_dir}/${target}" || return 1
+    done <<< "$conflicts"
+    __print_info "Backed up stow conflicts to ${backup_dir}"
+}
+
 __stow_dotfiles() {
     
     if ! __command_exists stow; then
@@ -1052,6 +1077,8 @@ __stow_dotfiles() {
     fi
     
     __print_info "Stowing files from ${HOME_DIR} to ${HOME}..."
+
+    __backup_stow_conflicts || { __print_error "Failed to stow dotfiles"; return 1; }
     
     if stow -R -v -d "${DOTFILES_DIR}" -t "${HOME}" home; then
         __print_success "Dotfiles stowed successfully"
