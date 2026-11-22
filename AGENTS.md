@@ -116,7 +116,15 @@ Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
   `~/dot-init.status`, adds the VM's GitHub key (auth + signing) with `gh`,
   and adds it as a Rex host (`ssh://<name>.exe.xyz`). `gh` needs
   `admin:public_key,admin:ssh_signing_key` (`gh auth refresh -s ...`); without
-  them, run `dot exe github-key <name>` later. Tailscale stays manual.
+  them, run `dot exe github-key <name>` later.
+- Tailscale: `dot exe new` joins VMs as `tag:exe-dev` (pre-approved, no key
+  expiry) with a single-use 10-minute auth key minted by a Tailscale OAuth
+  client (scope `auth_keys`, tag `tag:exe-dev`). Its ID/secret are
+  `TS_EXE_OAUTH_CLIENT_ID`/`TS_EXE_OAUTH_CLIENT_SECRET` in `conf.d/secrets.fish`;
+  the VM only sees the one-time key. The policy's `tagOwners` defines the tag,
+  and an `ssh` rule lets `autogroup:member` Tailscale-SSH into `tag:exe-dev`.
+  Deleting a VM leaves its tailnet device: remove it in the admin console.
+  Tailscale API key descriptions allow only letters, digits, spaces, hyphens.
 - `exe/first-boot.sh` clones this repo and runs `dot init --headless`; log in
   `~/dot-init.log`, state in `~/dot-init.status` (running/done/failed; a trap
   writes failed if the script dies).

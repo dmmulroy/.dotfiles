@@ -47,6 +47,11 @@ readonly EXE_HOST_KEY_FINGERPRINT="SHA256:JJOP/lwiBGOMilfONPWZCXUrfK154cnJFXcqls
 readonly EXE_FIRST_BOOT_SCRIPT="${DOTFILES_DIR}/exe/first-boot.sh"
 # How long `dot exe new` waits for a VM's first-boot `dot init` (seconds).
 readonly EXE_FIRST_BOOT_TIMEOUT=1800
+# `dot exe new` joins VMs to the tailnet as this tag, with a one-time key made by
+# a Tailscale OAuth client (scope auth_keys, tag:exe-dev) whose ID and secret are
+# TS_EXE_OAUTH_CLIENT_ID / TS_EXE_OAUTH_CLIENT_SECRET (in conf.d/secrets.fish).
+readonly TS_EXE_TAG="tag:exe-dev"
+readonly TS_API_URL="https://api.tailscale.com/api/v2"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
@@ -1198,9 +1203,9 @@ __add_github_ssh_key_with_gh() {
     fi
     for key_type in authentication signing; do
         if out="$(gh ssh-key add "$pub_file" --title "$title" --type "$key_type" 2>&1)"; then
-            __print_success "Added the key to GitHub as a ${key_type} key (${title})"
+            __print_success "Added the key to GitHub (${key_type}, ${title})"
         elif [[ "$out" == *"already"* ]]; then
-            __print_success "The key is already on GitHub as a ${key_type} key"
+            __print_success "The key is already on GitHub (${key_type})"
         else
             __print_warning "gh ssh-key add --type ${key_type} failed: ${out}"
             return 1
@@ -1626,6 +1631,43 @@ __exe_register_github_key() {
     rm -f "$pub_file"
 }
 
+# Print a single-use, pre-approved auth key for TS_EXE_TAG that expires in 10 minutes.
+# The OAuth client secret stays on this machine; the VM only sees this key.
+__tailscale_exe_auth_key() {
+    local description="$1" token response body
+    if [[ -z "${TS_EXE_OAUTH_CLIENT_ID:-}" || -z "${TS_EXE_OAUTH_CLIENT_SECRET:-}" ]]; then
+        return 1
+    fi
+    __command_exists jq || return 1
+    token="$(printf 'client_id=%s&client_secret=%s' "$TS_EXE_OAUTH_CLIENT_ID" "$TS_EXE_OAUTH_CLIENT_SECRET" \
+        | curl -fsS --data @- "${TS_API_URL}/oauth/token")" || return 1
+    token="$(jq -r '.access_token // empty' <<< "$token")"
+    [[ -n "$token" ]] || return 1
+    # Key descriptions allow only letters, digits, spaces and hyphens.
+    body="$(jq -n --arg tag "$TS_EXE_TAG" --arg description "${description//[^A-Za-z0-9 -]/-}" \
+        '{capabilities: {devices: {create: {reusable: false, ephemeral: false, preauthorized: true, tags: [$tag]}}},
+          expirySeconds: 600, description: $description}')"
+    response="$(curl -fsS -H @<(printf 'Authorization: Bearer %s' "$token") -H 'Content-Type: application/json' \
+        --data "$body" "${TS_API_URL}/tailnet/-/keys")" || return 1
+    jq -r '.key // empty' <<< "$response"
+}
+
+# Join a VM to the tailnet as TS_EXE_TAG. The key goes over ssh's stdin, never argv.
+__exe_join_tailscale() {
+    local name="$1" host="$2" auth_key
+    if ! auth_key="$(__tailscale_exe_auth_key "$name")" || [[ -z "$auth_key" ]]; then
+        __print_info "Tailscale: no auth key (set TS_EXE_OAUTH_CLIENT_ID/SECRET); join by hand:"
+        echo "  ssh ${host} sudo tailscale up --hostname=${name}"
+        return 0
+    fi
+    if printf '%s' "$auth_key" | __exe_ssh "$host" \
+        "sudo systemctl enable --now tailscaled >/dev/null 2>&1; sudo tailscale up --auth-key=file:/dev/stdin --hostname=${name} --advertise-tags=${TS_EXE_TAG} --timeout=60s"; then
+        __print_success "Joined the tailnet as ${name} (${TS_EXE_TAG})"
+    else
+        __print_warning "tailscale up failed on ${host}; run it by hand: ssh ${host} sudo tailscale up --hostname=${name}"
+    fi
+}
+
 __exe_add_rex_host() {
     local name="$1" host="$2" rex_bin
     if ! rex_bin="$(__rex_cli)"; then
@@ -1668,12 +1710,12 @@ __exe_new() {
 
     __exe_wait_for_first_boot "$host" || return 1
     __exe_register_github_key "$name" "$host" || true
+    __exe_join_tailscale "$name" "$host"
     __exe_add_rex_host "$name" "$host"
 
     __print_header "${name} is ready"
     echo "  Shell:       ssh ${host}"
     echo "  Rex for Mac: Add Remote Host… → ssh://${host}"
-    echo "  Tailscale:   ssh ${host} sudo tailscale up --hostname=${name}  (opens a sign-in link)"
 }
 
 cmd_exe() {
@@ -3405,7 +3447,9 @@ USAGE:
 new runs 'ssh exe.dev new --name=NAME FLAGS' with exe/first-boot.sh as the setup
 script, waits for 'dot init --headless' on the VM, adds the VM's GitHub key as an
 authentication and signing key when gh has admin:public_key and
-admin:ssh_signing_key, and adds the VM as a Rex host (ssh://NAME.exe.xyz).
+admin:ssh_signing_key, joins the VM to the tailnet as tag:exe-dev when
+TS_EXE_OAUTH_CLIENT_ID/SECRET are set, and adds the VM as a Rex host
+(ssh://NAME.exe.xyz).
 FLAGS go to exe.dev's 'new', e.g. --disk=50GB. Run it on your Mac.
 EOF
             ;;
