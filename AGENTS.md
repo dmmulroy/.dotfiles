@@ -121,8 +121,11 @@ Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
   expiry) with a single-use 10-minute auth key minted by a Tailscale OAuth
   client (scope `auth_keys`, tag `tag:exe-dev`). Its ID/secret are
   `TS_EXE_OAUTH_CLIENT_ID`/`TS_EXE_OAUTH_CLIENT_SECRET` in `conf.d/secrets.fish`;
-  the VM only sees the one-time key. The policy's `tagOwners` defines the tag,
-  and an `ssh` rule lets `autogroup:member` Tailscale-SSH into `tag:exe-dev`.
+  the VM only sees the one-time key.
+- Tailscale config (policy/ACLs, tailnet settings, DNS, device tags such as
+  `tag:exe-dev`) is managed as code in `~/Code/personal/iac` (`packages/tailnet`,
+  Alchemy). Change it there; never edit it via the API, Executor, or the admin
+  console, or the next deploy refuses to write. `dot` only mints per-VM join keys.
   Deleting a VM leaves its tailnet device: remove it in the admin console.
   Tailscale API key descriptions allow only letters, digits, spaces, hyphens.
 - `exe/first-boot.sh` clones this repo and runs `dot init --headless`; log in
