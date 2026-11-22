@@ -1218,8 +1218,10 @@ __print_github_key_hint() {
 
 # True when GitHub accepts this machine's SSH key (ssh -T always exits 1 there).
 __github_accepts_ssh_key() {
-    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -T git@github.com </dev/null 2>&1 \
-        | grep -q "successfully authenticated"
+    local greeting
+    # Not a pipe: under pipefail, ssh's exit 1 would fail it even on success.
+    greeting="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -T git@github.com </dev/null 2>&1 || true)"
+    [[ "$greeting" == *"successfully authenticated"* ]]
 }
 
 # Switch the dotfiles remote from HTTPS to SSH once GitHub accepts this machine's key.
