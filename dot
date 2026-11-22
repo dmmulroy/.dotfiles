@@ -37,6 +37,10 @@ readonly REX_THEME_IMPORT_ACTION="import_catppuccin_macchiato"
 # distilled-lua scripts/build_rocks.sh output, before the rocks are published.
 readonly REX_LUA_ROCKS_TREE="${REX_LUA_ROCKS_TREE:-${HOME}/.local/share/rex/rocks}"
 readonly REX_LUA_ROCKS=(twitch-lua)
+# Linux: Rex's server package (apt/dnf/pacman repo or tarball, picked by the
+# script). Re-running the script upgrades Rex and keeps the channel.
+readonly REX_LINUX_INSTALL_URL="https://pkgs.superlogical.com/rex/install.sh"
+readonly REX_LINUX_CHANNEL="preview"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key"
@@ -255,7 +259,7 @@ TOOL_REGISTRY=(
     "Stow dotfiles     ;; -    ;; fn:__stow_dotfiles          ;; true  ;; -         ;; false ;; all"
     "Bun               ;; bun  ;; fn:__install_bun            ;; true  ;; -         ;; true  ;; all"
     "Herdr plugins     ;; -    ;; fn:__sync_herdr_plugins     ;; true  ;; -         ;; false ;; all"
-    "Rex               ;; -    ;; fn:__setup_rex              ;; false ;; -         ;; false ;; darwin"
+    "Rex               ;; -    ;; fn:__setup_rex              ;; false ;; -         ;; false ;; all"
     "Scroll Reverser   ;; -    ;; fn:__setup_scroll_reverser  ;; false ;; -         ;; false ;; darwin"
     "Vite+             ;; vp   ;; fn:__install_vite_plus      ;; true  ;; -         ;; true  ;; all"
     "pi                ;; pi   ;; fn:__install_pi             ;; true  ;; -         ;; true  ;; all"
@@ -705,7 +709,61 @@ __install_rex_lua_rocks() {
     return "$failed"
 }
 
+# Install (or upgrade) Rex's Linux server package. Ubuntu also has an unrelated
+# "rex" package, so a rex that is not "rex 0.x" counts as missing.
+__install_rex_linux() {
+    local mode="${1:-install}"
+    if [[ "$mode" != "update" ]] && __command_exists rex && rex version 2>/dev/null | grep -q '^rex 0\.'; then
+        __print_success "Rex is installed ($(rex version | head -1))"
+        return 0
+    fi
+    __print_info "Installing Rex from the ${REX_LINUX_CHANNEL} channel..."
+    if curl -fsSL "$REX_LINUX_INSTALL_URL" | sh -s -- --channel "$REX_LINUX_CHANNEL"; then
+        hash -r
+        __print_success "Rex installed ($(rex version | head -1))"
+    else
+        __print_error "Failed to install Rex"
+        return 1
+    fi
+}
+
+# exe.dev SSH sessions may lack XDG_RUNTIME_DIR, which rex and systemctl --user need.
+__export_rex_runtime_dir() {
+    if [[ -z "${XDG_RUNTIME_DIR:-}" && -d "/run/user/$(id -u)" ]]; then
+        export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    fi
+}
+
+# Personal Rex server (systemd user units, socket-activated) running as this
+# account; this is the server Rex for Mac finds over ssh://<host>.
+__setup_rex_server_linux() {
+    if ! __command_exists systemctl || [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+        __print_warning "No systemd user session; skipping Rex server (run 'rex server install' later)"
+        return 0
+    fi
+    if systemctl --user is-enabled rex.socket >/dev/null 2>&1; then
+        __print_success "Rex server is installed (rex.socket)"
+    elif rex server install >/dev/null; then
+        __print_success "Rex server installed; it starts at boot and on the first rex command"
+    else
+        __print_warning "rex server install failed; run it by hand to see why"
+    fi
+}
+
+__setup_rex_linux() {
+    __install_rex_linux || return 1
+    __export_rex_runtime_dir
+    __setup_rex_server_linux
+    __reload_rex_config
+    __setup_rex_terminfo
+    __setup_rex_agents
+}
+
 __setup_rex() {
+    if [[ "$DOT_OS" == "linux" ]]; then
+        __setup_rex_linux
+        return
+    fi
     __update_rex_app || return 1
     __apply_rex_app_settings
     __install_rex_lua_rocks || true
@@ -1487,6 +1545,10 @@ cmd_update() {
         __apply_rex_app_settings || __print_warning "Rex app settings failed; continuing"
         __import_rex_theme
         __setup_scroll_reverser || __print_warning "Scroll Reverser setup failed; continuing"
+    else
+        __install_rex_linux update || __print_warning "Rex update failed; continuing"
+        __export_rex_runtime_dir
+        __reload_rex_config || __print_warning "Rex config reload failed; continuing"
     fi
 
     # Update pi and its configured packages.
@@ -1635,10 +1697,8 @@ cmd_doctor() {
         __print_warning "Missing development tools: ${missing_tools[*]}"
     fi
 
-    # Rex: app, CLI, stowed config (macOS only)
-    if [[ "$DOT_OS" == "darwin" ]]; then
-        __doctor_check_rex
-    fi
+    # Rex: app (macOS) or server (Linux), CLI, stowed config
+    __doctor_check_rex
     
     # Check if Fish plugins are installed (Fisher)
     if __command_exists fish && fish -c "type fisher" >/dev/null 2>&1; then
@@ -1671,7 +1731,19 @@ cmd_doctor() {
 
 __doctor_check_rex() {
     local rex_bin
-    if [[ -d "$REX_APP_PATH" ]]; then
+    if [[ "$DOT_OS" == "linux" ]]; then
+        __export_rex_runtime_dir
+        if __command_exists rex && rex version 2>/dev/null | grep -q '^rex 0\.'; then
+            __print_success "Rex is installed ($(rex version | head -1))"
+        else
+            __print_warning "Rex is not installed - run '${SCRIPT_NAME} init' or '${SCRIPT_NAME} update'"
+        fi
+        if systemctl --user is-enabled rex.socket >/dev/null 2>&1; then
+            __print_success "Rex server is installed (rex.socket)"
+        else
+            __print_warning "Rex server is not installed - run 'rex server install'"
+        fi
+    elif [[ -d "$REX_APP_PATH" ]]; then
         __print_success "Rex is installed (build $(__rex_installed_build))"
     else
         __print_warning "Rex is not installed - run '${SCRIPT_NAME} init' or '${SCRIPT_NAME} update'"
@@ -1681,7 +1753,9 @@ __doctor_check_rex() {
     else
         __print_warning "~/.config/rex is not a stow symlink - run '${SCRIPT_NAME} stow'"
     fi
-    if __command_exists luarocks; then
+    if [[ "$DOT_OS" == "linux" ]]; then
+        : # twitch-lua rocks are macOS-only; the config skips them when missing
+    elif __command_exists luarocks; then
         local rock
         for rock in "${REX_LUA_ROCKS[@]}"; do
             if __rex_luarocks show "$rock" >/dev/null 2>&1; then
@@ -1700,7 +1774,7 @@ __doctor_check_rex() {
             __print_warning "Rex config has errors - run 'rex config check'"
         fi
     else
-        __print_warning "rex CLI not found - launch Rex once to install its server"
+        __print_warning "rex CLI not found - launch Rex once (macOS) or run '${SCRIPT_NAME} init' (Linux)"
     fi
 }
 
@@ -3260,4 +3334,4 @@ main() {
 }
 
 # Run main function
-main "$@"
+[[ "${BASH_SOURCE[0]}" == "$0" ]] && main "$@"

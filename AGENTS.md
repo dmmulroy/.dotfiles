@@ -98,7 +98,11 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
   fetched after stow in `__setup_fish_shell`.
 - Fish: guard macOS-only config with `test (uname) = Darwin` or `command -q`.
   Vite+ lives in `~/.vite-plus` on macOS, `~/.local/share/vite-plus` on Linux.
-- Rex, `macos-defaults.conf`, casks, WARP/Homebrew fixes: macOS only.
+- Rex on Linux: `dot` installs the server package (`REX_LINUX_INSTALL_URL`,
+  preview channel) and a personal server (`rex server install`, systemd user
+  units), so Rex for Mac can add `ssh://<host>`. The Rex app, `macos-defaults.conf`,
+  theme import and twitch-lua rocks stay macOS only.
+- Casks, WARP/Homebrew fixes: macOS only.
 - Never commit absolute symlinks into stowed dirs (stow aborts on them).
 - Fish must work on 3.7 (Ubuntu 24.04 / exe.dev): no fish-4-only variables
   such as `$__fish_cache_dir` without a fallback.
@@ -162,7 +166,7 @@ dot gen-ssh-key       # Generate ed25519 key by email domain
 | Fish | `config.fish` | Sources `conf.d/`, sets EDITOR/MANPAGER |
 | Neovim | `init.lua` | 1 line: `require("dmmulroy")` |
 | Herdr | `config.toml` | Prefix `C-;`, workspaces/tabs/panes |
-| Rex | `init.lua` -> `dmmulroy/` | Same `C-;` prefix as `ctrl+;>` sequences; app updated by `dot` from Sparkle appcast (not Homebrew) |
+| Rex | `init.lua` -> `dmmulroy/` | Same `C-;` prefix as `ctrl+;>` sequences; app updated by `dot` from Sparkle appcast (not Homebrew); Linux gets the server via pkgs.superlogical.com |
 | Git | `config` | SSH signing, `pull.rebase`, conditional include |
 | Starship | `starship.toml` | 2s timeout (Vite+ shims), custom.scm after dir |
 | Pi | `settings.json` | Private gateway provider, Catppuccin theme |
