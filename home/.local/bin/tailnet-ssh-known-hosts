@@ -1,0 +1,44 @@
+#!/bin/sh
+# Prints known_hosts lines for one tailnet device from the SSH host keys Tailscale advertises.
+#
+# Usage: tailnet-ssh-known-hosts HOST
+#   HOST is a tailnet hostname (exe-dev-box) or its MagicDNS name
+#   (exe-dev-box.<tailnet>.ts.net).
+#
+# ~/.ssh/config calls this as KnownHostsCommand for tailnet hosts that run Tailscale SSH, so
+# plain `ssh` (and Rex) verify the host key against the tailnet instead of ~/.ssh/known_hosts.
+# A rebuilt VM gets a new host key and still connects without a prompt or a stale-key error.
+#
+# Prints nothing when the host is not on the tailnet or advertises no SSH host keys; ssh then
+# refuses the connection under StrictHostKeyChecking.
+set -eu
+
+host="${1:-}"
+[ -n "$host" ] || { echo "Usage: tailnet-ssh-known-hosts HOST" >&2; exit 2; }
+
+# ssh may run this with a minimal PATH (launchd, Rex), so fall back to the usual install paths.
+find_command() {
+    name="$1"; shift
+    if command -v "$name" >/dev/null 2>&1; then
+        command -v "$name"
+        return 0
+    fi
+    for candidate in "$@"; do
+        if [ -x "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo "tailnet-ssh-known-hosts: $name not found" >&2
+    return 1
+}
+
+tailscale_bin="$(find_command tailscale /usr/local/bin/tailscale /opt/homebrew/bin/tailscale \
+    /Applications/Tailscale.app/Contents/MacOS/Tailscale /usr/bin/tailscale)"
+jq_bin="$(find_command jq /opt/homebrew/bin/jq /usr/local/bin/jq /usr/bin/jq)"
+
+"$tailscale_bin" status --json | "$jq_bin" -r --arg host "$host" '
+    .Peer[]
+    | select((.HostName == $host) or ((.DNSName // "" | rtrimstr(".")) == $host))
+    | .sshHostKeys[]?
+    | "\($host) \(.)"'

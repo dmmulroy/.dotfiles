@@ -41,17 +41,6 @@ readonly REX_LUA_ROCKS=(twitch-lua)
 # script). Re-running the script upgrades Rex and keeps the channel.
 readonly REX_LINUX_INSTALL_URL="https://pkgs.superlogical.com/rex/install.sh"
 readonly REX_LINUX_CHANNEL="preview"
-# exe.dev: one RSA host key for exe.dev and every VM (*.exe.xyz), published at
-# https://exe.dev/docs/faq/host-key. `dot exe new` pins it before connecting.
-readonly EXE_HOST_KEY_FINGERPRINT="SHA256:JJOP/lwiBGOMilfONPWZCXUrfK154cnJFXcqlsi6lPo"
-readonly EXE_FIRST_BOOT_SCRIPT="${DOTFILES_DIR}/exe/first-boot.sh"
-# How long `dot exe new` waits for a VM's first-boot `dot init` (seconds).
-readonly EXE_FIRST_BOOT_TIMEOUT=1800
-# `dot exe new` joins VMs to the tailnet as this tag, with a one-time key made by
-# a Tailscale OAuth client (scope auth_keys, tag:exe-dev) whose ID and secret are
-# TS_EXE_OAUTH_CLIENT_ID / TS_EXE_OAUTH_CLIENT_SECRET (in conf.d/secrets.fish).
-readonly TS_EXE_TAG="tag:exe-dev"
-readonly TS_API_URL="https://api.tailscale.com/api/v2"
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
@@ -274,6 +263,7 @@ TOOL_REGISTRY=(
     "Claude Code       ;; claude ;; fn:__install_claude_code  ;; false ;; -         ;; true  ;; all"
     "pi-claude-cli     ;; -    ;; fn:__install_pi_claude_cli  ;; false ;; -         ;; false ;; all"
     "SSH key           ;; -    ;; fn:__generate_ssh_key       ;; false ;; SKIP_SSH  ;; false ;; all"
+    "Tailscale SSH     ;; -    ;; fn:__setup_tailnet_ssh      ;; false ;; -         ;; false ;; darwin"
     "MonoLisa font     ;; -    ;; fn:__install_font           ;; false ;; SKIP_FONT ;; false ;; all"
     "Fish shell        ;; -    ;; fn:__setup_fish_shell       ;; false ;; -         ;; false ;; all"
 )
@@ -1546,197 +1536,46 @@ __sync_fish_plugins() {
 
 
 # ---------------------------------------------------------------------------
-# exe.dev VMs: `dot exe new NAME` creates a VM that runs exe/first-boot.sh,
-# waits for its `dot init --headless`, registers its GitHub key with gh, and
-# adds it as a Rex host. Run it on the Mac whose key is on your exe.dev account.
+# exe.dev VMs are declared and created in the iac repo (infra/exe-dev,
+# IacExeDev Stack): their first boot runs `dot init --headless` and joins the
+# tailnet with Tailscale SSH on, and the deploy registers each VM's GitHub key.
+#
+# This Mac reaches them over the tailnet with plain `ssh exe-dev-NAME`:
+# Tailscale authenticates the connection (no SSH keys), and the host key comes
+# from the tailnet (tailnet-ssh-known-hosts), so a rebuilt VM needs no setup
+# here. VM names start with `exe-dev-` so the Host pattern below matches them.
 # ---------------------------------------------------------------------------
 
-__exe_ssh() {
-    ssh -o BatchMode=yes -o ConnectTimeout=15 "$@"
-}
+readonly TAILNET_SSH_CONFIG_MARKER="# Tailscale SSH to exe.dev VMs (managed by dot)"
 
-# Save exe.dev's host key for exe.dev and *.exe.xyz after checking its fingerprint.
-__ensure_exe_known_hosts() {
-    local known_hosts="${HOME}/.ssh/known_hosts" host_key fingerprint
-    if ssh-keygen -F exe.dev -f "$known_hosts" >/dev/null 2>&1 \
-        && grep -q '^\*\.exe\.xyz ' "$known_hosts" 2>/dev/null; then
-        return 0
-    fi
-    host_key="$(ssh-keyscan -t rsa exe.dev 2>/dev/null || true)"
-    host_key="$(awk '$2 == "ssh-rsa" { print $2 " " $3; exit }' <<< "$host_key")"
-    fingerprint="$(echo "exe.dev ${host_key}" | ssh-keygen -lf - 2>/dev/null | awk '{ print $2 }')"
-    if [[ -z "$host_key" || "$fingerprint" != "$EXE_HOST_KEY_FINGERPRINT" ]]; then
-        __print_error "exe.dev host key fingerprint is '${fingerprint}', expected ${EXE_HOST_KEY_FINGERPRINT}"
-        return 1
-    fi
-    mkdir -p "${HOME}/.ssh"
-    ssh-keygen -F exe.dev -f "$known_hosts" >/dev/null 2>&1 || echo "exe.dev ${host_key}" >> "$known_hosts"
-    grep -q '^\*\.exe\.xyz ' "$known_hosts" 2>/dev/null || echo "*.exe.xyz ${host_key}" >> "$known_hosts"
-    __print_success "Saved exe.dev's host key (${EXE_HOST_KEY_FINGERPRINT})"
-}
-
-# exe.dev picks the account by SSH key. Pin this machine's key so a key loaded in
-# ssh-agent for another exe.dev account never wins (exe.dev/docs/faq/ssh-key).
-__ensure_exe_ssh_config() {
+# Add the `Host exe-dev-*` block to ~/.ssh/config once. macOS only: VMs do not
+# SSH to each other.
+__setup_tailnet_ssh() {
     local ssh_config="${HOME}/.ssh/config"
-    if [[ -f "$ssh_config" ]] && grep -qiE '^[[:space:]]*Host[[:space:]]+exe\.dev([[:space:]]|$)' "$ssh_config"; then
+    if [[ "$DOT_OS" != "darwin" ]]; then
+        return 0
+    fi
+    if [[ -f "$ssh_config" ]] && grep -qxF -- "$TAILNET_SSH_CONFIG_MARKER" "$ssh_config"; then
+        __print_success "Tailscale SSH config for exe-dev-* is in ${ssh_config}"
         return 0
     fi
     mkdir -p "${HOME}/.ssh"
-    printf '\nHost exe.dev *.exe.xyz\n  IdentitiesOnly yes\n  IdentityFile %s\n' "$GITHUB_PRIVATE_KEY_PATH" >> "$ssh_config"
+    # ssh requires an absolute KnownHostsCommand path and checks it before expanding %d.
+    cat >> "$ssh_config" << EOF
+
+${TAILNET_SSH_CONFIG_MARKER}
+# Host keys come from the tailnet, never from known_hosts, so rebuilt VMs just work.
+# NAME.exe.xyz is excluded: that route goes through exe.dev and uses its own host key.
+Host exe-dev-* !*.exe.xyz
+  User exedev
+  PubkeyAuthentication no
+  StrictHostKeyChecking yes
+  UserKnownHostsFile /dev/null
+  GlobalKnownHostsFile /dev/null
+  KnownHostsCommand ${HOME}/.local/bin/tailnet-ssh-known-hosts %H
+EOF
     chmod 600 "$ssh_config"
-    __print_success "Added exe.dev and *.exe.xyz to ${ssh_config}"
-}
-
-__exe_wait_for_first_boot() {
-    local host="$1" status="" waited=0 last_line=""
-    __print_info "Waiting for first boot (dot init --headless) on ${host}; log: ~/dot-init.log"
-    while (( waited < EXE_FIRST_BOOT_TIMEOUT )); do
-        status="$(__exe_ssh "$host" cat dot-init.status 2>/dev/null || true)"
-        case "$status" in
-            done)
-                __print_success "dot init finished on ${host}"
-                return 0
-                ;;
-            failed)
-                __print_error "dot init failed on ${host}. Last lines of ~/dot-init.log:"
-                __exe_ssh "$host" tail -n 40 dot-init.log 2>/dev/null | sed 's/^/    /'
-                return 1
-                ;;
-        esac
-        last_line="$(__exe_ssh "$host" tail -n 1 dot-init.log 2>/dev/null | cut -c1-100 || true)"
-        [[ -n "$last_line" ]] && echo "    ${last_line}"
-        sleep 15
-        waited=$((waited + 15))
-    done
-    __print_error "Timed out after ${EXE_FIRST_BOOT_TIMEOUT}s; check ~/dot-init.log on ${host}"
-    return 1
-}
-
-# Add a VM's GitHub key with this machine's gh, then move its dotfiles remote to SSH.
-__exe_register_github_key() {
-    local name="$1" host="$2" pub_file title="${1} (exe.dev)"
-    pub_file="$(mktemp)"
-    if ! __exe_ssh "$host" cat .ssh/id_ed25519_github.pub > "$pub_file" 2>/dev/null || [[ ! -s "$pub_file" ]]; then
-        __print_warning "No GitHub key found on ${host} (~/.ssh/id_ed25519_github.pub)"
-        rm -f "$pub_file"
-        return 1
-    fi
-    if __add_github_ssh_key_with_gh "$pub_file" "$title"; then
-        __exe_ssh "$host" "bash -c 'source ~/.dotfiles/dot && __use_ssh_remote_for_dotfiles'"
-    else
-        __print_github_key_hint "$(cat "$pub_file")" "$title"
-        echo "  Then run: ${SCRIPT_NAME} exe github-key ${name}"
-    fi
-    rm -f "$pub_file"
-}
-
-# Print a single-use, pre-approved auth key for TS_EXE_TAG that expires in 10 minutes.
-# The OAuth client secret stays on this machine; the VM only sees this key.
-__tailscale_exe_auth_key() {
-    local description="$1" token response body
-    if [[ -z "${TS_EXE_OAUTH_CLIENT_ID:-}" || -z "${TS_EXE_OAUTH_CLIENT_SECRET:-}" ]]; then
-        return 1
-    fi
-    __command_exists jq || return 1
-    token="$(printf 'client_id=%s&client_secret=%s' "$TS_EXE_OAUTH_CLIENT_ID" "$TS_EXE_OAUTH_CLIENT_SECRET" \
-        | curl -fsS --data @- "${TS_API_URL}/oauth/token")" || return 1
-    token="$(jq -r '.access_token // empty' <<< "$token")"
-    [[ -n "$token" ]] || return 1
-    # Key descriptions allow only letters, digits, spaces and hyphens.
-    body="$(jq -n --arg tag "$TS_EXE_TAG" --arg description "${description//[^A-Za-z0-9 -]/-}" \
-        '{capabilities: {devices: {create: {reusable: false, ephemeral: false, preauthorized: true, tags: [$tag]}}},
-          expirySeconds: 600, description: $description}')"
-    response="$(curl -fsS -H @<(printf 'Authorization: Bearer %s' "$token") -H 'Content-Type: application/json' \
-        --data "$body" "${TS_API_URL}/tailnet/-/keys")" || return 1
-    jq -r '.key // empty' <<< "$response"
-}
-
-# Join a VM to the tailnet as TS_EXE_TAG. The key goes over ssh's stdin, never argv.
-__exe_join_tailscale() {
-    local name="$1" host="$2" auth_key
-    if ! auth_key="$(__tailscale_exe_auth_key "$name")" || [[ -z "$auth_key" ]]; then
-        __print_info "Tailscale: no auth key (set TS_EXE_OAUTH_CLIENT_ID/SECRET); join by hand:"
-        echo "  ssh ${host} sudo tailscale up --hostname=${name}"
-        return 0
-    fi
-    if printf '%s' "$auth_key" | __exe_ssh "$host" \
-        "sudo systemctl enable --now tailscaled >/dev/null 2>&1; sudo tailscale up --auth-key=file:/dev/stdin --hostname=${name} --advertise-tags=${TS_EXE_TAG} --timeout=60s"; then
-        __print_success "Joined the tailnet as ${name} (${TS_EXE_TAG})"
-    else
-        __print_warning "tailscale up failed on ${host}; run it by hand: ssh ${host} sudo tailscale up --hostname=${name}"
-    fi
-}
-
-__exe_add_rex_host() {
-    local name="$1" host="$2" rex_bin
-    if ! rex_bin="$(__rex_cli)"; then
-        __print_info "rex not found; skipping the Rex host"
-        return 0
-    fi
-    local labels
-    labels="$("$rex_bin" hosts list 2>/dev/null | awk 'NR > 1 { print $1 }' || true)"
-    if grep -qxF -- "$name" <<< "$labels"; then
-        __print_success "Rex host ${name} already exists"
-    elif "$rex_bin" hosts add "$name" "ssh://${host}" >/dev/null; then
-        __print_success "Added Rex host ${name} (ssh://${host})"
-    else
-        __print_warning "rex hosts add ${name} ssh://${host} failed"
-    fi
-}
-
-__exe_new() {
-    local name="${1:-}"
-    if [[ -z "$name" || "$name" == -* ]]; then
-        __print_error "Usage: ${SCRIPT_NAME} exe new NAME [exe.dev 'new' flags, e.g. --disk=50GB]"
-        return 1
-    fi
-    shift
-    local host="${name}.exe.xyz"
-
-    __print_header "Creating exe.dev VM ${name}"
-    __ensure_exe_known_hosts || return 1
-    __ensure_exe_ssh_config
-    if ! __exe_ssh exe.dev whoami >/dev/null 2>&1; then
-        __print_error "ssh exe.dev failed; is ${GITHUB_PRIVATE_KEY_PATH}.pub on your exe.dev account?"
-        return 1
-    fi
-
-    __print_info "Creating ${name}; its first boot runs exe/first-boot.sh..."
-    if ! __exe_ssh exe.dev new --name="$name" --no-email "$@" --setup-script /dev/stdin < "$EXE_FIRST_BOOT_SCRIPT"; then
-        __print_error "ssh exe.dev new failed"
-        return 1
-    fi
-
-    __exe_wait_for_first_boot "$host" || return 1
-    __exe_register_github_key "$name" "$host" || true
-    __exe_join_tailscale "$name" "$host"
-    __exe_add_rex_host "$name" "$host"
-
-    __print_header "${name} is ready"
-    echo "  Shell:       ssh ${host}"
-    echo "  Rex for Mac: Add Remote Host… → ssh://${host}"
-}
-
-cmd_exe() {
-    local subcommand="${1:-}"
-    shift || true
-    case "$subcommand" in
-        new)
-            __exe_new "$@"
-            ;;
-        github-key)
-            if [[ -z "${1:-}" ]]; then
-                __print_error "Usage: ${SCRIPT_NAME} exe github-key NAME"
-                return 1
-            fi
-            __exe_register_github_key "$1" "${1}.exe.xyz"
-            ;;
-        *)
-            __print_command_help exe
-            [[ -z "$subcommand" ]]
-            ;;
-    esac
+    __print_success "Added Tailscale SSH config for exe-dev-* to ${ssh_config}"
 }
 
 # Command functions
@@ -1756,8 +1595,8 @@ cmd_init() {
                 ;;
             --headless)
                 # No prompts and no font, for exe.dev and other remote VMs. The GitHub
-                # key is still generated (ssh-keygen needs no input); `dot exe new`
-                # registers it on GitHub from the Mac.
+                # key is still generated (ssh-keygen needs no input); the iac repo
+                # (infra/exe-dev) registers it on GitHub.
                 SKIP_FONT=true
                 export DOT_HEADLESS=true
                 export DEBIAN_FRONTEND=noninteractive
@@ -2187,9 +2026,6 @@ complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which p
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
-complete -c dot -n "__fish_use_subcommand" -a "exe" -d "Create exe.dev VMs set up by these dotfiles"
-complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "new" -d "Create a VM and run dot init on it"
-complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "github-key" -d "Add a VM's GitHub key with gh"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
@@ -3406,8 +3242,8 @@ USAGE:
 
 Initialize the complete environment. Skip SSH key or font setup with the
 corresponding option. --headless skips the font, still generates the GitHub
-key, and answers every prompt with its default (exe.dev first boot:
-exe/first-boot.sh).
+key, and answers every prompt with its default (exe.dev first boot, from the
+iac repo's infra/exe-dev).
 EOF
             ;;
         update)
@@ -3437,21 +3273,6 @@ EOF
             ;;
         gen-ssh-key)
             echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} gen-ssh-key [EMAIL]\n\nGenerate an Ed25519 key, add it to ssh-agent, and copy its public key."
-            ;;
-        exe)
-            cat << EOF
-USAGE:
-    ${SCRIPT_NAME} exe new NAME [FLAGS]    Create an exe.dev VM set up by these dotfiles
-    ${SCRIPT_NAME} exe github-key NAME     Add a VM's GitHub key with gh (after gh auth refresh)
-
-new runs 'ssh exe.dev new --name=NAME FLAGS' with exe/first-boot.sh as the setup
-script, waits for 'dot init --headless' on the VM, adds the VM's GitHub key as an
-authentication and signing key when gh has admin:public_key and
-admin:ssh_signing_key, joins the VM to the tailnet as tag:exe-dev when
-TS_EXE_OAUTH_CLIENT_ID/SECRET are set, and adds the VM as a Rex host
-(ssh://NAME.exe.xyz).
-FLAGS go to exe.dev's 'new', e.g. --disk=50GB. Run it on your Mac.
-EOF
             ;;
         stow)
             echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} stow\n\nRe-create symlinks from the repository's home directory."
@@ -3502,7 +3323,6 @@ cmd_help() {
     echo "    retry-failed        Retry failed package installations"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
-    echo "    exe                 Create exe.dev VMs set up by these dotfiles (exe new NAME)"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
     echo "    completions         Generate Fish shell completions"
     echo "    link                Install dot command globally (create symlink in PATH)"
@@ -3616,9 +3436,6 @@ main() {
             ;;
         gen-ssh-key)
             cmd_gen_ssh_key "$@"
-            ;;
-        exe)
-            cmd_exe "$@"
             ;;
         stow)
             cmd_stow "$@"

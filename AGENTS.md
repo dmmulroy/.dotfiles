@@ -37,7 +37,7 @@ are doing it, keep it short):
 │   ├── fish/           # Shell (AGENTS.md)
 │   ├── nvim/           # Editor (AGENTS.md)
 │   ├── herdr/          # Terminal-native workspace/tab/pane manager
-│   ├── rex/            # Rex multiplexer (init.lua -> dmmulroy/, ported from herdr)
+│   ├── rex/            # Rex multiplexer (init.lua -> dmmulroy/)
 │   ├── git/            # Conditional work config
 │   ├── ghostty/        # Terminal
 │   ├── starship.toml   # Prompt (custom.scm, 2s timeout for Vite+)
@@ -111,37 +111,46 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
 
 Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
 
-- New VM, from the Mac: `dot exe new <name> [exe.dev new flags]`. It pins
-  exe.dev's host key, creates the VM with `exe/first-boot.sh`, waits for
-  `~/dot-init.status`, adds the VM's GitHub key (auth + signing) with `gh`,
-  and adds it as a Rex host (`ssh://<name>.exe.xyz`). `gh` needs
-  `admin:public_key,admin:ssh_signing_key` (`gh auth refresh -s ...`); without
-  them, run `dot exe github-key <name>` later.
-- Tailscale: `dot exe new` joins VMs as `tag:exe-dev` (pre-approved, no key
-  expiry) with a single-use 10-minute auth key minted by a Tailscale OAuth
-  client (scope `auth_keys`, tag `tag:exe-dev`). Its ID/secret are
-  `TS_EXE_OAUTH_CLIENT_ID`/`TS_EXE_OAUTH_CLIENT_SECRET` in `conf.d/secrets.fish`;
-  the VM only sees the one-time key.
-- Tailscale config (policy/ACLs, tailnet settings, DNS, device tags such as
-  `tag:exe-dev`) is managed as code in the `iac` repo (`packages/tailnet`,
-  Alchemy): `~/Code/personal/iac` if cloned locally, otherwise
-  github.com/dmmulroy/iac. Change it there; never edit it via the API, Executor, or the admin
-  console, or the next deploy refuses to write. `dot` only mints per-VM join keys.
-  Deleting a VM leaves its tailnet device: remove it in the admin console.
-  Tailscale API key descriptions allow only letters, digits, spaces, hyphens.
-- `exe/first-boot.sh` clones this repo and runs `dot init --headless`; log in
-  `~/dot-init.log`, state in `~/dot-init.status` (running/done/failed; a trap
-  writes failed if the script dies).
-- Account default (also applies to VMs made in the web UI):
-  `ssh exe.dev defaults write dev.exe new.setup-script < exe/first-boot.sh`
+- VMs are declared in the `iac` repo (`infra/exe-dev`, `IacExeDev` Stack):
+  `~/Code/personal/iac` if cloned locally, otherwise github.com/dmmulroy/iac.
+  Add one to `src/exe-dev-workstations.ts` and run `vp run deploy:exe-dev`.
+  VM names start with `exe-dev-`. Never create VMs with `ssh exe.dev new` for
+  long-lived use.
+- What a VM installs belongs here (`dot init --headless`); the VM itself,
+  its size, integrations, tailnet trust, tailnet device, and GitHub keys
+  belong to `iac`.
+- First boot: `infra/exe-dev/src/exe-dev-first-boot.sh` (in `iac`) clones
+  this repo, runs `dot init --headless`, and joins the tailnet as
+  `tag:exe-dev` with Tailscale SSH on, using a token from exe.dev's
+  `tailscale-identity` workload identity integration (no auth key or OAuth
+  secret). Log in `~/dot-init.log`, state in `~/dot-init.status`
+  (running/done/failed). The deploy waits for it, then registers
+  `~/.ssh/id_ed25519_github.pub` on GitHub (authentication + signing); a
+  transient `dotfiles-ssh-remote` unit switches the dotfiles remote to SSH
+  once GitHub accepts the key.
 - `--headless`: skips the font, every `__confirm` takes its default, `sudo chsh`
-  instead of `chsh`. It still generates `~/.ssh/id_ed25519_github`; the dotfiles
-  remote switches to SSH once GitHub accepts the key.
-- Mac SSH: `~/.ssh/config` pins `Host exe.dev *.exe.xyz` to
-  `~/.ssh/id_ed25519_github` with `IdentitiesOnly yes` (exe.dev picks the
-  account by key).
-- Rex: `dot init` installs the Rex server on Linux; add `ssh://<name>.exe.xyz`
-  in Rex for Mac (Add Remote Host).
+  instead of `chsh`. It still generates `~/.ssh/id_ed25519_github`.
+- Connect from a Mac: `ssh exe-dev-<name>` over the tailnet. Tailscale SSH
+  authenticates by tailnet identity, so no SSH key is involved. `dot init`
+  (`__setup_tailnet_ssh`) adds a `Host exe-dev-* !*.exe.xyz` block to
+  `~/.ssh/config` that sets `User exedev` and takes the host key from the
+  tailnet through `KnownHostsCommand ~/.local/bin/tailnet-ssh-known-hosts`,
+  not from `known_hosts`. Nothing is set up per VM, and a rebuilt VM
+  connects as before.
+- Rex: `dot init` installs the Rex server on Linux. Add a VM once with
+  `rex hosts add <name> ssh://exedev@<name>`; Rex stores hosts in your Rex
+  home.
+- Delete a VM in `iac`: set `whenRemoved: "delete"` on its entry and deploy,
+  then remove the entry and deploy. That deletes the VM, its tailnet device,
+  and its GitHub keys.
+- Tailscale config (policy/ACLs, tailnet settings, DNS) is managed as code in
+  `iac` (`infra/tailnet`). Change it there; never edit it via the API,
+  Executor, or the admin console, or the next deploy refuses to write.
+- `dot` does not configure the exe.dev CLI (`ssh exe.dev ls`) or the
+  `<name>.exe.xyz` route. They need `Host exe.dev *.exe.xyz` in
+  `~/.ssh/config` with `IdentityFile ~/.ssh/id_ed25519_github` and
+  `IdentitiesOnly yes` (exe.dev picks the account by key), and exe.dev's host
+  key (https://exe.dev/docs/faq/host-key).
 - Test without a VM: Ubuntu 24.04 container, `exedev` user with NOPASSWD sudo.
   `source dot` to call one function (main runs only when executed).
 - Model logins are manual and stay on the VM's disk (no proxy/gateway):
@@ -184,7 +193,6 @@ dot stow              # Resymlink only
 dot package add X     # Add + install package
 dot benchmark-shell   # Fish startup perf
 dot gen-ssh-key       # Generate ed25519 key by email domain
-dot exe new NAME      # exe.dev VM set up by these dotfiles (+ Rex host)
 ```
 
 ## KEY CONFIGS
@@ -215,4 +223,4 @@ dot exe new NAME      # exe.dev VM set up by these dotfiles (+ Rex host)
 - Starship `command_timeout = 2000` because Vite+ node shims are slow
 - `secrets.fish` is gitignored — contains env tokens for work services
 - `.pi/agent/*` mostly gitignored; extensions explicitly un-ignored
-- jj was removed; repo now uses git only
+- Version control is git only
