@@ -1869,7 +1869,8 @@ cmd_doctor() {
     # Check Fish
     if __command_exists fish; then
         __print_success "Fish shell installed"
-        if [[ "$SHELL" == "$(command -v fish)" ]]; then
+        # Resolve both: on merged-/usr distros /bin/fish and /usr/bin/fish are one file.
+        if [[ "$(readlink -f "$SHELL" 2>/dev/null || echo "$SHELL")" == "$(readlink -f "$(command -v fish)" 2>/dev/null || command -v fish)" ]]; then
             __print_success "Fish is default shell"
         else
             __print_warning "Fish is not default shell"
