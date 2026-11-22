@@ -39,7 +39,7 @@ readonly REX_LUA_ROCKS_TREE="${REX_LUA_ROCKS_TREE:-${HOME}/.local/share/rex/rock
 readonly REX_LUA_ROCKS=(twitch-lua)
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
-readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key.pub"
+readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
 
 # Platform detection. Runtime checks only: one stow tree for every OS, and each
@@ -1088,6 +1088,17 @@ __stow_dotfiles() {
     fi
 }
 
+# ssh does not try id_ed25519_github by default; point github.com at it.
+__ensure_github_ssh_config() {
+    local ssh_config="${HOME}/.ssh/config"
+    if [[ -f "$ssh_config" ]] && grep -qiE '^[[:space:]]*Host[[:space:]]+github\.com([[:space:]]|$)' "$ssh_config"; then
+        return 0
+    fi
+    printf '\nHost github.com\n  AddKeysToAgent yes\n  IdentityFile %s\n' "$GITHUB_PRIVATE_KEY_PATH" >> "$ssh_config"
+    chmod 600 "$ssh_config"
+    __print_success "Added github.com to ${ssh_config}"
+}
+
 __generate_ssh_key() {
     local existing_key
     if existing_key=$(__existing_github_private_key); then
@@ -1104,6 +1115,7 @@ __generate_ssh_key() {
 
     if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_PRIVATE_KEY_PATH" -N ""; then
         __print_success "SSH key generated successfully"
+        __ensure_github_ssh_config
         __print_info "Add the public key to GitHub:"
         echo "  cat ${GITHUB_PRIVATE_KEY_PATH}.pub"
         echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
