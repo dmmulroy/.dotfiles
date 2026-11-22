@@ -1557,7 +1557,8 @@ __ensure_exe_known_hosts() {
         && grep -q '^\*\.exe\.xyz ' "$known_hosts" 2>/dev/null; then
         return 0
     fi
-    host_key="$(ssh-keyscan -t rsa exe.dev 2>/dev/null | awk '$2 == "ssh-rsa" { print $2 " " $3; exit }')"
+    host_key="$(ssh-keyscan -t rsa exe.dev 2>/dev/null || true)"
+    host_key="$(awk '$2 == "ssh-rsa" { print $2 " " $3; exit }' <<< "$host_key")"
     fingerprint="$(echo "exe.dev ${host_key}" | ssh-keygen -lf - 2>/dev/null | awk '{ print $2 }')"
     if [[ -z "$host_key" || "$fingerprint" != "$EXE_HOST_KEY_FINGERPRINT" ]]; then
         __print_error "exe.dev host key fingerprint is '${fingerprint}', expected ${EXE_HOST_KEY_FINGERPRINT}"
@@ -1631,7 +1632,9 @@ __exe_add_rex_host() {
         __print_info "rex not found; skipping the Rex host"
         return 0
     fi
-    if "$rex_bin" hosts list 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -qxF -- "$name"; then
+    local labels
+    labels="$("$rex_bin" hosts list 2>/dev/null | awk 'NR > 1 { print $1 }' || true)"
+    if grep -qxF -- "$name" <<< "$labels"; then
         __print_success "Rex host ${name} already exists"
     elif "$rex_bin" hosts add "$name" "ssh://${host}" >/dev/null; then
         __print_success "Added Rex host ${name} (ssh://${host})"
