@@ -3333,5 +3333,7 @@ main() {
     esac
 }
 
-# Run main function
-[[ "${BASH_SOURCE[0]}" == "$0" ]] && main "$@"
+# Run main function (skipped when sourced, e.g. to test one function)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
