@@ -404,7 +404,9 @@ __install_vite_plus() {
     fi
 
     __print_info "Installing Vite+..."
-    if curl -fsSL https://vite.plus | bash; then
+    # Without VP_SELF_SETUP_NO_MODIFY_PATH the installer overwrites the stowed
+    # conf.d/vite-plus.fish (writing into this repo) and edits ~/.bashrc/.profile.
+    if curl -fsSL https://vite.plus | VP_SELF_SETUP_NO_MODIFY_PATH=1 bash; then
         # __install_pi runs `vp` in this same process. macOS installs to
         # ~/.vite-plus, Linux to the XDG data dir.
         export PATH="${HOME}/.vite-plus/bin:${XDG_DATA_HOME:-${HOME}/.local/share}/vite-plus/bin:${PATH}"
