@@ -13,6 +13,9 @@ complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which p
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
+complete -c dot -n "__fish_use_subcommand" -a "exe" -d "Create exe.dev VMs set up by these dotfiles"
+complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "new" -d "Create a VM and run dot init on it"
+complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "github-key" -d "Add a VM's GitHub key with gh"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
@@ -20,9 +23,10 @@ complete -c dot -n "__fish_use_subcommand" -a "unlink" -d "Uninstall global dot 
 complete -c dot -n "__fish_use_subcommand" -a "edit" -d "Open dotfiles in editor"
 complete -c dot -n "__fish_use_subcommand" -a "help" -d "Show help message"
 
-# Global options
-complete -c dot -n "__fish_use_subcommand" -l "skip-ssh" -d "Skip SSH key generation"
-complete -c dot -n "__fish_use_subcommand" -l "skip-font" -d "Skip font installation"
+# Global and init options
+complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-ssh" -d "Skip SSH key generation"
+complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-font" -d "Skip font installation"
+complete -c dot -n "__fish_seen_subcommand_from init" -l "headless" -d "No prompts or font (remote VMs)"
 complete -c dot -n "__fish_use_subcommand" -l "version" -d "Show version information"
 complete -c dot -n "__fish_use_subcommand" -s "h" -l "help" -d "Show help message"
 

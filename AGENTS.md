@@ -111,12 +111,27 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
 
 Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
 
+- New VM, from the Mac: `dot exe new <name> [exe.dev new flags]`. It pins
+  exe.dev's host key, creates the VM with `exe/first-boot.sh`, waits for
+  `~/dot-init.status`, adds the VM's GitHub key (auth + signing) with `gh`,
+  and adds it as a Rex host (`ssh://<name>.exe.xyz`). `gh` needs
+  `admin:public_key,admin:ssh_signing_key` (`gh auth refresh -s ...`); without
+  them, run `dot exe github-key <name>` later. Tailscale stays manual.
 - `exe/first-boot.sh` clones this repo and runs `dot init --headless`; log in
-  `~/dot-init.log`, state in `~/dot-init.status` (running/done/failed).
-- Default for new VMs: `ssh exe.dev defaults write dev.exe new.setup-script < exe/first-boot.sh`
-- `--headless`: skips SSH key + font, every `__confirm` takes its default,
-  `sudo chsh` instead of `chsh`.
+  `~/dot-init.log`, state in `~/dot-init.status` (running/done/failed; a trap
+  writes failed if the script dies).
+- Account default (also applies to VMs made in the web UI):
+  `ssh exe.dev defaults write dev.exe new.setup-script < exe/first-boot.sh`
+- `--headless`: skips the font, every `__confirm` takes its default, `sudo chsh`
+  instead of `chsh`. It still generates `~/.ssh/id_ed25519_github`; the dotfiles
+  remote switches to SSH once GitHub accepts the key.
+- Mac SSH: `~/.ssh/config` pins `Host exe.dev *.exe.xyz` to
+  `~/.ssh/id_ed25519_github` with `IdentitiesOnly yes` (exe.dev picks the
+  account by key).
+- Rex: `dot init` installs the Rex server on Linux; add `ssh://<name>.exe.xyz`
+  in Rex for Mac (Add Remote Host).
 - Test without a VM: Ubuntu 24.04 container, `exedev` user with NOPASSWD sudo.
+  `source dot` to call one function (main runs only when executed).
 - Model logins are manual and stay on the VM's disk (no proxy/gateway):
   `claude auth login` (Claude subscription via pi-claude-cli, which `dot init`
   installs with Claude Code), then `/login` in pi for ChatGPT/Codex.
@@ -157,6 +172,7 @@ dot stow              # Resymlink only
 dot package add X     # Add + install package
 dot benchmark-shell   # Fish startup perf
 dot gen-ssh-key       # Generate ed25519 key by email domain
+dot exe new NAME      # exe.dev VM set up by these dotfiles (+ Rex host)
 ```
 
 ## KEY CONFIGS

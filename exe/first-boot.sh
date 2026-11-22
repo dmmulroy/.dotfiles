@@ -16,16 +16,18 @@ dotfiles_dir="${HOME}/.dotfiles"
 log_file="${HOME}/dot-init.log"
 status_file="${HOME}/dot-init.status"
 
+# Whatever ends this script (an error, a signal, a dropped session) leaves
+# "failed" unless the init finished. Only SIGKILL can skip the trap.
+result=failed
+trap 'echo "$result" > "$status_file"' EXIT
+trap 'exit 1' HUP INT TERM
+
 echo running > "$status_file"
-(
+if (
     if [[ ! -d "${dotfiles_dir}/.git" ]]; then
         git clone "$repo" "$dotfiles_dir" || exit 1
     fi
     "${dotfiles_dir}/dot" init --headless
-) > "$log_file" 2>&1 < /dev/null
-
-if [[ $? -eq 0 ]]; then
-    echo "done" > "$status_file"
-else
-    echo failed > "$status_file"
+) > "$log_file" 2>&1 < /dev/null; then
+    result=done
 fi

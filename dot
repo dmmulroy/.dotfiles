@@ -41,9 +41,14 @@ readonly REX_LUA_ROCKS=(twitch-lua)
 # script). Re-running the script upgrades Rex and keeps the channel.
 readonly REX_LINUX_INSTALL_URL="https://pkgs.superlogical.com/rex/install.sh"
 readonly REX_LINUX_CHANNEL="preview"
+# exe.dev: one RSA host key for exe.dev and every VM (*.exe.xyz), published at
+# https://exe.dev/docs/faq/host-key. `dot exe new` pins it before connecting.
+readonly EXE_HOST_KEY_FINGERPRINT="SHA256:JJOP/lwiBGOMilfONPWZCXUrfK154cnJFXcqlsi6lPo"
+readonly EXE_FIRST_BOOT_SCRIPT="${DOTFILES_DIR}/exe/first-boot.sh"
+# How long `dot exe new` waits for a VM's first-boot `dot init` (seconds).
+readonly EXE_FIRST_BOOT_TIMEOUT=1800
 readonly GITHUB_EMAIL="dillon.mulroy@gmail.com"
 readonly GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/id_ed25519_github"
-readonly LEGACY_GITHUB_PRIVATE_KEY_PATH="${HOME}/.ssh/key"
 readonly FONT_REPO_URL="git@github.com:dmmulroy/mono-lisa.git"
 
 # Platform detection. Runtime checks only: one stow tree for every OS, and each
@@ -195,8 +200,6 @@ __list_contains() {
 __existing_github_private_key() {
     if [[ -f "$GITHUB_PRIVATE_KEY_PATH" ]]; then
         printf '%s\n' "$GITHUB_PRIVATE_KEY_PATH"
-    elif [[ -f "$LEGACY_GITHUB_PRIVATE_KEY_PATH" ]]; then
-        printf '%s\n' "$LEGACY_GITHUB_PRIVATE_KEY_PATH"
     else
         return 1
     fi
@@ -651,6 +654,9 @@ __import_rex_theme() {
 # Install Rex's xterm-rex terminfo entry (~/.terminfo) and its ssh guard
 # (~/.config/rex/ssh_config + an Include in ~/.ssh/config, so remote hosts get
 # xterm-256color). Both hold machine paths, so Rex writes them, not stow.
+# "Ready:" is the verdict line of `rex terminfo status`. On Linux the package
+# installs the ssh guard system-wide (/etc/ssh/ssh_config.d/50-rex.conf), so
+# the per-user guard it reports "missing" is not needed there.
 __setup_rex_terminfo() {
     local rex_cli
     rex_cli="$(__rex_cli)" || {
@@ -725,6 +731,26 @@ __install_rex_linux() {
         __print_error "Failed to install Rex"
         return 1
     fi
+}
+
+# True when apt or pacman owns the rex binary; their upgrades then update Rex too.
+__rex_package_managed() {
+    local rex_bin
+    rex_bin="$(command -v rex)" || return 1
+    rex_bin="$(readlink -f "$rex_bin")"
+    case "$DOT_PACKAGE_MANAGER" in
+        apt) dpkg -S "$rex_bin" >/dev/null 2>&1 ;;
+        pacman) pacman -Qo "$rex_bin" >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
+}
+
+__update_rex_linux() {
+    if __rex_package_managed; then
+        __print_success "Rex is updated by ${DOT_PACKAGE_MANAGER} ($(rex version | head -1))"
+        return 0
+    fi
+    __install_rex_linux update
 }
 
 # exe.dev SSH sessions may lack XDG_RUNTIME_DIR, which rex and systemctl --user need.
@@ -1159,30 +1185,76 @@ __ensure_github_ssh_config() {
     __print_success "Added github.com to ${ssh_config}"
 }
 
-__generate_ssh_key() {
-    local existing_key
-    if existing_key=$(__existing_github_private_key); then
-        __print_success "SSH key already exists at $existing_key"
-        if [[ "$existing_key" == "$LEGACY_GITHUB_PRIVATE_KEY_PATH" ]]; then
-            __print_warning "Legacy key name detected; move it to $GITHUB_PRIVATE_KEY_PATH and move ${LEGACY_GITHUB_PRIVATE_KEY_PATH}.pub to ${GITHUB_PRIVATE_KEY_PATH}.pub"
-        fi
-        return 0
-    fi
-
-    __print_info "Generating new SSH key..."
-    mkdir -p "${HOME}/.ssh"
-    chmod 700 "${HOME}/.ssh"
-
-    if ssh-keygen -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_PRIVATE_KEY_PATH" -N ""; then
-        __print_success "SSH key generated successfully"
-        __ensure_github_ssh_config
-        __print_info "Add the public key to GitHub:"
-        echo "  cat ${GITHUB_PRIVATE_KEY_PATH}.pub"
-        echo "  Then go to: GitHub > Settings > SSH and GPG keys > New SSH key"
-    else
-        __print_error "Failed to generate SSH key"
+# Register a public key on GitHub as an authentication key (push/pull) and a
+# signing key (Verified commits). Needs gh logged in with the key scopes:
+#   gh auth refresh -h github.com -s admin:public_key,admin:ssh_signing_key
+# Returns 1 without changing anything when gh or the scopes are missing.
+__add_github_ssh_key_with_gh() {
+    local pub_file="$1" title="$2" key_type out auth_status
+    __command_exists gh || return 1
+    auth_status="$(gh auth status -h github.com 2>&1)" || return 1
+    if [[ "$auth_status" != *admin:public_key* || "$auth_status" != *admin:ssh_signing_key* ]]; then
         return 1
     fi
+    for key_type in authentication signing; do
+        if out="$(gh ssh-key add "$pub_file" --title "$title" --type "$key_type" 2>&1)"; then
+            __print_success "Added the key to GitHub as a ${key_type} key (${title})"
+        elif [[ "$out" == *"already"* ]]; then
+            __print_success "The key is already on GitHub as a ${key_type} key"
+        else
+            __print_warning "gh ssh-key add --type ${key_type} failed: ${out}"
+            return 1
+        fi
+    done
+}
+
+__print_github_key_hint() {
+    local pub_key="$1" title="$2"
+    __print_info "Add this key to GitHub as an authentication key and a signing key (title: ${title}):"
+    echo "  ${pub_key}"
+    echo "  With gh: gh auth refresh -h github.com -s admin:public_key,admin:ssh_signing_key  (once),"
+    echo "  then gh ssh-key add <file> --type authentication, and again with --type signing"
+}
+
+# Switch the dotfiles remote from HTTPS to SSH once GitHub accepts this machine's key.
+__use_ssh_remote_for_dotfiles() {
+    local url
+    url="$(git -C "$DOTFILES_DIR" remote get-url origin 2>/dev/null)" || return 0
+    [[ "$url" == https://github.com/* ]] || return 0
+    local ssh_url="git@github.com:${url#https://github.com/}"
+    if ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -T git@github.com </dev/null 2>&1 \
+        | grep -q "successfully authenticated"; then
+        git -C "$DOTFILES_DIR" remote set-url origin "$ssh_url"
+        __print_success "Dotfiles remote now uses SSH (${ssh_url})"
+    else
+        __print_info "GitHub does not accept this machine's SSH key yet; the dotfiles remote stays on HTTPS"
+    fi
+}
+
+# Generate the GitHub key (non-interactive, so headless runs do it too), register it
+# with gh when possible, and move the dotfiles remote to SSH once it works.
+__generate_ssh_key() {
+    if __existing_github_private_key >/dev/null; then
+        __print_success "SSH key already exists at $GITHUB_PRIVATE_KEY_PATH"
+    else
+        __print_info "Generating new SSH key..."
+        mkdir -p "${HOME}/.ssh"
+        chmod 700 "${HOME}/.ssh"
+        if ssh-keygen -q -t ed25519 -C "$GITHUB_EMAIL" -f "$GITHUB_PRIVATE_KEY_PATH" -N ""; then
+            __print_success "SSH key generated at $GITHUB_PRIVATE_KEY_PATH"
+        else
+            __print_error "Failed to generate SSH key"
+            return 1
+        fi
+    fi
+    __ensure_github_ssh_config
+
+    local title
+    title="$(hostname -s 2>/dev/null || hostname)"
+    if ! __add_github_ssh_key_with_gh "${GITHUB_PRIVATE_KEY_PATH}.pub" "$title"; then
+        __print_github_key_hint "$(cat "${GITHUB_PRIVATE_KEY_PATH}.pub")" "$title"
+    fi
+    __use_ssh_remote_for_dotfiles
 }
 
 __install_font() {
@@ -1190,10 +1262,6 @@ __install_font() {
     if ! github_private_key=$(__existing_github_private_key); then
         __print_warning "GitHub SSH key not found. Skipping font installation"
         return 0
-    fi
-
-    if [[ "$github_private_key" == "$LEGACY_GITHUB_PRIVATE_KEY_PATH" ]]; then
-        __print_warning "Using legacy private key path: $github_private_key"
     fi
 
     if ! __confirm "Have you added the SSH key to your GitHub account?" "n"; then
@@ -1462,6 +1530,161 @@ __sync_fish_plugins() {
     fi
 }
 
+
+# ---------------------------------------------------------------------------
+# exe.dev VMs: `dot exe new NAME` creates a VM that runs exe/first-boot.sh,
+# waits for its `dot init --headless`, registers its GitHub key with gh, and
+# adds it as a Rex host. Run it on the Mac whose key is on your exe.dev account.
+# ---------------------------------------------------------------------------
+
+__exe_ssh() {
+    ssh -o BatchMode=yes -o ConnectTimeout=15 "$@"
+}
+
+# Save exe.dev's host key for exe.dev and *.exe.xyz after checking its fingerprint.
+__ensure_exe_known_hosts() {
+    local known_hosts="${HOME}/.ssh/known_hosts" host_key fingerprint
+    if ssh-keygen -F exe.dev -f "$known_hosts" >/dev/null 2>&1 \
+        && grep -q '^\*\.exe\.xyz ' "$known_hosts" 2>/dev/null; then
+        return 0
+    fi
+    host_key="$(ssh-keyscan -t rsa exe.dev 2>/dev/null | awk '$2 == "ssh-rsa" { print $2 " " $3; exit }')"
+    fingerprint="$(echo "exe.dev ${host_key}" | ssh-keygen -lf - 2>/dev/null | awk '{ print $2 }')"
+    if [[ -z "$host_key" || "$fingerprint" != "$EXE_HOST_KEY_FINGERPRINT" ]]; then
+        __print_error "exe.dev host key fingerprint is '${fingerprint}', expected ${EXE_HOST_KEY_FINGERPRINT}"
+        return 1
+    fi
+    mkdir -p "${HOME}/.ssh"
+    ssh-keygen -F exe.dev -f "$known_hosts" >/dev/null 2>&1 || echo "exe.dev ${host_key}" >> "$known_hosts"
+    grep -q '^\*\.exe\.xyz ' "$known_hosts" 2>/dev/null || echo "*.exe.xyz ${host_key}" >> "$known_hosts"
+    __print_success "Saved exe.dev's host key (${EXE_HOST_KEY_FINGERPRINT})"
+}
+
+# exe.dev picks the account by SSH key. Pin this machine's key so a key loaded in
+# ssh-agent for another exe.dev account never wins (exe.dev/docs/faq/ssh-key).
+__ensure_exe_ssh_config() {
+    local ssh_config="${HOME}/.ssh/config"
+    if [[ -f "$ssh_config" ]] && grep -qiE '^[[:space:]]*Host[[:space:]]+exe\.dev([[:space:]]|$)' "$ssh_config"; then
+        return 0
+    fi
+    mkdir -p "${HOME}/.ssh"
+    printf '\nHost exe.dev *.exe.xyz\n  IdentitiesOnly yes\n  IdentityFile %s\n' "$GITHUB_PRIVATE_KEY_PATH" >> "$ssh_config"
+    chmod 600 "$ssh_config"
+    __print_success "Added exe.dev and *.exe.xyz to ${ssh_config}"
+}
+
+__exe_wait_for_first_boot() {
+    local host="$1" status="" waited=0 last_line=""
+    __print_info "Waiting for first boot (dot init --headless) on ${host}; log: ~/dot-init.log"
+    while (( waited < EXE_FIRST_BOOT_TIMEOUT )); do
+        status="$(__exe_ssh "$host" cat dot-init.status 2>/dev/null || true)"
+        case "$status" in
+            done)
+                __print_success "dot init finished on ${host}"
+                return 0
+                ;;
+            failed)
+                __print_error "dot init failed on ${host}. Last lines of ~/dot-init.log:"
+                __exe_ssh "$host" tail -n 40 dot-init.log 2>/dev/null | sed 's/^/    /'
+                return 1
+                ;;
+        esac
+        last_line="$(__exe_ssh "$host" tail -n 1 dot-init.log 2>/dev/null | cut -c1-100 || true)"
+        [[ -n "$last_line" ]] && echo "    ${last_line}"
+        sleep 15
+        waited=$((waited + 15))
+    done
+    __print_error "Timed out after ${EXE_FIRST_BOOT_TIMEOUT}s; check ~/dot-init.log on ${host}"
+    return 1
+}
+
+# Add a VM's GitHub key with this machine's gh, then move its dotfiles remote to SSH.
+__exe_register_github_key() {
+    local name="$1" host="$2" pub_file title="${1} (exe.dev)"
+    pub_file="$(mktemp)"
+    if ! __exe_ssh "$host" cat .ssh/id_ed25519_github.pub > "$pub_file" 2>/dev/null || [[ ! -s "$pub_file" ]]; then
+        __print_warning "No GitHub key found on ${host} (~/.ssh/id_ed25519_github.pub)"
+        rm -f "$pub_file"
+        return 1
+    fi
+    if __add_github_ssh_key_with_gh "$pub_file" "$title"; then
+        __exe_ssh "$host" "bash -c 'source ~/.dotfiles/dot && __use_ssh_remote_for_dotfiles'"
+    else
+        __print_github_key_hint "$(cat "$pub_file")" "$title"
+        echo "  Then run: ${SCRIPT_NAME} exe github-key ${name}"
+    fi
+    rm -f "$pub_file"
+}
+
+__exe_add_rex_host() {
+    local name="$1" host="$2" rex_bin
+    if ! rex_bin="$(__rex_cli)"; then
+        __print_info "rex not found; skipping the Rex host"
+        return 0
+    fi
+    if "$rex_bin" hosts list 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -qxF -- "$name"; then
+        __print_success "Rex host ${name} already exists"
+    elif "$rex_bin" hosts add "$name" "ssh://${host}" >/dev/null; then
+        __print_success "Added Rex host ${name} (ssh://${host})"
+    else
+        __print_warning "rex hosts add ${name} ssh://${host} failed"
+    fi
+}
+
+__exe_new() {
+    local name="${1:-}"
+    if [[ -z "$name" || "$name" == -* ]]; then
+        __print_error "Usage: ${SCRIPT_NAME} exe new NAME [exe.dev 'new' flags, e.g. --disk=50GB]"
+        return 1
+    fi
+    shift
+    local host="${name}.exe.xyz"
+
+    __print_header "Creating exe.dev VM ${name}"
+    __ensure_exe_known_hosts || return 1
+    __ensure_exe_ssh_config
+    if ! __exe_ssh exe.dev whoami >/dev/null 2>&1; then
+        __print_error "ssh exe.dev failed; is ${GITHUB_PRIVATE_KEY_PATH}.pub on your exe.dev account?"
+        return 1
+    fi
+
+    __print_info "Creating ${name}; its first boot runs exe/first-boot.sh..."
+    if ! __exe_ssh exe.dev new --name="$name" --no-email "$@" --setup-script /dev/stdin < "$EXE_FIRST_BOOT_SCRIPT"; then
+        __print_error "ssh exe.dev new failed"
+        return 1
+    fi
+
+    __exe_wait_for_first_boot "$host" || return 1
+    __exe_register_github_key "$name" "$host" || true
+    __exe_add_rex_host "$name" "$host"
+
+    __print_header "${name} is ready"
+    echo "  Shell:       ssh ${host}"
+    echo "  Rex for Mac: Add Remote Host… → ssh://${host}"
+    echo "  Tailscale:   ssh ${host} sudo tailscale up --hostname=${name}  (opens a sign-in link)"
+}
+
+cmd_exe() {
+    local subcommand="${1:-}"
+    shift || true
+    case "$subcommand" in
+        new)
+            __exe_new "$@"
+            ;;
+        github-key)
+            if [[ -z "${1:-}" ]]; then
+                __print_error "Usage: ${SCRIPT_NAME} exe github-key NAME"
+                return 1
+            fi
+            __exe_register_github_key "$1" "${1}.exe.xyz"
+            ;;
+        *)
+            __print_command_help exe
+            [[ -z "$subcommand" ]]
+            ;;
+    esac
+}
+
 # Command functions
 cmd_init() {
     local inherited_skip_ssh="${SKIP_SSH:-false}"
@@ -1478,8 +1701,9 @@ cmd_init() {
                 SKIP_FONT=true
                 ;;
             --headless)
-                # No prompts, no SSH key, no font: for exe.dev and other remote VMs.
-                SKIP_SSH=true
+                # No prompts and no font, for exe.dev and other remote VMs. The GitHub
+                # key is still generated (ssh-keygen needs no input); `dot exe new`
+                # registers it on GitHub from the Mac.
                 SKIP_FONT=true
                 export DOT_HEADLESS=true
                 export DEBIAN_FRONTEND=noninteractive
@@ -1508,6 +1732,9 @@ cmd_update() {
     else
         __print_error "Failed to update repository"
         return 1
+    fi
+    if __existing_github_private_key >/dev/null; then
+        __use_ssh_remote_for_dotfiles
     fi
 
     if [[ "$DOT_OS" == "darwin" ]]; then
@@ -1546,7 +1773,7 @@ cmd_update() {
         __import_rex_theme
         __setup_scroll_reverser || __print_warning "Scroll Reverser setup failed; continuing"
     else
-        __install_rex_linux update || __print_warning "Rex update failed; continuing"
+        __update_rex_linux || __print_warning "Rex update failed; continuing"
         __export_rex_runtime_dir
         __reload_rex_config || __print_warning "Rex config reload failed; continuing"
     fi
@@ -1654,13 +1881,21 @@ cmd_doctor() {
         __print_warning "Found $broken_links broken symlinks"
     fi
     
+    # Installers that edit shell or tool config can write through stow symlinks
+    # into this repo (Vite+ once replaced conf.d/vite-plus.fish).
+    local dirty_home
+    dirty_home="$(git -C "$DOTFILES_DIR" status --porcelain -- home 2>/dev/null)"
+    if [[ -n "$dirty_home" ]]; then
+        __print_warning "Uncommitted changes under home/ (an installer may have rewritten a stowed file):"
+        sed 's/^/    /' <<< "$dirty_home"
+    else
+        __print_success "No uncommitted changes under home/"
+    fi
+
     # Check SSH key
     local github_private_key
     if github_private_key=$(__existing_github_private_key); then
         __print_success "GitHub SSH private key exists at $github_private_key"
-        if [[ "$github_private_key" == "$LEGACY_GITHUB_PRIVATE_KEY_PATH" ]]; then
-            __print_warning "Legacy key name detected; migrate it to $GITHUB_PRIVATE_KEY_PATH"
-        fi
         if [[ ! -f "${github_private_key}.pub" ]]; then
             __print_warning "GitHub SSH public key not found at ${github_private_key}.pub"
         fi
@@ -1897,6 +2132,9 @@ complete -c dot -n "__fish_use_subcommand" -a "check-packages" -d "Check which p
 complete -c dot -n "__fish_use_subcommand" -a "retry-failed" -d "Retry failed package installations"
 complete -c dot -n "__fish_use_subcommand" -a "benchmark-shell" -d "Benchmark Fish shell startup performance"
 complete -c dot -n "__fish_use_subcommand" -a "gen-ssh-key" -d "Generate SSH key for GitHub/GitLab with email"
+complete -c dot -n "__fish_use_subcommand" -a "exe" -d "Create exe.dev VMs set up by these dotfiles"
+complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "new" -d "Create a VM and run dot init on it"
+complete -c dot -n "__fish_seen_subcommand_from exe" -n "not __fish_seen_subcommand_from new github-key" -a "github-key" -d "Add a VM's GitHub key with gh"
 complete -c dot -n "__fish_use_subcommand" -a "stow" -d "Create symlinks for dotfiles using GNU Stow"
 complete -c dot -n "__fish_use_subcommand" -a "completions" -d "Generate Fish shell completions"
 complete -c dot -n "__fish_use_subcommand" -a "link" -d "Install dot command globally (create symlink in PATH)"
@@ -1907,7 +2145,7 @@ complete -c dot -n "__fish_use_subcommand" -a "help" -d "Show help message"
 # Global and init options
 complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-ssh" -d "Skip SSH key generation"
 complete -c dot -n "__fish_seen_subcommand_from init" -l "skip-font" -d "Skip font installation"
-complete -c dot -n "__fish_seen_subcommand_from init" -l "headless" -d "No prompts, SSH key, or font (remote VMs)"
+complete -c dot -n "__fish_seen_subcommand_from init" -l "headless" -d "No prompts or font (remote VMs)"
 complete -c dot -n "__fish_use_subcommand" -l "version" -d "Show version information"
 complete -c dot -n "__fish_use_subcommand" -s "h" -l "help" -d "Show help message"
 
@@ -3112,8 +3350,9 @@ USAGE:
     ${SCRIPT_NAME} init [--skip-ssh] [--skip-font] [--headless]
 
 Initialize the complete environment. Skip SSH key or font setup with the
-corresponding option. --headless skips both and answers every prompt with
-its default (exe.dev first boot: exe/first-boot.sh).
+corresponding option. --headless skips the font, still generates the GitHub
+key, and answers every prompt with its default (exe.dev first boot:
+exe/first-boot.sh).
 EOF
             ;;
         update)
@@ -3143,6 +3382,19 @@ EOF
             ;;
         gen-ssh-key)
             echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} gen-ssh-key [EMAIL]\n\nGenerate an Ed25519 key, add it to ssh-agent, and copy its public key."
+            ;;
+        exe)
+            cat << EOF
+USAGE:
+    ${SCRIPT_NAME} exe new NAME [FLAGS]    Create an exe.dev VM set up by these dotfiles
+    ${SCRIPT_NAME} exe github-key NAME     Add a VM's GitHub key with gh (after gh auth refresh)
+
+new runs 'ssh exe.dev new --name=NAME FLAGS' with exe/first-boot.sh as the setup
+script, waits for 'dot init --headless' on the VM, adds the VM's GitHub key as an
+authentication and signing key when gh has admin:public_key and
+admin:ssh_signing_key, and adds the VM as a Rex host (ssh://NAME.exe.xyz).
+FLAGS go to exe.dev's 'new', e.g. --disk=50GB. Run it on your Mac.
+EOF
             ;;
         stow)
             echo -e "${BOLD}USAGE:${RESET}\n    ${SCRIPT_NAME} stow\n\nRe-create symlinks from the repository's home directory."
@@ -3193,6 +3445,7 @@ cmd_help() {
     echo "    retry-failed        Retry failed package installations"
     echo "    benchmark-shell     Benchmark Fish shell startup performance"
     echo "    gen-ssh-key         Generate SSH key for GitHub/GitLab with email"
+    echo "    exe                 Create exe.dev VMs set up by these dotfiles (exe new NAME)"
     echo "    stow                Create symlinks for dotfiles using GNU Stow"
     echo "    completions         Generate Fish shell completions"
     echo "    link                Install dot command globally (create symlink in PATH)"
@@ -3306,6 +3559,9 @@ main() {
             ;;
         gen-ssh-key)
             cmd_gen_ssh_key "$@"
+            ;;
+        exe)
+            cmd_exe "$@"
             ;;
         stow)
             cmd_stow "$@"
