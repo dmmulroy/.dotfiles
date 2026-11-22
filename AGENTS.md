@@ -123,8 +123,9 @@ Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
   `TS_EXE_OAUTH_CLIENT_ID`/`TS_EXE_OAUTH_CLIENT_SECRET` in `conf.d/secrets.fish`;
   the VM only sees the one-time key.
 - Tailscale config (policy/ACLs, tailnet settings, DNS, device tags such as
-  `tag:exe-dev`) is managed as code in `~/Code/personal/iac` (`packages/tailnet`,
-  Alchemy). Change it there; never edit it via the API, Executor, or the admin
+  `tag:exe-dev`) is managed as code in the `iac` repo (`packages/tailnet`,
+  Alchemy): `~/Code/personal/iac` if cloned locally, otherwise
+  github.com/dmmulroy/iac. Change it there; never edit it via the API, Executor, or the admin
   console, or the next deploy refuses to write. `dot` only mints per-VM join keys.
   Deleting a VM leaves its tailnet device: remove it in the admin console.
   Tailscale API key descriptions allow only letters, digits, spaces, hyphens.
