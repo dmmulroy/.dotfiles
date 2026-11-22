@@ -1216,14 +1216,19 @@ __print_github_key_hint() {
     echo "  then gh ssh-key add <file> --type authentication, and again with --type signing"
 }
 
+# True when GitHub accepts this machine's SSH key (ssh -T always exits 1 there).
+__github_accepts_ssh_key() {
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -T git@github.com </dev/null 2>&1 \
+        | grep -q "successfully authenticated"
+}
+
 # Switch the dotfiles remote from HTTPS to SSH once GitHub accepts this machine's key.
 __use_ssh_remote_for_dotfiles() {
     local url
     url="$(git -C "$DOTFILES_DIR" remote get-url origin 2>/dev/null)" || return 0
     [[ "$url" == https://github.com/* ]] || return 0
     local ssh_url="git@github.com:${url#https://github.com/}"
-    if ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -T git@github.com </dev/null 2>&1 \
-        | grep -q "successfully authenticated"; then
+    if __github_accepts_ssh_key; then
         git -C "$DOTFILES_DIR" remote set-url origin "$ssh_url"
         __print_success "Dotfiles remote now uses SSH (${ssh_url})"
     else
@@ -1251,7 +1256,9 @@ __generate_ssh_key() {
 
     local title
     title="$(hostname -s 2>/dev/null || hostname)"
-    if ! __add_github_ssh_key_with_gh "${GITHUB_PRIVATE_KEY_PATH}.pub" "$title"; then
+    if __github_accepts_ssh_key; then
+        __print_success "GitHub accepts this machine's SSH key"
+    elif ! __add_github_ssh_key_with_gh "${GITHUB_PRIVATE_KEY_PATH}.pub" "$title"; then
         __print_github_key_hint "$(cat "${GITHUB_PRIVATE_KEY_PATH}.pub")" "$title"
     fi
     __use_ssh_remote_for_dotfiles
