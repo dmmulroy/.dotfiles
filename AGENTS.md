@@ -162,7 +162,8 @@ Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
 
 Fisher owns plugins on every machine: `fish_plugins` is committed, the plugin
 files (jhillyerd/plugin-git: `conf.d/git.fish`, `functions/__git.*`, `g*.fish`)
-are gitignored, and `dot init` runs `fisher update`. Personal git abbrs go in
+are gitignored, and `dot init` and `dot update` run `fisher update`
+(`__update_fish_plugins`), restoring plugin files a pull deleted. Personal git abbrs go in
 `conf.d/git_abbreviations.fish`, never in the plugin's files.
 
 ## ANTI-PATTERNS
