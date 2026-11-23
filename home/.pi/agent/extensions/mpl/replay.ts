@@ -58,9 +58,11 @@ type FigureMethod = MethodName<Figure>;
 
 /** Public Axes methods a spec may call: matplotlib's drawing, labelling and axis API. */
 const AXES_ALLOWED = [
-	"annotate", "axhline", "axhspan", "axline", "axvline", "axvspan", "bar", "barh", "boxplot", "errorbar", "fill_between",
+	"annotate", "axhline", "axhspan", "axis", "axline", "axvline", "axvspan", "bar", "barh", "boxplot", "errorbar", "fill_between",
+	"fill_betweenx",
 	"get_title", "get_xinverted", "get_xticklabels", "get_yinverted", "get_yticklabels", "grid", "hist", "hlines", "imshow",
 	"invert_xaxis", "invert_yaxis", "labelOuter", "legend", "pie", "pie_label", "plot", "scatter", "set_anchor", "set_aspect",
+	"set_axis_off", "set_axis_on",
 	"set_box_aspect", "set_title", "set_xinverted", "set_xlabel", "set_xlim", "set_xscale", "set_xticklabels", "set_xticks",
 	"set_yinverted", "set_ylabel", "set_ylim", "set_yscale", "set_yticklabels", "set_yticks", "step", "text", "tick_params",
 	"vlines", "xaxis_inverted", "yaxis_inverted",

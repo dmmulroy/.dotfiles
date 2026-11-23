@@ -17,7 +17,7 @@ in the code (`rg "UPSTREAM\("`) and shows up as a `todo` test in `npm run check`
 
 | Ref | What | Status (as of) |
 |-----|------|----------|
-| none | | |
+| [ivarvong/mpl#108](https://github.com/ivarvong/mpl/pull/108) | Pinned to the PR head on the fork (`github:dmmulroy/mpl#54651f9`) ahead of merge: Inter Greek, `.mplstyle` `font.family` lists, `fill_between` edge/linestyle kwargs, libraqm script runs. No workarounds in the code. Merge check: `gh pr view 108 -R ivarvong/mpl --json state,mergeCommit`. When merged: re-pin to the merge commit on `ivarvong/mpl` (see Updating mpl; the fork may be deleted or force-pushed), then remove this row. If the PR changes before merge, re-pin to its new head. | open, pinned to fork (2026-11-23) |
 
 To add one: open the upstream PR, mark every workaround `UPSTREAM(<ref>)`, make the test that needs it a `todo`, and
 add a row with the merge check and the cleanup steps for when it lands.

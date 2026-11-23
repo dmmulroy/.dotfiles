@@ -159,6 +159,44 @@ test("unknown methods and kwargs are reported with the call index", () => {
 	assert.throws(() => renderChart({ calls: [unwrapped] }, outDir), /wrap all positional args in one array/);
 });
 
+test("set_xticks(ticks, labels) sets the labels, as matplotlib >= 3.5", () => {
+	const bars = ["bar", [[0, 1], [1, 2]]] as const;
+	const a = renderChart({ calls: [bars, ["set_xticks", [[0, 1], ["A", "B"]], { fontsize: 12 }]] }, outDir);
+	const b = renderChart({ calls: [bars, ["set_xticks", [[0, 1]]], ["set_xticklabels", [["A", "B"]], { fontsize: 12 }]] }, outDir);
+	const plain = renderChart({ calls: [bars, ["set_xticks", [[0, 1]]]] }, outDir);
+	assert.deepEqual(a.png, b.png);
+	assert.notDeepEqual(a.png, plain.png);
+	assert.deepEqual(renderChart({ calls: [bars, ["set_yticks", [[0, 2]], { labels: ["lo", "hi"] }]] }, outDir).png,
+		renderChart({ calls: [bars, ["set_yticks", [[0, 2]]], ["set_yticklabels", [["lo", "hi"]]]] }, outDir).png);
+	assert.throws(() => renderChart({ calls: [bars, ["set_xticks", [[0, 1]], { fontsize: 12 }]] }, outDir), /calls\[1\] set_xticks:/);
+	assert.throws(() => renderChart({ calls: [bars, ["set_xticks", [[0, 1]], { minor: true }]] }, outDir), /calls\[1\] set_xticks:.*minor/);
+});
+
+test("Catppuccin themes render Greek through the DejaVu Sans fallback and style boxplots", () => {
+	for (const theme of [MPL_DEFAULT_THEME, MPL_LIGHT_THEME]) {
+		// a missing glyph draws the same NO GLYPH box for every character, so two Greek letters would render alike
+		const mu = renderChart({ theme, calls: [["set_title", ["\u03bc"]]] }, outDir);
+		const sigma = renderChart({ theme, calls: [["set_title", ["\u03c3"]]] }, outDir);
+		assert.notDeepEqual(mu.png, sigma.png, theme);
+		// a comma list in .mplstyle font.family must stay a fallback list (mpl #108), or every text falls back to DejaVu Sans
+		const latin = renderChart({ theme, calls: [["set_title", ["Revenue"]]] }, outDir);
+		const dejavu = renderChart({ theme, rc: { "font.family": "DejaVu Sans" }, calls: [["set_title", ["Revenue"]]] }, outDir);
+		assert.notDeepEqual(latin.png, dejavu.png, `${theme} draws Latin in Inter`);
+		const box = renderChart({ theme, calls: [["boxplot", [[[1, 2, 3, 4, 9]]], { showmeans: true }]] }, outDir);
+		const black = renderChart({ theme, rc: { "boxplot.whiskerprops.color": "black" }, calls: [["boxplot", [[[1, 2, 3, 4, 9]]], { showmeans: true }]] }, outDir);
+		assert.notDeepEqual(box.png, black.png, theme);
+	}
+});
+
+test("fill_between takes step, where and interpolate; fill_betweenx and set_axis_off are callable", () => {
+	const x = [0, 1, 2, 3];
+	const plain = renderChart({ calls: [["fill_between", [x, [1, 3, 2, 4]]]] }, outDir);
+	const step = renderChart({ calls: [["fill_between", [x, [1, 3, 2, 4]], { step: "mid" }]] }, outDir);
+	assert.notDeepEqual(plain.png, step.png);
+	assert.ok(renderChart({ calls: [["fill_between", [x, [1, 3, 2, 4], 2], { where: [true, true, false, true], interpolate: true }]] }, outDir).png);
+	assert.ok(renderChart({ calls: [["fill_betweenx", [x, [1, 3, 2, 4]], { step: "pre" }], ["set_axis_off", []]] }, outDir).png);
+});
+
 test("the tool returns the PNG as an image block in structuredContent", async () => {
 	const tool = toMplRenderToolDefinition(() => outDir);
 	const result = await tool.execute("id", { calls: [["plot", [[1, 2, 3], [3, 1, 2]]]] } as never, undefined, undefined, undefined as never);

@@ -45,7 +45,7 @@ Dates:
 
 Colours: the theme can be dark or light, so never hardcode hex. Both Catppuccin themes share the cycle C0..C7 = blue, mauve, green, peach, red, teal, yellow, pink; name those slots (C4 for red/bad, C2 for green/good). Background {"$rc": "figure.facecolor"}, text {"$rc": "text.color"}, muted text {"$rc": "axes.labelcolor"}, gridline grey {"$rc": "grid.color"}.
 
-Chart types: line, step, scatter, bar/barh (bottom/left for stacks), hist, boxplot, errorbar, fill_between, imshow + fig.colorbar, pie, axhline/axvline/axhspan/axvspan, text, annotate. For shares of a whole with up to ~6 parts use pie (or a donut); with more parts, or to compare shares, use barh. For distributions use hist or boxplot; for legend placement use loc and ncols.
+Chart types: line, step, scatter, bar/barh (bottom/left for stacks), hist, boxplot, errorbar, fill_between/fill_betweenx, imshow + fig.colorbar, pie, axhline/axvline/axhspan/axvspan, text, annotate. For shares of a whole with up to ~6 parts use pie (or a donut); with more parts, or to compare shares, use barh. For distributions use hist or boxplot; for legend placement use loc and ncols.
 
 ${PIE_GUIDE}
 
@@ -53,6 +53,11 @@ Gotchas:
 - Unknown kwargs and rc keys throw, as in matplotlib; the error names the call index and the offending key.
 - Scatter legend: label a proxy ["plot", [[], [], "o"], { color: "C0", label: "name" }] rather than the scatter.
 - Text: Latin, Greek, arrows and math symbols; use ASCII for tree labels and ~ for approximations.
+- Ticks with labels: ["set_xticks", [ticks, labels], { fontsize, color, fontweight, rotation, ha }]; there are no minor ticks.
+- fill_between / fill_betweenx take where (bool mask), interpolate, and step: "pre" | "post" | "mid" (match the step() line's where) besides colour, alpha, edgecolor, linestyle and label.
+- ["set_axis_off", []] (or ["axis", ["off"]]) hides ticks, spines and grid, e.g. for annotation-only panels.
+- fig.suptitle: tight_layout leaves it no room (as in matplotlib), so end with ["fig.tight_layout", [], { rect: [0, 0, 1, 0.96] }].
+- imshow: the themes draw a y grid above images (axes.axisbelow, as in matplotlib); add ["grid", [false]] on heatmap Axes.
 - Keep each series under ~100k points.
 - fig.colorbar inside a subplot grid works with tight_layout.
 

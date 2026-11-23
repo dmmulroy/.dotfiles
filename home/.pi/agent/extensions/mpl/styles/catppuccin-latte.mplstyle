@@ -19,7 +19,8 @@ patch.edgecolor: eff1f5
 legend.labelcolor: 5c5f77
 # blue, mauve, green, peach, red, teal, yellow, pink
 axes.prop_cycle: cycler('color', ['1e66f5', '8839ef', '40a02b', 'fe640b', 'd20f39', '179299', 'df8e1d', 'ea76cb'])
-font.family: Inter
+# Inter, then DejaVu Sans for glyphs the bundled Inter subset lacks (Greek), per glyph as matplotlib's font fallback
+font.family: Inter, DejaVu Sans
 font.size: 9
 figure.figsize: 7.2, 4.2
 axes.spines.top: False
@@ -54,3 +55,14 @@ legend.fontsize: 8.5
 legend.handlelength: 1.4
 legend.handletextpad: 0.6
 legend.columnspacing: 1.4
+# boxplot: matplotlib's defaults are black (invisible on dark themes); muted lines, red median
+boxplot.boxprops.color: 6c6f85
+boxplot.whiskerprops.color: 6c6f85
+boxplot.capprops.color: 6c6f85
+boxplot.flierprops.color: 6c6f85
+boxplot.flierprops.markeredgecolor: 6c6f85
+boxplot.medianprops.color: d20f39
+boxplot.medianprops.linewidth: 1.6
+boxplot.meanprops.color: d20f39
+boxplot.meanprops.markerfacecolor: d20f39
+boxplot.meanprops.markeredgecolor: d20f39
