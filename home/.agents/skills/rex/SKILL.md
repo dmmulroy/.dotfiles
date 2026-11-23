@@ -3,6 +3,7 @@ name: rex
 description: Use the rex CLI to manage Rex sessions, open tabs, arrange panes, run commands, inspect terminal output, and control connected Rex apps.
 metadata:
   rex-stub: "2"
+disable-model-invocation: true
 ---
 <!-- Installed by "rex skill setup". Remove it with "rex skill remove". -->
 

@@ -21,6 +21,7 @@ npm workspace for pi agent extensions. TypeScript, ESM-only.
 │       ├── pi-cloak/             # Secret cloaking extension
 │       ├── mpl/                  # Codemode tool mpl_render: matplotlib-style charts (github:ivarvong/mpl), Catppuccin Macchiato default
 │       ├── git-interceptor.ts    # Standalone: git command interception
+│       ├── rex-transfer.ts       # Standalone: pi half of Rex's "Transfer pi Session to Host…" (sidecar per pane, /transfer)
 │       ├── whimsical.ts          # Standalone: whimsical diagram integration
 │       └── web-tools.json        # Helium browser profile config
 ```

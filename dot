@@ -260,6 +260,7 @@ TOOL_REGISTRY=(
     "Scroll Reverser   ;; -    ;; fn:__setup_scroll_reverser  ;; false ;; -         ;; false ;; darwin"
     "Vite+             ;; vp   ;; fn:__install_vite_plus      ;; true  ;; -         ;; true  ;; all"
     "pi                ;; pi   ;; fn:__install_pi             ;; true  ;; -         ;; true  ;; all"
+    "pi extensions     ;; -    ;; fn:__install_pi_extension_deps ;; false ;; -      ;; false ;; all"
     "Claude Code       ;; claude ;; fn:__install_claude_code  ;; false ;; -         ;; true  ;; all"
     "pi-claude-cli     ;; -    ;; fn:__install_pi_claude_cli  ;; false ;; -         ;; false ;; all"
     "SSH key           ;; -    ;; fn:__generate_ssh_key       ;; false ;; SKIP_SSH  ;; false ;; all"
@@ -843,6 +844,45 @@ __install_pi() {
         __print_success "pi installed successfully"
     else
         __print_error "Failed to install pi"
+        return 1
+    fi
+}
+
+# npm dependencies of the local pi extensions (home/.pi is an npm workspace).
+# Without them pi fails at startup: "Cannot find module 'mpl'" / 'effect'.
+# Reinstalls only when package-lock.json changed since the last install.
+__install_pi_extension_deps() {
+    local workspace="${DOTFILES_DIR}/home/.pi"
+    local lockfile="${workspace}/package-lock.json"
+    local stamp="${workspace}/node_modules/.dot-package-lock.cksum"
+    if [[ ! -f "$lockfile" ]]; then
+        __print_warning "No ${lockfile}; skipping pi extension dependencies"
+        return 0
+    fi
+    if ! __command_exists npm; then
+        __print_error "npm not found (Vite+ provides it); can't install pi extension dependencies"
+        return 1
+    fi
+
+    local lock_cksum
+    lock_cksum="$(cksum < "$lockfile")"
+    if [[ -f "$stamp" && "$(cat "$stamp")" == "$lock_cksum" ]]; then
+        __print_success "pi extension dependencies are up to date"
+        return 0
+    fi
+
+    __print_info "Installing pi extension dependencies..."
+    # The lockfile pins github dependencies (mpl) as git+ssh. They are public, so
+    # fetch over https: a new machine has no GitHub SSH key yet during `dot init`.
+    if (cd "$workspace" &&
+        GIT_CONFIG_COUNT=2 \
+        GIT_CONFIG_KEY_0="url.https://github.com/.insteadOf" GIT_CONFIG_VALUE_0="ssh://git@github.com/" \
+        GIT_CONFIG_KEY_1="url.https://github.com/.insteadOf" GIT_CONFIG_VALUE_1="git@github.com:" \
+        npm ci --no-audit --no-fund </dev/null); then
+        printf '%s\n' "$lock_cksum" > "$stamp"
+        __print_success "pi extension dependencies installed"
+    else
+        __print_error "Failed to install pi extension dependencies (pi will not start until they are)"
         return 1
     fi
 }
@@ -1705,6 +1745,8 @@ cmd_update() {
         __export_rex_runtime_dir
         __reload_rex_config || __print_warning "Rex config reload failed; continuing"
     fi
+
+    __install_pi_extension_deps || __print_warning "pi extension dependencies failed; continuing"
 
     # Update pi and its configured packages.
     if __command_exists pi; then

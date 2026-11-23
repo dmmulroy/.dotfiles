@@ -71,7 +71,8 @@ are doing it, keep it short):
 | Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Herdr + Rex backends) |
 | Starship prompt | `home/.config/starship.toml` |
 | Agent skill | `home/.agents/skills/<name>/SKILL.md` |
-| Pi extension | `home/.pi/agent/extensions/<name>/` |
+| Pi extension | `home/.pi/agent/extensions/<name>/` (npm deps: `__install_pi_extension_deps` in `dot`, run by init/update) |
+| Move a pi session to another Rex host | `home/.config/rex/dmmulroy/transfer_pi_session/` (README.md) + `home/.pi/agent/extensions/rex-transfer.ts` |
 | Pi settings | `home/.pi/agent/settings.json` |
 | Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
 

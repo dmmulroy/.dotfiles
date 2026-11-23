@@ -16,6 +16,9 @@ rex/
 │   ├── resize_mode.lua       # resize/* mode binds
 │   ├── smart_splits.lua      # ctrl+h/j/k/l, Neovim-aware (pairs with nvim smart-splits.lua)
 │   ├── import_theme.lua      # import_catppuccin_macchiato action
+│   ├── transfer_pi_session/  # "Transfer pi Session to Host…": init.lua (action), run.lua (`rex do`
+│   │                         #   worker), ports/ (Rex, pi, ssh, git), tests/. Read its README.md first.
+│   │                         #   Pairs with home/.pi/agent/extensions/rex-transfer.ts
 │   └── twitch_chat/          # init.lua (palette action), shared.lua, follow.lua (`rex do` script)
 │                             #   panes run twitch-lua, the rock `dot` installs into
 │                             #   ~/.local/share/rex/rocks (TWITCH_LUA_DIR: a checkout instead;
@@ -56,6 +59,15 @@ rex config check && rex config reload && rex keymap
 ```
 
 `dot update` runs check + reload after re-stowing.
+
+After editing `transfer_pi_session/`, also run its tests (no host is contacted):
+
+```bash
+rex do ~/.config/rex/dmmulroy/transfer_pi_session/tests/run.lua
+```
+
+`transfer_pi_session/tests/e2e.sh <host>` does a real transfer of a throwaway
+repo; run it after changing anything in `ports/`.
 
 ## ANTI-PATTERNS
 
