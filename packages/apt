@@ -1,6 +1,6 @@
 # Debian/Ubuntu packages installed by `dot init` (one per line).
 # Not packaged (or too old) here; `dot` installs them upstream instead:
-# neovim (GitHub release), starship, herdr, fisher.
+# neovim and tree-sitter CLI (GitHub releases), starship, herdr, fisher.
 # Debian renames: fd-find installs `fdfind`, lua-check installs `luacheck`.
 btop
 build-essential

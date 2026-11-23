@@ -7,7 +7,7 @@ macOS + Linux (Debian/Ubuntu, Arch) dev env via GNU Stow. Fish + Neovim + Herdr 
 
 ## PRIORITY CHECK — REX CONFIG API AUDIT (WEEKLY)
 
-**Last audit: 2026-11-16**
+**Last audit: 2026-11-23**
 
 At the start of every session, compare this date with today. If it is **7 or
 more days old**, do this audit **before** the user's task (tell the user you
@@ -94,7 +94,7 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
   (`brew`|`apt`|`pacman`, from `/etc/os-release` `ID`/`ID_LIKE`).
 - `TOOL_REGISTRY` 7th field is the OS (`all`|`darwin`|`linux`); init and doctor skip others.
 - Linux extras (`__install_linux_extras`): Neovim release (apt's is too old),
-  starship, herdr into `~/.local/bin` when the distro lacks them; Fisher is
+  tree-sitter CLI release on apt (nvim-treesitter main needs >= 0.26.1), starship, herdr into `~/.local/bin` when the distro lacks them; Fisher is
   fetched after stow in `__setup_fish_shell`.
 - Fish: guard macOS-only config with `test (uname) = Darwin` or `command -q`.
   Vite+ lives in `~/.vite-plus` on macOS, `~/.local/share/vite-plus` on Linux.

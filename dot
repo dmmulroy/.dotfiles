@@ -1083,6 +1083,38 @@ __install_neovim_release() {
     fi
 }
 
+# tree-sitter CLI from the GitHub release: nvim-treesitter (main) builds parsers
+# with it and needs >= 0.26.1, newer than Debian/Ubuntu ship.
+__install_tree_sitter_release() {
+    local minimum_minor=26
+    local current_version
+    if __command_exists tree-sitter \
+        && current_version="$(tree-sitter --version | sed -nE 's/^tree-sitter ([0-9]+\.[0-9]+).*/\1/p')" \
+        && [[ -n "$current_version" && ( "${current_version%%.*}" -gt 0 || "${current_version#*.}" -ge $minimum_minor ) ]]; then
+        __print_success "tree-sitter $current_version is already installed"
+        return 0
+    fi
+
+    local arch
+    case "$(uname -m)" in
+        x86_64|amd64) arch="x64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) __print_error "No tree-sitter release for $(uname -m)"; return 1 ;;
+    esac
+
+    local target="${HOME}/.local/bin/tree-sitter"
+    __print_info "Installing tree-sitter CLI release (linux-${arch}) to ${target}..."
+    mkdir -p "${HOME}/.local/bin"
+    if curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-linux-${arch}.gz" \
+        | gunzip > "${target}.tmp" && chmod +x "${target}.tmp" && mv "${target}.tmp" "$target"; then
+        __print_success "tree-sitter installed"
+    else
+        rm -f "${target}.tmp"
+        __print_error "Failed to install tree-sitter"
+        return 1
+    fi
+}
+
 # Install a tool from its upstream script when the distro package is missing.
 __install_linux_tool_from_script() {
     local tool_name="$1"
@@ -1107,6 +1139,9 @@ __install_linux_extras() {
     local failed=0
 
     __install_neovim_release || failed=1
+    if [[ "$DOT_PACKAGE_MANAGER" != "pacman" ]]; then
+        __install_tree_sitter_release || failed=1
+    fi
     __install_linux_tool_from_script starship \
         'curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"' || failed=1
     __install_linux_tool_from_script herdr \
