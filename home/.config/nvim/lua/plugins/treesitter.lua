@@ -43,11 +43,9 @@ return {
 		"nvim-treesitter/nvim-treesitter",
 		branch = "main",
 		lazy = false,
-		build = function()
-			local treesitter = require("nvim-treesitter")
-			treesitter.install(parser_languages):wait(300000)
-			treesitter.update(parser_languages):wait(300000)
-		end,
+		-- Installs happen in config (install_missing_parsers); installing here too
+		-- races it on first bootstrap and leaves half-written ~/.cache/nvim/tree-sitter-* dirs.
+		build = ":TSUpdate",
 		config = function()
 			require("nvim-treesitter").setup({})
 			install_missing_parsers()
