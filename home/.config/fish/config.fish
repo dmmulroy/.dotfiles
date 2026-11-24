@@ -7,8 +7,8 @@ set -gx EDITOR 'nvim'
 # Set neovim as the program to open manpages
 set -gx MANPAGER 'nvim +Man!'
 
-# Add dotfiles directory to PATH for 'dot' command
-fish_add_path ~/.dotfiles
+# Add dot (dotfiles CLI) to PATH; conf.d/paths.fish does too
+fish_add_path ~/.dotfiles/dot/bin
 
 # Rex puts its server's rex CLI first on PATH, but startup files reorder PATH.
 # Keep it first so rex matches the running server (must stay last).

@@ -9,10 +9,10 @@ Layered: `config.fish` -> `conf.d/*.fish` (auto) -> `functions/*.fish` (lazy)
 
 ```
 fish/
-├── config.fish         # Core: greeting, EDITOR, MANPAGER, dotfiles PATH
+├── config.fish         # Core: greeting, EDITOR, MANPAGER, dot/bin PATH
 ├── conf.d/             # Auto-sourced config fragments (16 files)
 │   ├── aliases.fish    # Shell aliases (c, code, pn, wr)
-│   ├── paths.fish      # PATH modifications (.dotfiles, .local/bin, ghostty)
+│   ├── paths.fish      # PATH modifications (.dotfiles/dot/bin, .local/bin, ghostty)
 │   ├── git.fish        # Git abbreviations init
 │   ├── brew.fish       # Homebrew setup
 │   ├── vite-plus.fish  # Sources Vite+ env
@@ -103,4 +103,4 @@ fish/
 - `secrets.fish` + `vault-funcs.fish` are gitignored — contain sensitive tokens
 - `fish_frozen_key_bindings.fish` exists in conf.d — prevents fish from re-generating bindings
 - `catppuccin_macchiato_theme.fish` sets shell colors to match global theme
-- `config.fish` is minimal: greeting off, EDITOR=nvim, MANPAGER=nvim, dotfiles PATH
+- `config.fish` is minimal: greeting off, EDITOR=nvim, MANPAGER=nvim, dot/bin PATH

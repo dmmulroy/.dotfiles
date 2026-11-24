@@ -24,7 +24,7 @@ are doing it, keep it short):
    Flag renamed/removed keys we write, and new keys that map to Ghostty options.
 3. If a file/Lua API now exists: migrate `macos-defaults.conf` and the theme
    import into it, and remove `__apply_rex_app_settings`/`__import_rex_theme`
-   from `dot`. If only keys changed: update `macos-defaults.conf`.
+   from `dot/lib/components/rex.sh`. If only keys changed: update `macos-defaults.conf`.
 4. Update **Last audit** above to today's date (even if nothing changed) and
    mention the result to the user.
 
@@ -32,7 +32,7 @@ are doing it, keep it short):
 
 ```
 .dotfiles/
-├── dot                 # CLI: init/update/doctor/stow/package (2500 lines bash)
+├── dot/                # CLI (dot/README.md): bin/dot, lib/components/<name>.sh, commands/, tests/
 ├── home/.config/       # Stowed to ~/.config/
 │   ├── fish/           # Shell (AGENTS.md)
 │   ├── nvim/           # Editor (AGENTS.md)
@@ -58,6 +58,7 @@ are doing it, keep it short):
 
 | Task | Location |
 |------|----------|
+| Something dot installs/updates (tool, app, setting) | New component: `dot/lib/components/<name>.sh` + `DOT_COMPONENT_ORDER` in `dot/lib/component-registry.sh` (dot/README.md); test with `dot/tests/run-tests` |
 | Add package | `dot package add <name>` (edits `packages/bundle` on macOS, `packages/apt`/`pacman` on Linux) |
 | Shell alias/abbr | `home/.config/fish/conf.d/aliases.fish` |
 | Shell function | `home/.config/fish/functions/` |
@@ -66,12 +67,12 @@ are doing it, keep it short):
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
 | Herdr config | `home/.config/herdr/config.toml` |
 | Rex config | `home/.config/rex/dmmulroy/` (`init.lua` bootstraps; keys in `keymaps.lua`; then `rex config check && rex config reload`) |
-| Rex config Lua rocks (twitch-lua) | `REX_LUA_ROCKS` in `dot` (`__install_rex_lua_rocks`, run by init/update): `luarocks --lua-version 5.1 --tree ~/.local/share/rex/rocks`; the config reads that tree (`twitch_chat/shared.lua`) |
+| Rex config Lua rocks (twitch-lua) | `REX_LUA_ROCKS` in `dot/lib/components/rex.sh` (`__install_rex_lua_rocks`, run by init/update): `luarocks --lua-version 5.1 --tree ~/.local/share/rex/rocks`; the config reads that tree (`twitch_chat/shared.lua`) |
 | Rex app settings (font, Option key, tabs) | `home/.config/rex/macos-defaults.conf` (`dot update` writes defaults; relaunch Rex) |
 | Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Herdr + Rex backends) |
 | Starship prompt | `home/.config/starship.toml` |
 | Agent skill | `home/.agents/skills/<name>/SKILL.md` |
-| Pi extension | `home/.pi/agent/extensions/<name>/` (npm deps: `__install_pi_extension_deps` in `dot`, run by init/update) |
+| Pi extension | `home/.pi/agent/extensions/<name>/` (npm deps: `dot/lib/components/pi_extensions.sh`, run by init/update) |
 | Move a pi session to another Rex host | `home/.config/rex/dmmulroy/transfer_pi_session/` (README.md) + `home/.pi/agent/extensions/rex-transfer.ts` |
 | Pi settings | `home/.pi/agent/settings.json` |
 | Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
@@ -92,11 +93,16 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
 `thdxr/environment` model). No per-OS stow packages.
 
 - `dot` sets `DOT_OS` (`darwin`|`linux`) and `DOT_PACKAGE_MANAGER`
-  (`brew`|`apt`|`pacman`, from `/etc/os-release` `ID`/`ID_LIKE`).
-- `TOOL_REGISTRY` 7th field is the OS (`all`|`darwin`|`linux`); init and doctor skip others.
-- Linux extras (`__install_linux_extras`): Neovim release (apt's is too old),
-  tree-sitter CLI release on apt (nvim-treesitter main needs >= 0.26.1), starship, herdr into `~/.local/bin` when the distro lacks them; Fisher is
-  fetched after stow in `__setup_fish_shell`.
+  (`brew`|`apt`|`pacman`, from `/etc/os-release` `ID`/`ID_LIKE`;
+  `dot/lib/platform-detect.sh`). Package verbs go through the adapter in
+  `dot/lib/package-manager.sh`; never branch on the OS to install a package.
+- Each component declares its OS (`__define_component <name> all|darwin|linux ...`);
+  init, update, and doctor skip the others.
+- Linux extras (`dot/lib/components/linux_extras.sh`): Neovim and tree-sitter CLI
+  at pinned releases (`NEOVIM_RELEASE_VERSION`, `TREE_SITTER_RELEASE_VERSION`;
+  apt's are too old, nvim-treesitter main needs tree-sitter >= 0.26.1), starship,
+  herdr into `~/.local/bin` when the distro lacks them; Fisher
+  (`FISHER_RELEASE_VERSION`) is fetched after stow by the fish component.
 - Fish: guard macOS-only config with `test (uname) = Darwin` or `command -q`.
   Vite+ lives in `~/.vite-plus` on macOS, `~/.local/share/vite-plus` on Linux.
 - Rex on Linux: `dot` installs the server package (`REX_LINUX_INSTALL_URL`,
@@ -153,7 +159,8 @@ Persistent dev boxes on exe.dev (Ubuntu 24.04 `exeuntu` image, user `exedev`).
   `IdentitiesOnly yes` (exe.dev picks the account by key), and exe.dev's host
   key (https://exe.dev/docs/faq/host-key).
 - Test without a VM: Ubuntu 24.04 container, `exedev` user with NOPASSWD sudo.
-  `source dot` to call one function (main runs only when executed).
+  `dot/tests/headless-ubuntu` runs a full `dot init --headless` + `dot doctor`
+  that way. `source dot/bin/dot` to call one function (nothing runs when sourced).
 - Model logins are manual and stay on the VM's disk (no proxy/gateway):
   `claude auth login` (Claude subscription via pi-claude-cli, which `dot init`
   installs with Claude Code), then `/login` in pi for ChatGPT/Codex.
@@ -188,13 +195,15 @@ Canonical skills live in `home/.agents/skills/<name>/` and stow to `~/.agents/sk
 ## COMMANDS
 
 ```bash
-dot init              # Full setup (brew, stow, bun, ssh, font, fish)
-dot update            # Pull + brew update/upgrade + restow + pi update
-dot doctor            # Health check
+dot init              # Install every component (--only/--skip/--dry-run/--headless)
+dot update            # Pull, then update every component (restarts if dot/ changed)
+dot doctor            # Check every component; exit 1 on a failed required one
+dot components        # Component list: OS, required, update step
 dot stow              # Resymlink only
 dot package add X     # Add + install package
 dot benchmark-shell   # Fish startup perf
 dot gen-ssh-key       # Generate ed25519 key by email domain
+dot/tests/run-tests   # shellcheck + bats for dot (CI: .github/workflows/dot.yml)
 ```
 
 ## KEY CONFIGS

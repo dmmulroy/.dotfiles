@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Lint and unit-test dot: shellcheck on every script, then every *.bats file
+# under dot/ (tests sit next to the code they cover). CI runs this too
+# (.github/workflows/dot.yml). Needs shellcheck and bats-core (packages/bundle).
+#   dot/tests/run-tests
+set -euo pipefail
+
+dot_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$dot_root"
+
+for tool in shellcheck bats; do
+    if ! command -v "$tool" >/dev/null; then
+        echo "run-tests: ${tool} is not installed (brew install shellcheck bats-core, or apt install shellcheck bats)" >&2
+        exit 1
+    fi
+done
+
+echo "==> shellcheck"
+shellcheck -S warning bin/dot lib/*.sh lib/components/*.sh commands/*.sh tests/run-tests tests/headless-ubuntu
+echo "ok"
+
+echo "==> bats"
+bats -r .

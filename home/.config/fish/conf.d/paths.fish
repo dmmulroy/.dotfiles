@@ -1,5 +1,6 @@
 # User paths (use $HOME for portability across machines)
-fish_add_path "$HOME/.dotfiles"
+# dot (the dotfiles CLI) lives in dot/bin of the repo.
+fish_add_path "$HOME/.dotfiles/dot/bin"
 fish_add_path "$HOME/.local/bin"
 if test (uname) = Darwin
     fish_add_path "/Applications/Ghostty.app/Contents/MacOS"

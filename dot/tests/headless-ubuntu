@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Smoke test: a real `dot init --headless` in a fresh Ubuntu 24.04 container
+# as user exedev with passwordless sudo (like an exe.dev VM), then
+# `dot update --no-pull` (every update step) and `dot doctor`.
+# Uses the working tree as is, uncommitted changes included. Takes several
+# minutes and downloads a lot. Needs Docker (OrbStack works).
+#   dot/tests/headless-ubuntu [--keep]     # --keep: leave the container running
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+container_name="dot-headless-ubuntu-$$"
+keep=false
+[[ "${1:-}" == "--keep" ]] && keep=true
+
+cleanup() {
+    if [[ "$keep" == false ]]; then
+        docker rm -f "$container_name" >/dev/null 2>&1 || true
+    else
+        echo "Container kept: docker exec -it -u exedev ${container_name} bash"
+    fi
+}
+trap cleanup EXIT
+
+docker run -d --name "$container_name" -v "${repo_root}:/src:ro" ubuntu:24.04 sleep infinity >/dev/null
+
+docker exec "$container_name" bash -euc '
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq sudo git curl ca-certificates rsync >/dev/null
+    useradd -m -s /bin/bash exedev
+    echo "exedev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/exedev
+    # Copy, skipping the Mac-only and machine-local parts of the working tree.
+    rsync -a --exclude node_modules --exclude .git/hooks /src/ /home/exedev/.dotfiles/
+    chown -R exedev:exedev /home/exedev/.dotfiles
+'
+
+echo "==> dot init --headless"
+init_status=0
+docker exec -u exedev -w /home/exedev "$container_name" \
+    bash -lc 'NO_COLOR=1 ~/.dotfiles/dot/bin/dot init --headless' || init_status=$?
+
+# What a login shell would have on PATH after init.
+installed_path='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/vite-plus/bin:$PATH"'
+
+echo "==> dot update --no-pull"
+update_status=0
+docker exec -u exedev -w /home/exedev "$container_name" \
+    bash -lc "${installed_path}; NO_COLOR=1 DEBIAN_FRONTEND=noninteractive ~/.dotfiles/dot/bin/dot update --no-pull" || update_status=$?
+
+echo "==> dot doctor"
+doctor_status=0
+docker exec -u exedev -w /home/exedev "$container_name" \
+    bash -lc "${installed_path}; NO_COLOR=1 ~/.dotfiles/dot/bin/dot doctor" || doctor_status=$?
+
+echo "==> init exit ${init_status}, update exit ${update_status}, doctor exit ${doctor_status}"
+[[ $init_status -eq 0 && $update_status -eq 0 && $doctor_status -eq 0 ]]

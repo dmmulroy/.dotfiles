@@ -1,0 +1,6 @@
+# dot is split across files that share globals (DOT_OS, component metadata,
+# colors), so "assigned but unused" and "used but not assigned" are noise here.
+shell=bash
+external-sources=true
+disable=SC2034,SC2154
+source-path=SCRIPTDIR

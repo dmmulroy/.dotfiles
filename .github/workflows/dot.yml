@@ -1,0 +1,38 @@
+# dot: lint + unit tests on macOS and Ubuntu for every change to dot/, and a
+# headless `dot init` in an Ubuntu 24.04 container (like an exe.dev VM) on main.
+name: dot
+
+on:
+  push:
+    branches: [main]
+    paths: ["dot/**", "packages/**", ".github/workflows/dot.yml"]
+  pull_request:
+    paths: ["dot/**", "packages/**", ".github/workflows/dot.yml"]
+  workflow_dispatch:
+
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck and bats
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install shellcheck bats-core stow
+          else
+            sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck bats stow
+          fi
+      - run: dot/tests/run-tests
+
+  headless-ubuntu:
+    if: github.event_name != 'pull_request'
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: dot/tests/headless-ubuntu

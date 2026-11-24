@@ -7,6 +7,7 @@ tap "dmmulroy/tap"
 tap "plannotator/tap"
 
 brew "ast-grep"
+brew "bats-core"
 brew "btop"
 brew "cloc"
 brew "cmake"

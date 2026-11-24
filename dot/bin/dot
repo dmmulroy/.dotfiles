@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# dot: set up, update, and check this machine from the dotfiles repo.
+# This file only finds the repo, loads dot/lib/dot-lib.sh, and runs dot_main
+# (dot/lib/dot-main.sh). Sourcing it loads every function without running
+# anything (bats tests, the iac repo's exe.dev first boot). See dot/README.md.
+
+# Load once per shell, even when sourced again.
+if [[ -z "${DOT_LIB_LOADED:-}" ]]; then
+    # Follow symlinks (`dot link` puts one in /usr/local/bin) back to dot/bin.
+    __dot_entry_path="${BASH_SOURCE[0]}"
+    while [[ -L "$__dot_entry_path" ]]; do
+        __dot_entry_dir="$(cd -P "$(dirname "$__dot_entry_path")" && pwd)"
+        __dot_entry_path="$(readlink "$__dot_entry_path")"
+        [[ "$__dot_entry_path" == /* ]] || __dot_entry_path="${__dot_entry_dir}/${__dot_entry_path}"
+    done
+    # dot/ in the repo, and the repo itself.
+    DOT_ROOT="$(cd -P "$(dirname "$__dot_entry_path")/.." && pwd)"
+    DOTFILES_DIR="$(cd -P "${DOT_ROOT}/.." && pwd)"
+    unset __dot_entry_path __dot_entry_dir
+
+    # shellcheck source=../lib/dot-lib.sh
+    source "${DOT_ROOT}/lib/dot-lib.sh"
+    DOT_LIB_LOADED=1
+fi
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    set -euo pipefail
+    dot_main "$@"
+fi
