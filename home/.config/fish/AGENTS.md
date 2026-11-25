@@ -12,7 +12,7 @@ fish/
 ├── config.fish         # Core: greeting, EDITOR, MANPAGER, dot/bin PATH
 ├── conf.d/             # Auto-sourced config fragments (16 files)
 │   ├── aliases.fish    # Shell aliases (c, code, pn, wr)
-│   ├── paths.fish      # PATH modifications (.dotfiles/dot/bin, .local/bin, ghostty)
+│   ├── paths.fish      # PATH modifications (.dotfiles/dot/bin, .local/bin, Rex CLI)
 │   ├── git.fish        # Git abbreviations init
 │   ├── brew.fish       # Homebrew setup
 │   ├── vite-plus.fish  # Sources Vite+ env

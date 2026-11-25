@@ -21,7 +21,7 @@ are doing it, keep it short):
    `theme`, `font`).
 2. Diff the app's settings keys against `home/.config/rex/macos-defaults.conf`:
    `strings "/Applications/Rex Beta.app/Contents/MacOS/Rex" | grep '^Workspace\.' | sort -u`
-   Flag renamed/removed keys we write, and new keys that map to Ghostty options.
+   Flag renamed/removed keys we write, and new keys worth setting.
 3. If a file/Lua API now exists: migrate `macos-defaults.conf` and the theme
    import into it, and remove `__apply_rex_app_settings`/`__import_rex_theme`
    from `dot/lib/components/rex.sh`. If only keys changed: update `macos-defaults.conf`.
@@ -38,7 +38,6 @@ are doing it, keep it short):
 │   ├── nvim/           # Editor (AGENTS.md)
 │   ├── rex/            # Rex multiplexer (init.lua -> dmmulroy/)
 │   ├── git/            # Conditional work config
-│   ├── ghostty/        # Terminal
 │   ├── starship.toml   # Prompt (custom.scm, 2s timeout for Vite+)
 │   └── ripgrep/        # rg config
 ├── home/.agents/       # Shared agent skills (stowed to ~/.agents/)

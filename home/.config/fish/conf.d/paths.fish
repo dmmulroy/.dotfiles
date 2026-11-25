@@ -3,8 +3,6 @@
 fish_add_path "$HOME/.dotfiles/dot/bin"
 fish_add_path "$HOME/.local/bin"
 if test (uname) = Darwin
-    fish_add_path "/Applications/Ghostty.app/Contents/MacOS"
-
     # Rex CLI (installed by the Rex app with its server). Versions/Current follows
     # app updates. Inside Rex panes, REX_BIN_DIR (config.fish) still goes first.
     set -l rex_cli_dir "$HOME/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS"

@@ -27,7 +27,7 @@ After the first run, Fish puts `dot` on PATH (`conf.d/paths.fish` adds
 │   ├── commands/      # one file per command
 │   └── tests/         # test runner and container smoke test
 ├── home/              # configuration, stowed to ~
-│   ├── .config/       # fish, nvim, rex, git, ghostty, ...
+│   ├── .config/       # fish, nvim, rex, git, ...
 │   ├── .agents/       # shared agent skills
 │   └── .pi/           # pi agent extensions and settings
 ├── packages/
