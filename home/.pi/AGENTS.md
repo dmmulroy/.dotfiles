@@ -83,6 +83,6 @@ Most of `agent/` is gitignored by default. Tracked files are explicitly un-ignor
 ## NOTES
 
 - Pi Web Tools is installed from `git:github.com/dmmulroy/pi-web-tools`; `web-tools.json` is only Helium browser profile config
-- private-gateway supports native pi `/login` + importing existing OpenCode auth
+- private-gateway logs in with native pi `/login` (it speaks the gateway's OpenCode-compatible discovery protocol, but never imports OpenCode credentials)
 - Treat model IDs supplied through local `private-gateway` overlays as private information: never expose them in version-controlled content.
 - pi-skill-toggle has a full UI layer (overlay, render, view-model)

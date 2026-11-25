@@ -7,7 +7,7 @@ USAGE:
     ${SCRIPT_NAME} update [--only LIST] [--skip LIST] [--dry-run] [--no-pull]
 
 Pull the dotfiles repo, then update every component in order: packages,
-stowed config, Bun, Vite+ and Node.js, Herdr plugins, Rex, pi and its
+stowed config, Bun, Vite+ and Node.js, Rex, pi and its
 packages, Claude Code, Fish plugins, and the rest ('${SCRIPT_NAME} components').
 When the pull changes dot/ itself, dot restarts with the new version first.
 

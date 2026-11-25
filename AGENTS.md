@@ -3,7 +3,7 @@
 **Generated:** 2026-05-09T00:00:00Z
 **Commit:** 871ce6f
 
-macOS + Linux (Debian/Ubuntu, Arch) dev env via GNU Stow. Fish + Neovim + Herdr + Git + pi.
+macOS + Linux (Debian/Ubuntu, Arch) dev env via GNU Stow. Fish + Neovim + Rex + Git + pi.
 
 ## PRIORITY CHECK — REX CONFIG API AUDIT (WEEKLY)
 
@@ -36,7 +36,6 @@ are doing it, keep it short):
 ├── home/.config/       # Stowed to ~/.config/
 │   ├── fish/           # Shell (AGENTS.md)
 │   ├── nvim/           # Editor (AGENTS.md)
-│   ├── herdr/          # Terminal-native workspace/tab/pane manager
 │   ├── rex/            # Rex multiplexer (init.lua -> dmmulroy/)
 │   ├── git/            # Conditional work config
 │   ├── ghostty/        # Terminal
@@ -65,14 +64,13 @@ are doing it, keep it short):
 | Git alias | `home/.config/git/config` [alias] section |
 | Neovim plugin | `home/.config/nvim/lua/plugins/<name>.lua` |
 | Neovim keymap | `home/.config/nvim/lua/dmmulroy/keymaps.lua` |
-| Herdr config | `home/.config/herdr/config.toml` |
 | Rex config | `home/.config/rex/dmmulroy/` (`init.lua` bootstraps; keys in `keymaps.lua`; then `rex config check && rex config reload`) |
 | Rex config Lua rocks (twitch-lua) | `REX_LUA_ROCKS` in `dot/lib/components/rex.sh` (`__install_rex_lua_rocks`, run by init/update): `luarocks --lua-version 5.1 --tree ~/.local/share/rex/rocks`; the config reads that tree (`twitch_chat/shared.lua`) |
 | Rex app settings (font, Option key, tabs) | `home/.config/rex/macos-defaults.conf` (`dot update` writes defaults; relaunch Rex) |
-| Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Herdr + Rex backends) |
+| Vim/mux pane navigation | `home/.config/nvim/lua/plugins/smart-splits.lua` (Rex backend) |
 | Starship prompt | `home/.config/starship.toml` |
 | Agent skill | `home/.agents/skills/<name>/SKILL.md` |
-| Pi extension | `home/.pi/agent/extensions/<name>/` (npm deps: `dot/lib/components/pi_extensions.sh`, run by init/update) |
+| Pi extension | `home/.pi/agent/extensions/<name>/` (npm deps and pi-claude-cli: `dot/lib/components/pi_extensions.sh`, run by init/update) |
 | Move a pi session to another Rex host | `home/.config/rex/dmmulroy/transfer_pi_session/` (README.md) + `home/.pi/agent/extensions/rex-transfer.ts` |
 | Pi settings | `home/.pi/agent/settings.json` |
 | Work git identity | Auto via `home/.config/git/work_config` for `~/Code/work/` |
@@ -100,8 +98,8 @@ One stow tree for every OS; differences are runtime checks only (Dax Raad's
   init, update, and doctor skip the others.
 - Linux extras (`dot/lib/components/linux_extras.sh`): Neovim and tree-sitter CLI
   at pinned releases (`NEOVIM_RELEASE_VERSION`, `TREE_SITTER_RELEASE_VERSION`;
-  apt's are too old, nvim-treesitter main needs tree-sitter >= 0.26.1), starship,
-  herdr into `~/.local/bin` when the distro lacks them; Fisher
+  apt's are too old, nvim-treesitter main needs tree-sitter >= 0.26.1), starship
+  into `~/.local/bin` when the distro lacks it; Fisher
   (`FISHER_RELEASE_VERSION`) is fetched after stow by the fish component.
 - Fish: guard macOS-only config with `test (uname) = Darwin` or `command -q`.
   Vite+ lives in `~/.vite-plus` on macOS, `~/.local/share/vite-plus` on Linux.
@@ -212,17 +210,15 @@ dot/tests/run-tests   # shellcheck + bats for dot (CI: .github/workflows/dot.yml
 |------|-------|-------|
 | Fish | `config.fish` | Sources `conf.d/`, sets EDITOR/MANPAGER |
 | Neovim | `init.lua` | 1 line: `require("dmmulroy")` |
-| Herdr | `config.toml` | Prefix `C-;`, workspaces/tabs/panes |
-| Rex | `init.lua` -> `dmmulroy/` | Same `C-;` prefix as `ctrl+;>` sequences; app updated by `dot` from Sparkle appcast (not Homebrew); Linux gets the server via pkgs.superlogical.com |
+| Rex | `init.lua` -> `dmmulroy/` | Prefix `C-;` (`ctrl+;>` sequences); app updated by `dot` from Sparkle appcast (not Homebrew); Linux gets the server via pkgs.superlogical.com |
 | Git | `config` | SSH signing, `pull.rebase`, conditional include |
 | Starship | `starship.toml` | 2s timeout (Vite+ shims), custom.scm after dir |
 | Pi | `settings.json` | Private gateway provider, Catppuccin theme |
 
 ## UNIQUE STYLES
 
-- herdr prefix: `C-;`
-- herdr splits: `\` split right, `Enter` split down
-- herdr pane navigation: direct `C-h/j/k/l`
+- Rex prefix: `C-;`
+- pane navigation: direct `C-h/j/k/l` (Neovim + Rex via smart-splits)
 - nvim: `jj`/`JJ` exit insert, `H`/`L` line start/end
 - nvim completion: blink.cmp (not nvim-cmp), LSP source score_offset=1000
 - git: `fomo` = fetch origin main + rebase

@@ -37,7 +37,6 @@ tmp/
 home/.agents/skills/ui/
 home/.agents/skills/account-id-tags/
 
-
 # Python
 __pycache__/
 *.pyc
@@ -48,18 +47,6 @@ __pycache__/
 # Plannotator runtime/state (keep config tracked)
 home/.plannotator/*
 !home/.plannotator/config.json
-
-# Herdr runtime/state (installed plugin sources are tracked in plugins.txt)
-home/.config/herdr/*.log
-home/.config/herdr/session-history.json
-home/.config/herdr/session.json
-home/.config/herdr/release-notes.json
-home/.config/herdr/plugins.json
-home/.config/herdr/plugins/
-home/.config/herdr/.plugins.lock
-home/.config/herdr/session-snapshots/
-home/.config/herdr/*.sock
-home/.config/herdr/*.sock.*
 
 # jj per-repo configs
 home/.config/jj/repos/
@@ -79,7 +66,6 @@ home/.local/share/pi/mcp-auth.json
 
 # pi extensions node_modules
 home/.pi/agent/extensions/**/node_modules/
-
 
 !home/.pi/agent/tsconfig.json
 !home/.pi/agent/package.json

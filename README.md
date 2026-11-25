@@ -1,7 +1,7 @@
 # Dotfiles
 
 My development environment for macOS and Linux (Debian/Ubuntu via apt, Arch
-via pacman): Fish, Neovim, Herdr, Rex, Git, and pi, managed by a small CLI
+via pacman): Fish, Neovim, Rex, Git, and pi, managed by a small CLI
 called `dot`.
 
 ## Quick start
@@ -27,7 +27,7 @@ After the first run, Fish puts `dot` on PATH (`conf.d/paths.fish` adds
 │   ├── commands/      # one file per command
 │   └── tests/         # test runner and container smoke test
 ├── home/              # configuration, stowed to ~
-│   ├── .config/       # fish, nvim, herdr, rex, git, ghostty, ...
+│   ├── .config/       # fish, nvim, rex, git, ghostty, ...
 │   ├── .agents/       # shared agent skills
 │   └── .pi/           # pi agent extensions and settings
 ├── packages/
@@ -48,7 +48,7 @@ install step, an update step, and a check step, and `init`, `update`, and
 | Command | What it does |
 |---------|--------------|
 | `dot init` | Install everything; safe to rerun. `--headless`, `--skip-ssh`, `--skip-font` |
-| `dot update` | `git pull`, then update every component (packages, stow, Bun, Vite+ and Node.js, Herdr plugins, Rex, pi, Claude Code, Fish plugins, ...) |
+| `dot update` | `git pull`, then update every component (packages, stow, Bun, Vite+ and Node.js, Rex, pi, Claude Code, Fish plugins, ...) |
 | `dot doctor` | Check every component; exits 1 when a required one fails |
 | `dot components` | List components: platform, required, update step |
 | `dot package add\|remove\|update\|list` | Edit the package lists and install/uninstall (brew, cask, apt, pacman) |
@@ -87,7 +87,6 @@ Package lists stay sorted; casks go in `packages/bundle`, never `bundle.work`.
 
 - **Fish**: functions, abbreviations, Fisher plugins (`fish_plugins`)
 - **Neovim**: Lua config with lazy.nvim, one plugin per file
-- **Herdr**: workspaces, tabs, panes; plugins from `home/.config/herdr/plugins.txt`
 - **Rex**: Lua config in `home/.config/rex/dmmulroy/`; app settings in `macos-defaults.conf`
 - **Git**: SSH signing, conditional work config for `~/Code/work/`
 - **pi**: extensions in `home/.pi/agent/extensions/`

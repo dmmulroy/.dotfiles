@@ -170,10 +170,6 @@ __install_package_list() {
 
     local batch_ok=false
     if __package_list_is_brewfile "$list_file"; then
-        # Homebrew 6 requires explicit trust before loading third-party tap formulae.
-        if brew help trust >/dev/null 2>&1; then
-            brew trust plannotator/tap >/dev/null || true
-        fi
         brew bundle --file="$list_file" && batch_ok=true
     else
         local names=()

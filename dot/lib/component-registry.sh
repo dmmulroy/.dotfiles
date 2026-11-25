@@ -10,17 +10,15 @@
 DOT_COMPONENT_ORDER=(
     homebrew        # macOS package manager
     packages        # packages/bundle (+ bundle.work), packages/apt, packages/pacman
-    linux_extras    # Neovim, tree-sitter, starship, herdr releases on Linux
+    linux_extras    # Neovim, tree-sitter, starship releases on Linux
     stow            # symlink home/ into ~
     bun
-    herdr_plugins
     rex
     scroll_reverser
     vite_plus       # also Node.js runtimes and npm
-    pi_extensions   # npm deps of home/.pi extensions
     pi
+    pi_extensions   # npm deps of home/.pi extensions + pi-claude-cli (needs pi)
     claude_code
-    pi_claude_cli
     ssh_key         # GitHub SSH key; moves the dotfiles remote to SSH
     tailnet_ssh     # ssh exe-dev-* over Tailscale
     font            # MonoLisa

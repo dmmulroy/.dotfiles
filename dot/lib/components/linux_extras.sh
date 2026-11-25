@@ -1,7 +1,6 @@
 # Linux tools the distro lacks or ships too old, installed into ~/.local:
-# Neovim and tree-sitter at pinned releases, starship and herdr from their
-# install scripts. Bump the pinned versions here to upgrade them.
-__define_component linux_extras linux optional "Linux extras (Neovim, tree-sitter, starship, herdr)"
+# Neovim and tree-sitter at pinned releases, starship from its install script. Bump the pinned versions here to upgrade them.
+__define_component linux_extras linux optional "Linux extras (Neovim, tree-sitter, starship)"
 
 # Pinned so every VM gets the same build; Debian/Ubuntu's are too old for this config.
 NEOVIM_RELEASE_VERSION="v0.12.6"
@@ -24,8 +23,6 @@ component_linux_extras_install() {
     fi
     __try "starship install" __install_linux_tool_from_script starship \
         https://starship.rs/install.sh sh -y -b "$LINUX_EXTRAS_BIN_DIR" || status=1
-    __try "herdr install" __install_linux_tool_from_script herdr \
-        https://herdr.dev/install.sh sh || status=1
     return "$status"
 }
 
@@ -36,7 +33,6 @@ component_linux_extras_check() {
             "tree-sitter CLI is installed" __command_exists tree-sitter
     fi
     __doctor_check --warn "starship is installed" __command_exists starship
-    __doctor_check --warn "herdr is installed" __command_exists herdr
 }
 
 # Print the Linux release architecture name a project uses for this machine.
@@ -145,7 +141,7 @@ __install_tree_sitter_release() {
 }
 
 # Install a tool from its upstream install script when it is not on PATH:
-#   __install_linux_tool_from_script herdr https://herdr.dev/install.sh sh
+#   __install_linux_tool_from_script starship https://starship.rs/install.sh sh -y -b ~/.local/bin
 __install_linux_tool_from_script() {
     local tool_name="$1"
     shift

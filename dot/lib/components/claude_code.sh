@@ -1,4 +1,4 @@
-# Claude Code's native installer (~/.local/bin/claude). pi-claude-cli runs it
+# Claude Code's native installer (~/.local/bin/claude). pi-claude-cli (pi_extensions) runs it
 # for the Claude subscription; log in yourself afterwards: `claude auth login`.
 __define_component claude_code all optional "Claude Code"
 

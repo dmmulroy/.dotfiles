@@ -1,5 +1,4 @@
 # Arch packages installed by `dot init` (one per line).
-# Not packaged here; `dot` installs them upstream instead: herdr.
 ast-grep
 base-devel
 btop

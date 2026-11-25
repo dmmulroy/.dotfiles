@@ -1,4 +1,0 @@
-# GitHub plugin sources installed by `dot init` and refreshed by `dot update`.
-# One Herdr owner/repository[/subdirectory] source per line.
-plannotator/herdr-annotate
-paulbkim-dev/vim-herdr-navigation

@@ -19,5 +19,8 @@
   "reviewAnalysis": {
     "semanticDiff": true,
     "callFlow": true
+  },
+  "displayOptions": {
+    "inputMethod": "drag"
   }
 }
