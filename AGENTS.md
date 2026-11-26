@@ -20,7 +20,8 @@ are doing it, keep it short):
    `https://www.superlogical.com/rex/docs/search.json?q=settings` (also
    `theme`, `font`).
 2. Diff the app's settings keys against `home/.config/rex/macos-defaults.conf`:
-   `strings "/Applications/Rex Beta.app/Contents/MacOS/Rex" | grep '^Workspace\.' | sort -u`
+   `strings "$(lsappinfo info -only bundlepath -app com.superlogical.rex | cut -d'"' -f4)/Contents/MacOS/Rex" | grep '^Workspace\.' | sort -u`
+   (Rex running; the app is found by bundle ID, its name has changed before)
    Flag renamed/removed keys we write, and new keys worth setting.
 3. If a file/Lua API now exists: migrate `macos-defaults.conf` and the theme
    import into it, and remove `__apply_rex_app_settings`/`__import_rex_theme`
@@ -83,6 +84,7 @@ are doing it, keep it short):
 - Private helpers: prefix `__` (e.g., `__git.default_branch`)
 - Pi extensions: TypeScript, npm workspaces under `home/.pi/`
 - Agent skills: Markdown-first (`SKILL.md`) under `home/.agents/skills/`, stowed to `~/.agents/skills/`
+- Bugs found along the way: fix them without asking (with a test when `dot/` is involved), then tell the user what was fixed
 
 ## CROSS-PLATFORM (macOS + Linux)
 

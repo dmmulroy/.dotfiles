@@ -27,4 +27,6 @@ __detect_platform() {
     fi
 }
 
-__detect_platform
+# Pass the defaults explicitly: shellcheck 0.9 (Ubuntu/Debian apt) flags SC2120
+# when a function reads arguments that no call passes.
+__detect_platform "$(uname -s)" /etc/os-release

@@ -5,12 +5,19 @@
 # and the agent skill + hooks.
 __define_component rex all optional "Rex"
 
-REX_APP_PATH="/Applications/Rex Beta.app"
-REX_APPCAST_URL="https://blob.superlogical.com/public/rex-app/preview/appcast.xml"
+# The app is found by bundle ID, never by name: it has shipped as "Rex Beta.app"
+# and "Rex.app", and a user may rename it. Fresh installs go to the first
+# REX_APP_DIRS entry under the name the disk image uses.
+REX_BUNDLE_ID="com.superlogical.rex"
+REX_APP_DIRS=("/Applications" "${HOME}/Applications")
+# Updates follow the installed app's own Sparkle feed (SUFeedURL), as Sparkle
+# does. Without an app: ${REX_APPCAST_BASE_URL}/${REX_APPCAST_CHANNEL}-<arch>/appcast.xml.
+REX_APPCAST_BASE_URL="https://blob.superlogical.com/public/rex-app"
+REX_APPCAST_CHANNEL="preview"
 REX_TEAM_ID="AG92C3PT77"
 REX_BUNDLED_CLI="${HOME}/Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS/rex"
 # Rex app settings (fonts, keyboard, tabs) live in macOS defaults, not init.lua.
-REX_DEFAULTS_DOMAIN="com.superlogical.rex"
+REX_DEFAULTS_DOMAIN="$REX_BUNDLE_ID"
 REX_APP_SETTINGS_FILE="${HOME_DIR}/.config/rex/macos-defaults.conf"
 REX_THEME_NAME="catppuccin-macchiato"
 REX_THEME_IMPORT_ACTION="import_catppuccin_macchiato"
@@ -69,7 +76,9 @@ component_rex_check() {
         __doctor_check --warn --hint "run: rex server install" "Rex server is installed (rex.socket)" \
             systemctl --user is-enabled rex.socket
     else
-        __doctor_check --warn --hint "run: ${SCRIPT_NAME} init --only rex" "Rex is installed" test -d "$REX_APP_PATH"
+        __doctor_check --warn --hint "run: ${SCRIPT_NAME} init --only rex" "Rex is installed" __rex_app_path
+        __doctor_check --warn --hint "remove the extra copies dot does not update (see: ${SCRIPT_NAME} update --only rex)" \
+            "Only one Rex app is installed" __rex_single_app
         if __command_exists luarocks; then
             local rock
             for rock in "${REX_LUA_ROCKS[@]}"; do
@@ -108,14 +117,93 @@ __rex_cli() {
     fi
 }
 
-__rex_installed_build() {
-    defaults read "${REX_APP_PATH}/Contents/Info" CFBundleVersion 2>/dev/null
+# Print one Info.plist value of an app bundle.
+__rex_app_info() {
+    local app="$1" key="$2"
+    defaults read "${app}/Contents/Info" "$key" 2>/dev/null
 }
 
-# Print "<build> <dmg-url>" for the newest appcast entry.
+# Print every installed Rex app bundle in REX_APP_DIRS, one per line.
+__rex_app_bundles() {
+    local dir app
+    for dir in "${REX_APP_DIRS[@]}"; do
+        for app in "$dir"/*.app; do
+            [[ -d "$app" ]] || continue
+            if [[ "$(__rex_app_info "$app" CFBundleIdentifier)" == "$REX_BUNDLE_ID" ]]; then
+                echo "$app"
+            fi
+        done
+    done
+}
+
+# Print the bundle path of the running Rex app; fail when it is not running.
+# Asks Launch Services by bundle ID, then falls back to pgrep per bundle.
+__rex_running_app() {
+    local app
+    app="$(lsappinfo info -only bundlepath -app "$REX_BUNDLE_ID" 2>/dev/null \
+        | sed -n 's/^"LSBundlePath"="\(.*\)"$/\1/p')" || true
+    if [[ -n "$app" && -d "$app" ]]; then
+        echo "$app"
+        return 0
+    fi
+    while IFS= read -r app; do
+        if pgrep -qf "${app}/Contents/MacOS/"; then
+            echo "$app"
+            return 0
+        fi
+    done < <(__rex_app_bundles)
+    return 1
+}
+
+# Print the Rex app dot manages: the running one, else the installed copy with
+# the highest build. Fails when Rex is not installed.
+__rex_app_path() {
+    if __rex_running_app; then
+        return 0
+    fi
+    local app build best="" best_build=-1
+    while IFS= read -r app; do
+        build="$(__rex_app_info "$app" CFBundleVersion)"
+        [[ "$build" =~ ^[0-9]+$ ]] || build=0
+        if (( build > best_build )); then
+            best="$app"
+            best_build="$build"
+        fi
+    done < <(__rex_app_bundles)
+    [[ -n "$best" ]] && echo "$best"
+}
+
+# True unless more than one Rex app is installed.
+__rex_single_app() {
+    (( $(__rex_app_bundles | grep -c .) <= 1 ))
+}
+
+# Warn about Rex copies other than the managed one: dot and Sparkle never
+# update them, and Launch Services may open them instead.
+__warn_extra_rex_apps() {
+    local managed="$1" app
+    while IFS= read -r app; do
+        [[ "$app" == "$managed" ]] && continue
+        __print_warning "Extra Rex app at ${app} is not updated; remove it: rm -rf \"${app}\""
+    done < <(__rex_app_bundles)
+}
+
+# Print the appcast URL: the installed app's own feed, else the default
+# channel for this Mac's architecture.
+__rex_appcast_url() {
+    local app="${1:-}" feed=""
+    [[ -n "$app" ]] && feed="$(__rex_app_info "$app" SUFeedURL)"
+    if [[ "$feed" == https://* ]]; then
+        echo "$feed"
+    else
+        echo "${REX_APPCAST_BASE_URL}/${REX_APPCAST_CHANNEL}-$(uname -m)/appcast.xml"
+    fi
+}
+
+# Print "<build> <dmg-url>" for the newest entry of an appcast.
 __rex_latest_release() {
-    local appcast
-    appcast="$(__download_url "$REX_APPCAST_URL" -)" || return 1
+    local appcast_url="$1" appcast
+    appcast="$(__download_url "$appcast_url" -)" || return 1
     awk '
         /<sparkle:version>/ { gsub(/.*<sparkle:version>|<\/sparkle:version>.*/, ""); build = $0 }
         /<enclosure / && build != "" {
@@ -130,8 +218,10 @@ __rex_latest_release() {
 
 # Install Rex from a DMG after checking its Developer ID team. Only used when
 # the app is not running; a running app updates through Sparkle instead.
+# Replaces the app at <target> when given (an update keeps the bundle where
+# it is), else installs into the first REX_APP_DIRS entry under the DMG's name.
 __install_rex_dmg() {
-    local url="$1"
+    local url="$1" target="${2:-}"
     local work mount app
     work="$(mktemp -d)" || return 1
     mount="${work}/mount"
@@ -147,39 +237,57 @@ __install_rex_dmg() {
     fi
 
     app="$(find "$mount" -maxdepth 1 -name '*.app' -print -quit)"
+    [[ -z "$target" && -n "$app" ]] && target="${REX_APP_DIRS[0]}/${app##*/}"
     local status=1
     if [[ -z "$app" ]]; then
         __print_error "No app found in the Rex disk image"
+    elif [[ "$(__rex_app_info "$app" CFBundleIdentifier)" != "$REX_BUNDLE_ID" ]]; then
+        __print_error "Rex disk image holds an app that is not ${REX_BUNDLE_ID}; not installing"
     elif ! codesign --verify --deep --strict "$app" 2>/dev/null \
         || ! codesign -dv "$app" 2>&1 | grep -q "^TeamIdentifier=${REX_TEAM_ID}$"; then
         __print_error "Rex disk image failed signature verification; not installing"
-    elif ditto "$app" "${REX_APP_PATH}.new" \
-        && rm -rf "$REX_APP_PATH" \
-        && mv "${REX_APP_PATH}.new" "$REX_APP_PATH"; then
+    elif ditto "$app" "${target}.new" \
+        && rm -rf "$target" \
+        && mv "${target}.new" "$target"; then
         status=0
     fi
 
     hdiutil detach -quiet "$mount" || true
-    rm -rf "$work" "${REX_APP_PATH}.new"
+    rm -rf "$work"
+    [[ -n "$target" ]] && rm -rf "${target}.new"
     return "$status"
 }
 
 # Install Rex if missing, or update it when the appcast has a newer build.
 __update_rex_app() {
-    local release latest url installed
-    if ! release="$(__rex_latest_release)" || [[ -z "$release" ]]; then
-        __print_warning "Could not read the Rex appcast; skipping Rex update"
+    local app="" running="" installed="" appcast_url release latest url
+    if running="$(__rex_running_app)"; then
+        app="$running"
+    else
+        app="$(__rex_app_path || true)"
+    fi
+    if [[ -n "$app" ]]; then
+        installed="$(__rex_app_info "$app" CFBundleVersion || true)"
+        __warn_extra_rex_apps "$app"
+    fi
+
+    appcast_url="$(__rex_appcast_url "$app")"
+    if ! release="$(__rex_latest_release "$appcast_url")" || [[ -z "$release" ]]; then
+        __print_warning "Could not read the Rex appcast (${appcast_url}); skipping Rex update"
         return 1
     fi
     read -r latest url <<< "$release"
-    installed="$(__rex_installed_build || true)"
+    if [[ ! "$latest" =~ ^[0-9]+$ || -z "$url" ]]; then
+        __print_warning "Rex appcast (${appcast_url}) has no usable release; skipping Rex update"
+        return 1
+    fi
 
-    if [[ -n "$installed" && "$installed" -ge "$latest" ]]; then
-        __print_success "Rex is up to date (build ${installed})"
+    if [[ "$installed" =~ ^[0-9]+$ ]] && (( installed >= latest )); then
+        __print_success "Rex is up to date (build ${installed}, ${app})"
         return 0
     fi
 
-    if [[ -n "$installed" ]] && pgrep -qf "${REX_APP_PATH}/Contents/MacOS/"; then
+    if [[ -n "$running" ]]; then
         # Replacing a running app bundle is unsafe; let Sparkle do it. The app
         # relaunches, and sessions survive because they live in the server.
         __print_info "Rex build ${latest} is available (installed: ${installed}); asking the app to install it..."
@@ -193,8 +301,8 @@ __update_rex_app() {
     fi
 
     __print_info "Installing Rex build ${latest}..."
-    if __install_rex_dmg "$url"; then
-        __print_success "Rex build ${latest} installed"
+    if __install_rex_dmg "$url" "$app"; then
+        __print_success "Rex build ${latest} installed ($(__rex_app_path))"
     else
         __print_error "Failed to install Rex"
         return 1
@@ -246,7 +354,7 @@ __apply_rex_app_settings() {
 
     if (( changed == 0 )); then
         __print_success "Rex app settings are up to date"
-    elif pgrep -qf "${REX_APP_PATH}/Contents/MacOS/"; then
+    elif __rex_running_app >/dev/null; then
         __print_success "Wrote ${changed} Rex app setting(s); relaunch Rex to apply them"
     else
         __print_success "Wrote ${changed} Rex app setting(s)"
@@ -270,8 +378,12 @@ __import_rex_theme() {
         return 0
     fi
     local rex_bin
-    if ! pgrep -qf "${REX_APP_PATH}/Contents/MacOS/" || ! rex_bin="$(__rex_cli)"; then
+    if ! __rex_running_app >/dev/null; then
         __print_warning "Rex is not running; launch it and rerun '${SCRIPT_NAME} update' to import the ${REX_THEME_NAME} theme"
+        return 0
+    fi
+    if ! rex_bin="$(__rex_cli)"; then
+        __print_warning "rex CLI not found; rerun '${SCRIPT_NAME} update' once Rex has installed its server to import the ${REX_THEME_NAME} theme"
         return 0
     fi
     if "$rex_bin" "do" "$REX_THEME_IMPORT_ACTION" >/dev/null 2>&1; then
