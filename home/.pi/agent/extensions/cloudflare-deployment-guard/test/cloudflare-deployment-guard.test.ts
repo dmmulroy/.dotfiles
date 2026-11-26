@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { evaluateCloudflareDeploymentCommand } from "../evaluate.ts";
 import {
-	evaluateCloudflareDeploymentCommand,
+	POLICY_FILE_PATH,
 	findsCloudflarePolicyMutation,
 	parseCloudflareDeploymentPolicy,
 	type CloudflareDeploymentPolicy,
-} from "../cloudflare-deployment-allowlist.ts";
+} from "../policy.ts";
 
 function makePolicy(
 	workers: Readonly<Record<string, readonly string[]>>,
@@ -287,7 +288,10 @@ test("fails closed for unknown and ambiguous Wrangler targets", () => {
 		"wrangler deploy --env production --env staging",
 		"wrangler deploy --config missing.json",
 		"wrangler deploy --name unknown-api",
-		"sh -c 'wrangler deploy'",
+		// Nested shells are parsed and their deployments held to the same policy.
+		"sh -c 'wrangler deploy --name unknown-api'",
+		"bash <<'EOF'\nwrangler deploy --env missing\nEOF",
+		"echo 'wrangler deploy' | sh",
 		"cd missing; wrangler deploy",
 		"cd missing || wrangler deploy",
 	];
@@ -764,8 +768,9 @@ test("bounds recursive scripts and blocks cycles, dynamic intent, and hidden she
 				a: "pnpm b",
 				b: "pnpm a",
 				"deploy:dynamic": "alchemy deploy --stage $STAGE",
-				"deploy:hidden": "sh -c 'alchemy deploy --stage prod'",
-				"deploy:ambiguous": "alchemy deploy --stage prod || echo failed",
+				"deploy:hidden": "sh -c 'cd apps/intro-kit && alchemy deploy --stage prod'",
+				"deploy:ambiguous": "cd apps/intro-kit && alchemy deploy --stage prod || echo failed",
+				"deploy:piped": "echo 'alchemy deploy --stage prod' | sh",
 				"deploy:malformed": 42,
 			},
 		}),
@@ -774,10 +779,12 @@ test("bounds recursive scripts and blocks cycles, dynamic intent, and hidden she
 		{ project: join(workspace.designSystem, "alchemy.run.ts"), stages: ["prod"] },
 	]);
 	for (const [command, reason] of [
-		["pnpm deploy:cycle", /cycle/],
-		["pnpm deploy:dynamic", /dynamic|unresolved shell variables/],
-		["pnpm deploy:hidden", /shell -c/],
-		["pnpm deploy:ambiguous", /pipelines or \|\|/],
+		["pnpm deploy:cycle", /did not reach a recognized static deployment command/],
+		["pnpm deploy:dynamic", /dynamic/],
+		// The nested shell and the || list are evaluated; the intro kit is not allowlisted.
+		["pnpm deploy:hidden", /unknown Alchemy project/],
+		["pnpm deploy:ambiguous", /unknown Alchemy project/],
+		["pnpm deploy:piped", /shell reads its script from a pipe/],
 		["pnpm deploy:malformed", /static non-empty string/],
 		["pnpm --filter one --filter two run deploy", /conflicting workspace filters/],
 	] as const) {
@@ -863,7 +870,7 @@ test("rejects malformed policy shapes with actionable errors", () => {
 
 test("detects high-confidence bash mutations of the global policy", () => {
 	const cwd = process.cwd();
-	const policyPath = join(cwd, "agent/cloudflare-deployment-allowlist.json");
+	const policyPath = POLICY_FILE_PATH;
 	for (const command of [
 		`printf '{}' > ${policyPath}`,
 		`rm -f ${policyPath}`,
